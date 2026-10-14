@@ -81,6 +81,14 @@ scripts/
 
 ## Factory branding and Login
 
+### Visual polish pass
+
+The shared UI now uses an enterprise/minimal hierarchy informed by ui-ux-pro-max: a dark neutral navigation rail, light workspace, clearer page/section headings, coordinated card/table/filter spacing, and a framed Login form. Factory primary/accent configuration remains unchanged. The search's marketing hero recommendation was rejected because it does not fit the ERP workspace; no generated design-system output was persisted.
+
+Thai typography uses a self-hosted Noto Sans Thai variable font from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/notosansthai), with the SIL Open Font License retained in `public/fonts/OFL-NotoSansThai.txt`. No font requests to a third-party service are needed at runtime. Mobile targets and reduced-motion handling are defined in shared CSS.
+
+Checks for this pass: the two focused Node test files passed **9 tests**; `git diff --check` passed. Login and Dashboard were visually reviewed at 1440×900 and 375×812, with mock entry, mobile Sheet, desktop collapse/expand and Gold branding save/restore exercised. The existing dev server at localhost:3002 was reused; the attempted second dev server at 3010 exited without replacing it. No production build, lint, typecheck, full E2E suite or real integration check ran. This is not an exhaustive accessibility or all-workflow certification.
+
 Open **ปรับแต่งโรงงาน** on Login or the sidebar. Configure factory name, short name, logo and primary color; choose a preset or a custom six-digit hex color. Saving updates Login, sidebar, topbar, navigation, buttons, focus styling and selected tabs without changing feature pages.
 
 - Defaults and presets: `src/lib/branding.ts`; the initial factory is Ionflow Factory / IF.

@@ -101,8 +101,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav
           aria-label="เมนูโรงงาน"
           className={cn(
-            "flex-1 py-6",
-            compact ? "space-y-3 px-2" : "space-y-5 px-3",
+            "flex-1 py-5",
+            compact ? "space-y-3 px-2" : "space-y-4 px-3",
           )}
         >
           {navigation.map((item) => {
@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             return (
               <div key={item.href}>
                 {!compact && (
-                  <p className="mb-2 px-3 text-[10px] font-semibold tracking-widest text-muted-foreground">
+                  <p className="mb-2 px-3 text-xs font-medium tracking-widest text-muted-foreground">
                     {item.group}
                   </p>
                 )}
@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             }
           />
           {!compact && (
-            <div className="rounded-lg border bg-surface-muted p-3">
+            <div className="factory-demo-panel rounded-lg border p-3">
               <div className="flex items-center gap-2 text-xs font-semibold">
                 <span className="size-2 rounded-full bg-warning" />
                 DEMO WORKSPACE
@@ -187,19 +187,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside
           id="factory-sidebar"
           className={cn(
-            "no-print fixed inset-y-0 left-0 hidden flex-col overflow-y-auto border-r bg-surface transition-[width] duration-200 motion-reduce:transition-none lg:flex",
-            collapsed ? "w-20" : "w-60",
+            "factory-sidebar no-print fixed inset-y-0 left-0 hidden flex-col overflow-y-auto border-r lg:flex",
+            collapsed ? "w-20" : "w-64",
           )}
         >
           {renderNavigation(collapsed)}
         </aside>
         <div
           className={cn(
-            "transition-[padding] duration-200 motion-reduce:transition-none print:pl-0",
-            collapsed ? "lg:pl-20" : "lg:pl-60",
+            "print:pl-0",
+            collapsed ? "lg:pl-20" : "lg:pl-64",
           )}
         >
-          <header className="no-print sticky top-0 z-30 flex h-20 items-center justify-between gap-3 border-b bg-surface/95 px-4 backdrop-blur sm:px-7">
+          <header className="no-print sticky top-0 z-30 flex h-18 items-center justify-between gap-3 border-b bg-surface/95 px-4 backdrop-blur sm:px-7">
             <div className="flex min-w-0 items-center gap-3">
               <Button
                 variant="ghost"
@@ -225,7 +225,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </SheetTrigger>
                 <SheetContent
                   side="left"
-                  className="flex w-72 flex-col gap-0 overflow-y-auto bg-surface p-0"
+                  className="factory-sidebar flex w-72 flex-col gap-0 overflow-y-auto p-0"
                 >
                   <SheetHeader className="sr-only">
                     <SheetTitle>เมนู {branding.factoryName}</SheetTitle>
@@ -319,7 +319,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </header>
           <main
             id="main-content"
-            className="mx-auto max-w-[1680px] space-y-6 px-4 py-7 sm:px-7 lg:px-8 lg:py-8"
+            className="factory-content mx-auto max-w-[1680px] space-y-6 px-4 py-7 sm:px-7 lg:px-8 lg:py-8"
           >
             {children}
             <footer className="no-print flex flex-wrap justify-between gap-2 pt-4 text-[10px] tracking-wide text-muted-foreground">

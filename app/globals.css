@@ -1,9 +1,21 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@font-face {
+  font-family: "Noto Sans Thai";
+  src: url("/fonts/NotoSansThai-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --background: #f4f6f8;
-  --foreground: #182b38;
+  --background: #f3f5f8;
+  --foreground: #20313f;
+  --sidebar: #172d3b;
+  --sidebar-foreground: #eef4f7;
+  --sidebar-muted: #a9bdc9;
+  --sidebar-line: #334b5b;
   --surface: #ffffff;
   --surface-muted: #f7f9fa;
   --card: var(--surface);
@@ -28,6 +40,157 @@
   --info: #296b9e;
   --destructive: var(--danger);
   --radius: 0.625rem;
+}
+
+.factory-sidebar {
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+}
+.factory-sidebar .text-muted-foreground {
+  color: var(--sidebar-muted);
+}
+.factory-sidebar nav a {
+  color: var(--sidebar-foreground);
+  min-height: 44px;
+  border-inline-start: 3px solid transparent;
+}
+.factory-sidebar nav a:hover:not([aria-current="page"]) {
+  background: var(--sidebar-line);
+}
+.factory-sidebar nav a[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-inline-start-color: var(--primary);
+}
+.factory-sidebar [data-slot="separator"] {
+  background: var(--sidebar-line);
+}
+.factory-sidebar > div.border-t,
+.factory-sidebar .factory-demo-panel {
+  border-color: var(--sidebar-line);
+}
+.factory-sidebar [data-slot="button"] {
+  color: var(--sidebar-foreground);
+}
+.factory-sidebar [data-slot="button"]:hover {
+  background: var(--sidebar-line);
+}
+.factory-sidebar a:focus-visible, .factory-sidebar button:focus-visible {
+  outline: 2px solid var(--sidebar-foreground);
+  outline-offset: 3px;
+}
+.factory-demo-panel {
+  background: var(--sidebar-line);
+}
+.factory-section,
+.factory-filter,
+.factory-table,
+.factory-metric {
+  box-shadow: 0 2px 8px rgb(20 40 60 / 3%);
+}
+.factory-page-header h1 {
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+}
+.factory-page-header nav {
+  font-size: 0.8125rem;
+}
+.factory-section [data-slot="card-description"] {
+  font-size: 0.8125rem;
+}
+.factory-metric {
+  position: relative;
+  overflow: hidden;
+}
+.factory-metric::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 3px 3px;
+}
+.factory-table th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"] {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: none;
+}
+[data-slot="button"][data-variant="default"] {
+  box-shadow: 0 2px 3px rgb(20 40 60 / 8%);
+}
+[data-slot="button"] {
+  touch-action: manipulation;
+}
+.login-showcase {
+  position: relative;
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+}
+.login-showcase::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.15;
+  background-image:
+    linear-gradient(var(--sidebar-muted) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sidebar-muted) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(transparent, black);
+}
+.login-showcase .text-muted-foreground {
+  color: var(--sidebar-muted);
+}
+.login-preview {
+  border: 1px solid var(--sidebar-line);
+  background: var(--sidebar);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 12%);
+}
+.login-form-panel {
+  background: var(--background);
+}
+.login-form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 45px rgb(20 40 60 / 5%);
+}
+@media (max-width: 639px) {
+  [data-slot="button"]:not([data-size="xs"]):not([data-size="icon-xs"]):not(
+      [data-variant="link"]
+    ) {
+    min-height: 44px;
+  }
+  [data-slot="button"][data-size^="icon"] {
+    min-width: 44px;
+  }
+  .factory-content {
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  .login-form-card {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Keep primary text readable even when the configured button color is light. */

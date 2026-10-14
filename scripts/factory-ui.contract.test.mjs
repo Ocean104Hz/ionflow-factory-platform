@@ -77,3 +77,13 @@ test("Login is a mock entry outside the factory shell and never stores credentia
   assert.match(read("app/page.tsx"), /redirect\("\/login"\)/);
   assert.match(read("app/login/page.tsx"), /<Login \/>/);
 });
+
+test("shared polish keeps local typography, mobile targets and reduced-motion support", () => {
+  const css = read("app/globals.css");
+  assert.match(css, /\/fonts\/NotoSansThai-Variable\.ttf/);
+  assert.match(css, /font-display: swap/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /min-height: 44px/);
+  assert.match(read("src/components/factory/app-shell.tsx"), /factory-sidebar/);
+  assert.match(read("src/features/login/login.tsx"), /login-form-card/);
+});

@@ -111,9 +111,12 @@ export function Dashboard() {
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c, i) => (
-          <div key={c.title} className="rounded-xl border bg-surface p-5">
+          <div
+            key={c.title}
+            className="factory-metric rounded-xl border bg-surface p-5"
+          >
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 {c.title}
               </p>
               <span className="rounded-lg bg-accent p-2 text-primary">
@@ -127,7 +130,7 @@ export function Dashboard() {
               </span>
             </p>
             <div className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
-              อ้างอิงข้อมูลสาธิตใน workspace
+              ข้อมูลจาก workspace สาธิต
             </div>
           </div>
         ))}
@@ -136,7 +139,7 @@ export function Dashboard() {
         title="ภาพรวมสถานะการผลิต"
         subtitle="จำนวนคำสั่งตามแต่ละสถานะ · ไม่นับเอกสารยกเลิก"
       >
-        <div className="grid gap-5 md:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {statuses.map((status) => {
             const count = active.filter((r) =>
               [r.material, r.approval, r.production].some(
@@ -144,12 +147,12 @@ export function Dashboard() {
               ),
             ).length;
             return (
-              <div key={status}>
+              <div key={status} className="rounded-lg bg-surface-muted p-4">
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {status}
                   </p>
-                  <strong className="text-lg tabular-nums">{count}</strong>
+                  <strong className="text-2xl tabular-nums">{count}</strong>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted">
                   <div

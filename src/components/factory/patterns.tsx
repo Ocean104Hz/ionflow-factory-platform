@@ -52,7 +52,7 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="factory-page-header space-y-4">
       <nav
         aria-label="Breadcrumb"
         className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
@@ -131,7 +131,7 @@ export function StatusBadge({
     <Badge
       variant="outline"
       className={cn(
-        "rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap",
+        "rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap",
         tones[tone ?? statusTones[children] ?? "neutral"],
       )}
     >
@@ -151,10 +151,10 @@ export function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="gap-0 overflow-hidden rounded-xl border py-0 shadow-none">
-      <CardHeader className="flex flex-col gap-3 border-b bg-surface-muted px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="factory-section gap-0 overflow-hidden rounded-xl border py-0 shadow-none">
+      <CardHeader className="flex flex-col gap-3 border-b bg-surface px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle className="text-base">
+          <CardTitle className="text-base leading-relaxed">
             <h2>{title}</h2>
           </CardTitle>
           {subtitle && (
@@ -265,7 +265,7 @@ export function FactoryDataTable<T>({
   minWidth?: number;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border bg-surface">
+    <div className="factory-table overflow-hidden rounded-xl border bg-surface">
       <div
         tabIndex={0}
         role="region"
@@ -296,7 +296,7 @@ export function FactoryDataTable<T>({
                     <TableCell
                       key={c.key}
                       className={cn(
-                        "px-4 py-4 align-top",
+                        "px-4 py-3.5 align-top",
                         c.numeric && "text-right tabular-nums",
                       )}
                     >
@@ -437,7 +437,7 @@ export function FilterBar({
         e.preventDefault();
         onApply(draft);
       }}
-      className="grid gap-4 rounded-xl border bg-surface p-5 sm:grid-cols-2 xl:grid-cols-4"
+      className="factory-filter grid gap-4 rounded-xl border bg-surface p-5 sm:grid-cols-2 xl:grid-cols-4"
     >
       <div className="space-y-2">
         <Label htmlFor={`${id}-search`}>ค้นหา</Label>

@@ -25,7 +25,7 @@ export function FactoryLogo({ compact = false }: { compact?: boolean }) {
           <strong className="block truncate text-lg tracking-tight">
             {branding.factoryName}
           </strong>
-          <span className="block truncate text-[10px] tracking-widest text-muted-foreground">
+          <span className="block truncate text-xs tracking-wider text-muted-foreground">
             {branding.shortName} · FACTORY WORKSPACE
           </span>
         </span>

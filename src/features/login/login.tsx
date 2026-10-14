@@ -33,23 +33,23 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [pending, startTransition] = useTransition();
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
-      <section className="hidden flex-col justify-between border-r bg-accent p-12 text-accent-foreground lg:flex">
+    <main className="grid min-h-dvh lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="login-showcase hidden flex-col justify-between gap-10 p-10 lg:flex xl:p-14">
         <FactoryLogo />
-        <div className="max-w-xl space-y-7">
-          <span className="inline-flex rounded-full border border-primary/20 px-3 py-1 text-xs font-medium">
-            REUSABLE FACTORY TEMPLATE
+        <div className="relative max-w-xl space-y-7">
+          <span className="inline-flex items-center gap-2 text-xs font-medium tracking-widest text-muted-foreground">
+            FACTORY OPERATIONS / WORKSPACE
           </span>
-          <h1 className="text-4xl font-semibold leading-tight">
+          <p className="text-4xl font-semibold leading-[1.4] tracking-tight">
             พื้นที่ทำงานเดียว
             <br />
             สำหรับทุกขั้นตอนของโรงงาน
-          </h1>
-          <p className="text-base leading-relaxed">
+          </p>
+          <p className="max-w-lg text-base leading-relaxed text-muted-foreground">
             {branding.factoryName} · จัดการคำสั่งผลิต การส่งสินค้า เอกสารขาย
             และราคากลาง ด้วยมาตรฐาน UI เดียวกัน
           </p>
-          <div className="grid gap-5">
+          <div className="login-preview grid gap-6 p-6">
             {[
               {
                 icon: Factory,
@@ -71,7 +71,9 @@ export function Login() {
                 <item.icon className="mt-1 size-5 shrink-0" />
                 <div>
                   <p className="font-medium">{item.title}</p>
-                  <p className="mt-1 text-sm opacity-80">{item.text}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {item.text}
+                  </p>
                 </div>
               </div>
             ))}
@@ -79,7 +81,7 @@ export function Login() {
         </div>
         <p className="text-xs">{branding.shortName} · FACTORY UI STANDARD</p>
       </section>
-      <section className="flex flex-col justify-between bg-surface p-6 sm:p-10 lg:p-12">
+      <section className="login-form-panel flex flex-col justify-between gap-5 p-5 sm:p-8 lg:p-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="lg:hidden">
             <FactoryLogo />
@@ -93,11 +95,13 @@ export function Login() {
             }
           />
         </div>
-        <div className="mx-auto w-full max-w-md py-12">
-          <span className="mb-6 inline-flex size-12 items-center justify-center rounded-xl bg-accent text-primary">
+        <div className="login-form-card mx-auto w-full max-w-lg px-2 py-6 sm:px-9 sm:py-9">
+          <span className="mb-5 inline-flex size-11 items-center justify-center rounded-xl bg-accent text-primary">
             <LockKeyhole />
           </span>
-          <h2 className="text-3xl font-semibold tracking-tight">เข้าสู่ระบบ</h2>
+          <h1 className="text-3xl font-semibold leading-relaxed tracking-tight">
+            เข้าสู่ระบบ
+          </h1>
           <p className="mt-3 break-words leading-relaxed text-muted-foreground">
             ยินดีต้อนรับสู่ {branding.factoryName}
           </p>
