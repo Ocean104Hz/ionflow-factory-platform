@@ -77,7 +77,7 @@ export function themeVariables(primary: string): Record<string, string> {
   const color = parseBranding({ primaryColor: primary }).primaryColor;
   const foreground = luminance(color) > 0.179 ? "#000000" : "#ffffff";
   const ink = luminance(color) > 0.183 ? mix(color, 0, 0.55) : color;
-  const sidebar = mix(color, 0, 0.7);
+  const sidebar = mix(color, 255, 0.98);
   return {
     "--primary": color,
     "--primary-foreground": foreground,
@@ -86,8 +86,8 @@ export function themeVariables(primary: string): Record<string, string> {
     "--accent": mix(color, 255, 0.92),
     "--accent-foreground": ink,
     "--sidebar": sidebar,
-    "--sidebar-foreground": mix(color, 255, 0.95),
-    "--sidebar-muted": mix(color, 255, 0.75),
-    "--sidebar-line": mix(sidebar, 255, 0.1),
+    "--sidebar-foreground": "#20313f",
+    "--sidebar-muted": mix(ink, 0, 0.15),
+    "--sidebar-line": mix(color, 255, 0.88),
   };
 }

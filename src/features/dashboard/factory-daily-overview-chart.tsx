@@ -65,10 +65,10 @@ export function FactoryDailyOverviewChart({
   const active = rows[hovered ?? selected];
   return (
     <SectionCard
-      title="ภาพรวมรายวัน"
-      subtitle="เปรียบเทียบคำสั่งการผลิต จำนวนสินค้า และงานผลิตเสร็จในแต่ละวัน"
+      title="ภาพรวมการผลิต"
+      subtitle="แนวโน้มคำสั่งการผลิตและสถานะงานตามช่วงเวลา"
     >
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Label htmlFor="analytics-day">
             เลือก{rows[0]?.date.length === 7 ? "เดือน" : "วัน"}เพื่อดูค่าจริง
@@ -99,7 +99,7 @@ export function FactoryDailyOverviewChart({
           {Object.entries(config).map(([key, value]) => (
             <div key={key}>
               <dt className="text-xs text-muted-foreground">{value.label}</dt>
-              <dd className="mt-1 text-xl font-semibold tabular-nums">
+              <dd className="mt-1 text-lg font-semibold tabular-nums">
                 {number(active[key as keyof typeof config])}
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                   {key === "totalQuantity" ? "หน่วย" : "รายการ"}
@@ -124,14 +124,14 @@ export function FactoryDailyOverviewChart({
         แตะกราฟเพื่อเลือก หรือใช้ตัวเลือกวันด้านบน
       </p>
       <div
-        className="overflow-x-auto rounded-lg border focus-visible:outline-2 focus-visible:outline-primary"
+        className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary"
         tabIndex={0}
         role="region"
         aria-label="กราฟเปรียบเทียบ เลื่อนแนวนอนเพื่อดูทุกวันที่"
       >
         <ChartContainer
           config={config}
-          className="h-80 w-full aspect-auto [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
+          className="h-64 w-full aspect-auto [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
           style={{ minWidth: Math.max(360, rows.length * 64 + 80) }}
         >
           <BarChart

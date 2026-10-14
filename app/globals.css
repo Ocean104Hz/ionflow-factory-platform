@@ -12,12 +12,12 @@
 }
 
 :root {
-  --background: #f3f5f8;
+  --background: #fafbfc;
   --foreground: #20313f;
-  --sidebar: #172d3b;
-  --sidebar-foreground: #eef4f7;
-  --sidebar-muted: #a9bdc9;
-  --sidebar-line: #334b5b;
+  --sidebar: color-mix(in srgb, var(--primary) 2%, white);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-muted: var(--muted-foreground);
+  --sidebar-line: var(--border);
   --surface: #ffffff;
   --surface-muted: #f7f9fa;
   --card: var(--surface);
@@ -27,7 +27,7 @@
   --primary: #176c65;
   --primary-foreground: #ffffff;
   --primary-ink: var(--primary);
-  --border: #dde5e9;
+  --border: #e5e7eb;
   --input: var(--border);
   --muted: #edf2f4;
   --muted-foreground: #5c6e7b;
@@ -42,6 +42,11 @@
   --info: #296b9e;
   --destructive: var(--danger);
   --radius: 0.625rem;
+  --chart-1: var(--primary);
+  --chart-2: var(--info);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--muted-foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
@@ -59,8 +64,8 @@
 }
 .factory-sidebar nav a {
   color: var(--sidebar-foreground);
-  min-height: 44px;
-  border-inline-start: 3px solid transparent;
+  min-height: 36px;
+  border-inline-start: 2px solid transparent;
 }
 .factory-sidebar nav a:hover:not([aria-current="page"]) {
   background: var(--sidebar-line);
@@ -95,7 +100,7 @@
 .factory-filter,
 .factory-table,
 .factory-metric {
-  box-shadow: 0 2px 8px rgb(20 40 60 / 3%);
+  box-shadow: none;
 }
 .factory-page-header h1 {
   line-height: 1.35;
@@ -110,16 +115,6 @@
 .factory-metric {
   position: relative;
   overflow: hidden;
-}
-.factory-metric::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 20px;
-  right: 20px;
-  height: 3px;
-  background: var(--primary);
-  border-radius: 0 0 3px 3px;
 }
 .factory-table th {
   color: var(--muted-foreground);
@@ -163,16 +158,16 @@
   border: 1px solid var(--sidebar-line);
   background: var(--sidebar);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgb(0 0 0 / 12%);
+  box-shadow: none;
 }
 .login-form-panel {
   background: var(--background);
 }
 .login-form-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 12px 45px rgb(20 40 60 / 5%);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: none;
 }
 @media (max-width: 639px) {
   [data-slot="button"]:not([data-size="xs"]):not([data-size="icon-xs"]):not(
@@ -212,6 +207,11 @@
 }
 
 @theme inline {
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);

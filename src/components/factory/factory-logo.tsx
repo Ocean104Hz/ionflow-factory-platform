@@ -6,7 +6,13 @@ export function FactoryLogo({ compact = false }: { compact?: boolean }) {
   const { branding } = useBranding();
   return (
     <span className="flex min-w-0 items-center gap-3">
-      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-surface text-primary">
+      <span
+        className={
+          compact
+            ? "flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface text-primary"
+            : "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface text-primary"
+        }
+      >
         {branding.logoDataUrl ? (
           <Image
             src={branding.logoDataUrl}
@@ -17,12 +23,12 @@ export function FactoryLogo({ compact = false }: { compact?: boolean }) {
             className="size-full object-contain p-1"
           />
         ) : (
-          <Factory className="size-6" />
+          <Factory className="size-5" />
         )}
       </span>
       {!compact && (
         <span className="min-w-0">
-          <strong className="block truncate text-lg tracking-tight">
+          <strong className="block truncate text-base tracking-tight">
             {branding.factoryName}
           </strong>
           <span className="block truncate text-xs tracking-wider text-muted-foreground">

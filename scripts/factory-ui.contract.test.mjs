@@ -20,8 +20,8 @@ test("factory shell includes the five module links and mobile Sheet", () => {
     "SidebarInset",
     "SidebarMenuButton",
     "SidebarTrigger",
-    "CollapsibleTrigger",
-    "CollapsibleContent",
+    "SidebarGroupLabel",
+    "Breadcrumb",
     "AvatarFallback",
   ])
     assert.ok(shell.includes(`<${primitive}`), primitive);
@@ -30,9 +30,19 @@ test("factory shell includes the five module links and mobile Sheet", () => {
     /<Sheet open=\{openMobile\}/,
   );
   assert.match(shell, /setOpenMobile\(false\)/);
-  for (const group of ["จัดซื้อ", "จ่าย", "ข้อมูลหลัก"])
-    assert.ok(shell.includes(`title: "${group}"`));
+  for (const group of [
+    "OVERVIEW",
+    "PRODUCTION",
+    "LOGISTICS",
+    "SALES DOCUMENTS",
+    "MASTER DATA",
+    "SYSTEM",
+  ])
+    assert.ok(shell.includes(group));
   assert.doesNotMatch(shell, /renderNavigation|closedGroups|<aside/);
+  assert.match(shell, /ionflow.sidebar.open/);
+  assert.match(shell, /<AppSidebar/);
+  assert.match(shell, /<SiteHeader/);
 });
 
 test("factory UI uses shared shadcn primitives instead of native control substitutes", () => {
@@ -64,6 +74,110 @@ test("production detail has the eleven sections in the required order", () => {
     matches,
     Array.from({ length: 11 }, (_, i) => i),
   );
+});
+
+test("compact filter Popover preserves fields and rejects reversed dates before applying", () => {
+  const source = read("src/components/factory/patterns.tsx");
+  for (const field of [
+    "draft.search",
+    "draft.status",
+    "draft.cancellation",
+    "draft.productType",
+    "draft.pageSize",
+    "draft[key]",
+  ])
+    assert.ok(source.includes(field), field);
+  assert.match(source, /<Popover open=\{filtersOpen\}/);
+  const body = source.match(/function apply\(\) \{([\s\S]*?)\n  \}/)?.[1];
+  assert.ok(body);
+  const apply = new Function(
+    "draft",
+    "onApply",
+    "setFilterError",
+    "setFiltersOpen",
+    body,
+  );
+  for (const [from, to, valid] of [
+    ["2026-10-01", "2026-10-14", true],
+    ["2026-10-14", "2026-10-01", false],
+    ["", "", true],
+  ]) {
+    const draft = { from, to };
+    let applied = null,
+      error = "",
+      open = false;
+    apply(
+      draft,
+      (value) => {
+        applied = value;
+      },
+      (value) => {
+        error = value;
+      },
+      (value) => {
+        open = value;
+      },
+    );
+    assert.equal(applied, valid ? draft : null);
+    assert.equal(open, !valid);
+    assert.equal(Boolean(error), !valid);
+  }
+});
+
+test("operations composition retains chart, ranking, latest orders and Appearance", () => {
+  const dashboard = read("src/features/dashboard/dashboard.tsx");
+  for (const component of [
+    "SectionCards",
+    "FactoryDailyOverviewChart",
+    "ProductionStatusOverview",
+    "TopOrderedProducts",
+    "FactoryDataTable",
+    "PeriodFilter",
+  ])
+    assert.ok(dashboard.includes(`<${component}`), component);
+  assert.ok(dashboard.includes("คำสั่งการผลิตล่าสุด"));
+  const metrics = read("src/features/dashboard/section-cards.tsx");
+  for (const component of [
+    "CardHeader",
+    "CardTitle",
+    "CardDescription",
+    "CardFooter",
+    "Badge",
+  ])
+    assert.ok(metrics.includes(`<${component}`), component);
+  const editor = read("src/components/factory/branding-editor.tsx");
+  for (const label of [
+    "ข้อมูลแบรนด์",
+    "สีธีม",
+    "ตัวอย่าง",
+    "บันทึกการปรับแต่ง",
+  ])
+    assert.ok(editor.includes(label));
+  assert.match(read("src/components/factory/app-shell.tsx"), /<BrandingEditor/);
+  assert.match(read("src/features/dashboard/period-filter.tsx"), /<Tabs /);
+});
+
+test("document and product table domain columns remain available", () => {
+  const documents = read("src/features/documents/document-list.tsx");
+  for (const column of [
+    "ลูกค้า",
+    "วันที่",
+    "จำนวนรายการ",
+    "สถานะ",
+    "อัปเดตล่าสุด",
+  ])
+    assert.ok(documents.includes(column), column);
+  const products = read("src/features/products/products.tsx");
+  for (const column of [
+    "รหัสสินค้า",
+    "ชื่อสินค้า",
+    "ประเภท",
+    "หน่วย",
+    "สถานะ",
+    "ราคาปัจจุบัน",
+    "วันที่เริ่มใช้",
+  ])
+    assert.ok(products.includes(column), column);
 });
 test("Sales Hub table preserves fourteen standard columns", () => {
   const list = read(

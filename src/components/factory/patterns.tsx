@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "../ui/breadcrumb";
+import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import {
   Empty,
@@ -61,26 +70,25 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="factory-page-header space-y-4">
-      <nav
-        aria-label="Breadcrumb"
-        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-      >
-        <Link href="/dashboard">Factory</Link>
-        <ChevronRight className="size-3" />
-        {parent && (
-          <>
-            <Link href={parent.href}>{parent.title}</Link>
-            <ChevronRight className="size-3" />
-          </>
-        )}
-        <span aria-current="page">{title}</span>
-      </nav>
+    <div className="factory-page-header space-y-2">
+      {parent && (
+        <Breadcrumb>
+          <BreadcrumbList className="text-xs">
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={parent.href}>{parent.title}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{title}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
-            {title}
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {description && (
             <p className="mt-2 max-w-2xl leading-relaxed text-muted-foreground">
               {description}
@@ -160,8 +168,8 @@ export function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="factory-section gap-0 overflow-hidden rounded-xl border py-0 shadow-none">
-      <CardHeader className="flex flex-col gap-3 border-b bg-surface px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="factory-section gap-4 overflow-hidden border py-5 shadow-none">
+      <CardHeader className="flex flex-col gap-2 px-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base leading-relaxed">
             <h2>{title}</h2>
@@ -176,7 +184,7 @@ export function SectionCard({
           <div className="no-print flex flex-wrap gap-2">{action}</div>
         )}
       </CardHeader>
-      <CardContent className="p-5">{children}</CardContent>
+      <CardContent className="px-5">{children}</CardContent>
     </Card>
   );
 }
@@ -291,7 +299,7 @@ export function FactoryDataTable<T>({
                 <TableHead
                   key={c.key}
                   className={cn(
-                    "h-12 px-4 text-xs font-semibold whitespace-nowrap",
+                    "h-10 px-4 text-xs font-medium whitespace-nowrap",
                     c.numeric && "text-right",
                   )}
                 >
@@ -308,7 +316,7 @@ export function FactoryDataTable<T>({
                     <TableCell
                       key={c.key}
                       className={cn(
-                        "px-4 py-3.5 align-top",
+                        "px-4 py-2.5 align-middle",
                         c.numeric && "text-right tabular-nums",
                       )}
                     >
@@ -441,15 +449,29 @@ export function FilterBar({
 }) {
   const id = useId();
   const [draft, setDraft] = useState<Filters>(defaultFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterError, setFilterError] = useState("");
+  function apply() {
+    // Portal fields are unmounted when closed, so retain their original date validation here.
+    if (draft.from && draft.to && draft.to < draft.from) {
+      setFilterError("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น");
+      setFiltersOpen(true);
+      return;
+    }
+    setFilterError("");
+    onApply(draft);
+    setFiltersOpen(false);
+  }
   const field = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setDraft((previous) => ({ ...previous, [key]: value }));
   return (
     <form
+      id={`${id}-filters`}
       onSubmit={(e) => {
         e.preventDefault();
-        onApply(draft);
+        apply();
       }}
-      className="factory-filter grid gap-4 rounded-xl border bg-surface p-5 sm:grid-cols-2 xl:grid-cols-4"
+      className="factory-filter grid items-end gap-3 sm:grid-cols-2 @[900px]/main:grid-cols-[minmax(160px,1fr)_170px_auto_auto]"
     >
       <div className="space-y-2">
         <Label htmlFor={`${id}-search`}>ค้นหา</Label>
@@ -470,66 +492,95 @@ export function FilterBar({
           ...statuses.map((v) => ({ value: v, label: v })),
         ]}
       />
-      {production && (
-        <SelectField
-          label="สถานะยกเลิก"
-          value={draft.cancellation}
-          onChange={(v) => field("cancellation", v)}
-          options={[
-            { value: "all", label: "ทั้งหมด" },
-            { value: "none", label: "ไม่มีคำขอยกเลิก" },
-            { value: "pending", label: "รอพิจารณา" },
-          ]}
-        />
-      )}
-      {product && (
-        <SelectField
-          label="ประเภทสินค้า"
-          value={draft.productType}
-          onChange={(v) => field("productType", v)}
-          options={[
-            { value: "all", label: "ทั้งหมด" },
-            ...["วัตถุดิบ", "สินค้าสำเร็จรูป", "บรรจุภัณฑ์"].map((v) => ({
-              value: v,
-              label: v,
-            })),
-          ]}
-        />
-      )}
-      <SelectField
-        label="จำนวนต่อหน้า"
-        value={String(draft.pageSize)}
-        onChange={(v) => field("pageSize", Number(v))}
-        options={[5, 10, 20].map((n) => ({
-          value: String(n),
-          label: `${n} รายการ`,
-        }))}
-      />
-      {!product && (
-        <>
-          {(["from", "to"] as const).map((key) => (
-            <div key={key} className="space-y-2">
-              <Label htmlFor={`${id}-${key}`}>
-                {key === "from" ? "วันที่เริ่มต้น" : "วันที่สิ้นสุด"}
-              </Label>
-              <Input
-                id={`${id}-${key}`}
-                type="date"
-                value={draft[key]}
-                min={key === "to" ? draft.from : undefined}
-                onChange={(e) => field(key, e.target.value)}
-                className="h-10"
+      <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline">
+            ตัวกรองเพิ่มเติม
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[min(400px,calc(100vw-32px))]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {production && (
+              <SelectField
+                label="สถานะยกเลิก"
+                value={draft.cancellation}
+                onChange={(v) => field("cancellation", v)}
+                options={[
+                  { value: "all", label: "ทั้งหมด" },
+                  { value: "none", label: "ไม่มีคำขอยกเลิก" },
+                  { value: "pending", label: "รอพิจารณา" },
+                ]}
               />
-            </div>
-          ))}
-        </>
-      )}
-      <div className="flex flex-wrap items-end justify-end gap-2 sm:col-span-2 xl:col-start-3">
+            )}
+            {product && (
+              <SelectField
+                label="ประเภทสินค้า"
+                value={draft.productType}
+                onChange={(v) => field("productType", v)}
+                options={[
+                  { value: "all", label: "ทั้งหมด" },
+                  ...["วัตถุดิบ", "สินค้าสำเร็จรูป", "บรรจุภัณฑ์"].map((v) => ({
+                    value: v,
+                    label: v,
+                  })),
+                ]}
+              />
+            )}
+            <SelectField
+              label="จำนวนต่อหน้า"
+              value={String(draft.pageSize)}
+              onChange={(v) => field("pageSize", Number(v))}
+              options={[5, 10, 20].map((n) => ({
+                value: String(n),
+                label: `${n} รายการ`,
+              }))}
+            />
+            {!product && (
+              <>
+                {(["from", "to"] as const).map((key) => (
+                  <div key={key} className="space-y-2">
+                    <Label htmlFor={`${id}-${key}`}>
+                      {key === "from" ? "วันที่เริ่มต้น" : "วันที่สิ้นสุด"}
+                    </Label>
+                    <Input
+                      id={`${id}-${key}`}
+                      type="date"
+                      form={`${id}-filters`}
+                      aria-invalid={!!filterError}
+                      aria-describedby={
+                        filterError ? `${id}-filter-error` : undefined
+                      }
+                      value={draft[key]}
+                      min={key === "to" ? draft.from : undefined}
+                      onChange={(e) => field(key, e.target.value)}
+                      className="h-10"
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          {filterError && (
+            <p
+              role="alert"
+              id={`${id}-filter-error`}
+              className="mt-3 text-sm text-danger"
+            >
+              {filterError}
+            </p>
+          )}
+          <Button type="button" onClick={apply} className="mt-4 w-full">
+            ใช้ตัวกรอง
+          </Button>
+        </PopoverContent>
+      </Popover>
+      <div className="flex flex-wrap items-end gap-2">
         <Button
           type="button"
           variant="outline"
           onClick={() => {
             setDraft(defaultFilters);
+            setFilterError("");
             onApply(defaultFilters);
           }}
         >

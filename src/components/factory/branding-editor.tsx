@@ -1,5 +1,9 @@
 "use client";
 import Image from "next/image";
+import { Separator } from "../ui/separator";
+import { Card, CardContent } from "../ui/card";
+import { Badge } from "../ui/badge";
+import type { CSSProperties } from "react";
 import { useId, useState, type ReactElement } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -19,6 +23,7 @@ import {
   isLogoDataUrl,
   logoFileLimit,
   themePresets,
+  themeVariables,
   type FactoryBranding,
 } from "@/src/lib/branding";
 import { useBranding } from "./branding-provider";
@@ -110,6 +115,7 @@ export function BrandingEditor({ trigger }: { trigger: ReactElement }) {
             );
           }}
         >
+          <h3 className="text-sm font-semibold">ข้อมูลแบรนด์</h3>
           <div className="space-y-2">
             <Label htmlFor={`${id}-name`}>ชื่อโรงงาน</Label>
             <Input
@@ -170,6 +176,8 @@ export function BrandingEditor({ trigger }: { trigger: ReactElement }) {
               </div>
             )}
           </div>
+          <Separator />
+          <h3 className="text-sm font-semibold">สีธีม</h3>
           <div className="space-y-2">
             <Label htmlFor={`${id}-color`}>สีหลัก</Label>
             <div className="flex gap-2">
@@ -213,6 +221,20 @@ export function BrandingEditor({ trigger }: { trigger: ReactElement }) {
                 </Button>
               ))}
             </div>
+          </div>
+          <Separator />
+          <h3 className="text-sm font-semibold">ตัวอย่าง</h3>
+          <div style={themeVariables(draft.primaryColor) as CSSProperties}>
+            <Card className="py-4 shadow-none">
+              <CardContent className="flex items-center justify-between gap-3 px-4">
+                <p className="text-sm font-medium">
+                  {draft.factoryName || defaultBranding.factoryName}
+                </p>
+                <Badge className="bg-primary text-primary-foreground">
+                  ธีมตัวอย่าง
+                </Badge>
+              </CardContent>
+            </Card>
           </div>
           <p className="text-xs text-muted-foreground">
             เก็บเฉพาะชื่อ โลโก้ และสี · ไม่เก็บรหัสผ่านหรือข้อมูลบัญชี

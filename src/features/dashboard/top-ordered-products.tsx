@@ -9,13 +9,13 @@ export function TopOrderedProducts({
   return (
     <SectionCard
       title="สินค้าสั่งผลิตสูงสุด 5 อันดับ"
-      subtitle="เรียงตามจำนวนสินค้าในช่วงที่เลือก · หน่วยสาธิตมาตรฐาน ไม่ใช่หน่วยเฉพาะโรงงาน"
+      subtitle="จำนวนสินค้าในช่วงที่เลือก · หน่วยสาธิต"
     >
       <ol className="divide-y">
         {products.map((product, index) => (
           <li
             key={product.sku}
-            className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 py-4 first:pt-0 last:pb-0 sm:gap-5"
+            className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 py-3 first:pt-0 last:pb-0 sm:gap-5"
           >
             <span className="text-sm font-semibold tabular-nums text-muted-foreground">
               {String(index + 1).padStart(2, "0")}

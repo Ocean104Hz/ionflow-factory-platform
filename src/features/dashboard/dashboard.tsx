@@ -19,7 +19,7 @@ import {
   type Column,
 } from "@/src/components/factory/patterns";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent } from "@/src/components/ui/card";
+import { SectionCards } from "./section-cards";
 import { useBranding } from "@/src/components/factory/branding-provider";
 import {
   dashboardAnalytics,
@@ -118,61 +118,49 @@ export function Dashboard() {
     <>
       <PageHeader
         title="แดชบอร์ด"
-        description="ภาพรวมการดำเนินงานของโรงงาน"
+        description={`ภาพรวมการดำเนินงานของโรงงาน · ${branding.factoryName}`}
         actions={
           <>
-            <span className="flex items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-xs text-muted-foreground">
+            <span className="sr-only">
               <CalendarDays aria-hidden="true" className="size-4" />
               {branding.factoryName} · {date(range.from)} – {date(range.to)}
             </span>
+            <PeriodFilter
+              period={period}
+              range={range}
+              anchor={demoDate}
+              onChange={(value, selectedRange) => {
+                setPeriod(value);
+                setRange(selectedRange);
+              }}
+            />
             <RefreshButton onClick={() => setRefresh((value) => value + 1)} />
           </>
         }
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((c, i) => (
-          <Card
-            key={c.title}
-            className="factory-metric rounded-xl border bg-surface py-0 shadow-none"
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {c.title}
-                </p>
-                <span className="rounded-lg bg-accent p-2 text-primary">
-                  <c.icon aria-hidden="true" className="size-4" />
-                </span>
-              </div>
-              <p className="mt-5 text-4xl font-semibold tabular-nums tracking-tight">
-                {counts[i]}
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  รายการ
-                </span>
-              </p>
-              <div className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
-                {i === 0
-                  ? "ยอด analytics สาธิตในช่วงที่เลือก"
-                  : "งานปัจจุบันใน demo workspace"}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <SectionCards
+        items={cards.map((card, index) => ({
+          ...card,
+          count: counts[index],
+          context:
+            index === 0 ? "ในช่วงเวลาที่เลือก" : "งานปัจจุบันใน demo workspace",
+          badge: ["ช่วงที่เลือก", "รอตรวจสอบ", "กำลังดำเนินการ", "พร้อมรับ"][
+            index
+          ],
+        }))}
+      />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <div className="min-w-0">
+          <FactoryDailyOverviewChart
+            key={`${range.from}:${range.to}:${period}:${refresh}`}
+            rows={analytics.rows}
+            hasData={analytics.hasData}
+          />
+        </div>
+        <div className="min-w-0">
+          <TopOrderedProducts products={analytics.topProducts} />
+        </div>
       </div>
-      <PeriodFilter
-        period={period}
-        range={range}
-        anchor={demoDate}
-        onChange={(value, selectedRange) => {
-          setPeriod(value);
-          setRange(selectedRange);
-        }}
-      />
-      <FactoryDailyOverviewChart
-        key={`${range.from}:${range.to}:${period}:${refresh}`}
-        rows={analytics.rows}
-        hasData={analytics.hasData}
-      />
       <ProductionStatusOverview
         orders={active}
         anchor={demoDate}
@@ -182,7 +170,6 @@ export function Dashboard() {
           ).length
         }
       />
-      <TopOrderedProducts products={analytics.topProducts} />
       <SectionCard
         title="คำสั่งการผลิตล่าสุด"
         subtitle="เอกสารที่อัปเดตล่าสุด"

@@ -51,12 +51,12 @@ export function ProductionStatusOverview({
     },
   ];
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[2fr_1fr]">
+    <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
       <SectionCard
         title="สถานะการผลิต"
-        subtitle="งานปัจจุบันใน demo workspace · ไม่ใช่ยอดสะสมตามช่วงเวลา · ไม่นับเอกสารยกเลิก"
+        subtitle="งานปัจจุบันใน demo workspace · ไม่รวมเอกสารยกเลิก"
       >
-        <div className="space-y-5">
+        <div className="space-y-4">
           {statuses.map((status) => (
             <div key={status.label}>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -83,12 +83,12 @@ export function ProductionStatusOverview({
         title="รายการที่ต้องดำเนินการ"
         subtitle="รายการปัจจุบันใน demo workspace"
       >
-        <div className="space-y-2">
+        <div className="space-y-0">
           {attention.map((row) => (
             <Link
               key={row.label}
               href="/production-orders"
-              className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-accent"
+              className="flex items-center justify-between gap-3 border-b py-3 last:border-0 hover:text-primary"
             >
               <span className="text-sm">{row.label}</span>
               <StatusBadge tone={row.tone}>{`${row.count} รายการ`}</StatusBadge>

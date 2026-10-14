@@ -35,158 +35,138 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [pending, startTransition] = useTransition();
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[0.95fr_1.05fr]">
-      <section className="login-showcase hidden flex-col justify-between gap-10 p-10 lg:flex xl:p-14">
+    <main className="grid min-h-dvh lg:grid-cols-2">
+      <section className="login-showcase relative hidden flex-col justify-between p-10 lg:flex">
         <FactoryLogo />
-        <div className="relative max-w-xl space-y-7">
-          <span className="inline-flex items-center gap-2 text-xs font-medium tracking-widest text-muted-foreground">
-            FACTORY OPERATIONS / WORKSPACE
-          </span>
-          <p className="text-4xl font-semibold leading-[1.4] tracking-tight">
+        <div className="relative mx-auto w-full max-w-md space-y-5">
+          <Factory aria-hidden="true" className="size-12 text-primary" />
+          <p className="text-xs tracking-widest text-muted-foreground">
+            FACTORY WORKSPACE
+          </p>
+          <h2 className="text-3xl font-semibold leading-relaxed">
             พื้นที่ทำงานเดียว
             <br />
             สำหรับทุกขั้นตอนของโรงงาน
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {branding.factoryName} · คำสั่งผลิต การส่งสินค้า
+            และเอกสารขายในมาตรฐานเดียว
           </p>
-          <p className="max-w-lg text-base leading-relaxed text-muted-foreground">
-            {branding.factoryName} · จัดการคำสั่งผลิต การส่งสินค้า เอกสารขาย
-            และราคากลาง ด้วยมาตรฐาน UI เดียวกัน
-          </p>
-          <div className="login-preview grid gap-6 p-6">
-            {[
-              {
-                icon: Factory,
-                title: "ภาพรวมการผลิต",
-                text: "ติดตามคำสั่งและสถานะใน workspace เดียว",
-              },
-              {
-                icon: ClipboardList,
-                title: "เอกสารที่เป็นมาตรฐาน",
-                text: "ฟอร์มและตารางที่ใช้ร่วมกันทุกโรงงาน",
-              },
-              {
-                icon: ShieldCheck,
-                title: "UI สาธิตเท่านั้น",
-                text: "ไม่มีการตรวจบัญชีหรือเชื่อมต่อข้อมูลจริง",
-              },
-            ].map((item) => (
-              <div key={item.title} className="flex gap-3">
-                <item.icon className="mt-1 size-5 shrink-0" />
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {item.text}
-                  </p>
-                </div>
-              </div>
+          <div className="grid grid-cols-3 gap-4 border-t border-sidebar-border pt-5">
+            {["การผลิต", "ขนส่ง", "เอกสาร"].map((label) => (
+              <p key={label} className="text-sm font-medium">
+                {label}
+              </p>
             ))}
           </div>
         </div>
-        <p className="text-xs">{branding.shortName} · FACTORY UI STANDARD</p>
+        <p className="text-xs text-muted-foreground">
+          {branding.shortName} · UI template · ข้อมูลสมมติเท่านั้น
+        </p>
       </section>
-      <section className="login-form-panel flex flex-col justify-between gap-5 p-5 sm:p-8 lg:p-10">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="lg:hidden">
+      <section className="flex min-w-0 flex-col gap-4 bg-card p-6 md:p-10">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1 lg:hidden">
             <FactoryLogo />
           </div>
           <BrandingEditor
             trigger={
               <Button variant="outline" size="sm" className="ml-auto">
-                <Palette />
+                <Palette aria-hidden="true" />
                 ปรับแต่งโรงงาน
               </Button>
             }
           />
         </div>
-        <Card className="login-form-card block gap-0 mx-auto w-full max-w-lg px-2 py-6 sm:px-9 sm:py-9">
-          <span className="mb-5 inline-flex size-11 items-center justify-center rounded-xl bg-accent text-primary">
-            <LockKeyhole />
-          </span>
-          <h1 className="text-3xl font-semibold leading-relaxed tracking-tight">
-            เข้าสู่ระบบ
-          </h1>
-          <p className="mt-3 break-words leading-relaxed text-muted-foreground">
-            ยินดีต้อนรับสู่ {branding.factoryName}
-          </p>
-          <Alert role="note" className="my-6 border-info/20 bg-info/5">
-            <AlertDescription className="text-xs leading-relaxed text-info">
-              MOCK LOGIN · ใช้ข้อมูลตัวอย่างเท่านั้น ห้ามกรอกรหัสผ่านจริง
-              ไม่มีการส่งหรือเก็บข้อมูลบัญชี
-            </AlertDescription>
-          </Alert>
-          <form
-            className="space-y-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.currentTarget.reset();
-              setShowPassword(false);
-              startTransition(() => router.push("/dashboard"));
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor={`${id}-email`}>อีเมลตัวอย่าง</Label>
-              <Input
-                id={`${id}-email`}
-                name="demo-email"
-                type="email"
-                required
-                defaultValue="demo@example.test"
-                autoComplete="off"
-                className="h-11"
-              />
+        <div className="flex flex-1 items-center justify-center py-8">
+          <Card className="login-form-card w-full max-w-sm gap-0 border-0 bg-transparent p-0 shadow-none">
+            <div className="mb-6 space-y-2">
+              <h1 className="text-2xl font-semibold">เข้าสู่ระบบ</h1>
+              <p className="text-sm text-muted-foreground">
+                ยินดีต้อนรับสู่ {branding.factoryName}
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${id}-password`}>รหัสผ่านตัวอย่าง</Label>
-              <div className="relative">
+            <Alert role="note" className="mb-6 border-info/20 bg-info/5">
+              <AlertDescription className="text-xs text-info">
+                MOCK LOGIN · ใช้ข้อมูลตัวอย่างเท่านั้น ห้ามกรอกรหัสผ่านจริง
+                ไม่มีการส่งหรือเก็บข้อมูลบัญชี
+              </AlertDescription>
+            </Alert>
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.currentTarget.reset();
+                setShowPassword(false);
+                startTransition(() => router.push("/dashboard"));
+              }}
+            >
+              <div className="space-y-2">
+                <Label htmlFor={`${id}-email`}>อีเมลตัวอย่าง</Label>
                 <Input
-                  id={`${id}-password`}
-                  name="demo-password"
-                  type={showPassword ? "text" : "password"}
+                  id={`${id}-email`}
+                  name="demo-email"
+                  type="email"
                   required
-                  defaultValue="demo-only"
+                  defaultValue="demo@example.test"
                   autoComplete="off"
-                  className="h-11 pr-12"
+                  className="h-11"
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1"
-                  aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((v) => !v)}
-                >
-                  {showPassword ? <EyeOff /> : <Eye />}
-                </Button>
               </div>
-            </div>
-            <div className="flex justify-end">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button type="button" variant="link" className="h-auto p-0">
-                    ลืมรหัสผ่าน?
+              <div className="space-y-2">
+                <Label htmlFor={`${id}-password`}>รหัสผ่านตัวอย่าง</Label>
+                <div className="relative">
+                  <Input
+                    id={`${id}-password`}
+                    name="demo-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    defaultValue="demo-only"
+                    autoComplete="off"
+                    className="h-11 pr-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1"
+                    aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? <EyeOff /> : <Eye />}
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-surface">
-                  <DialogHeader>
-                    <DialogTitle>การกู้คืนรหัสผ่าน · UI demo</DialogTitle>
-                    <DialogDescription>
-                      ไม่มีระบบบัญชีจริงใน phase นี้
-                      จึงไม่ส่งอีเมลหรือสร้างลิงก์กู้คืน
-                      ใช้ข้อมูลตัวอย่างที่ให้ไว้แล้วกดเข้าใช้งาน demo ได้ทันที
-                    </DialogDescription>
-                  </DialogHeader>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <Button type="submit" disabled={pending} className="h-11 w-full">
-              {pending ? "กำลังเปิด workspace…" : "เข้าใช้งาน Demo"}
-              <ArrowRight />
-            </Button>
-          </form>
-          <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">
-            หน้า workspace เปิดได้โดยตรง ไม่มี route guard หรือ authentication
-          </p>
-        </Card>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="link" className="h-auto p-0">
+                      ลืมรหัสผ่าน?
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-surface">
+                    <DialogHeader>
+                      <DialogTitle>การกู้คืนรหัสผ่าน · UI demo</DialogTitle>
+                      <DialogDescription>
+                        ไม่มีระบบบัญชีจริงใน phase นี้
+                        จึงไม่ส่งอีเมลหรือสร้างลิงก์กู้คืน
+                        ใช้ข้อมูลตัวอย่างที่ให้ไว้แล้วกดเข้าใช้งาน demo ได้ทันที
+                      </DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <Button type="submit" disabled={pending} className="h-11 w-full">
+                {pending ? "กำลังเปิด workspace…" : "เข้าใช้งาน Demo"}
+                <ArrowRight />
+              </Button>
+            </form>
+            <p className="mt-5 text-center text-xs text-muted-foreground">
+              หน้า workspace เปิดได้โดยตรง ไม่มี route guard หรือ authentication
+            </p>
+          </Card>
+        </div>
         <footer className="text-center text-xs text-muted-foreground">
           {branding.shortName} · Factory Template · UI only
         </footer>

@@ -1,15 +1,35 @@
 "use client";
 import { useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { SectionCard } from "@/src/components/factory/patterns";
+import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/src/components/ui/select";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/src/components/ui/popover";
 import {
   periodRange,
   validRange,
   type DateRange,
   type DashboardPeriod,
 } from "@/src/lib/mock-data/dashboard";
+const periods = [
+  ["today", "วันนี้"],
+  ["week", "7 วัน"],
+  ["month", "เดือนนี้"],
+  ["year", "ปีนี้"],
+  ["custom", "กำหนดเอง"],
+] as const;
 export function PeriodFilter({
   period,
   range,
@@ -24,95 +44,105 @@ export function PeriodFilter({
   const [custom, setCustom] = useState(false);
   const [draft, setDraft] = useState(range);
   const [error, setError] = useState("");
+  function choose(value: string) {
+    const option = periods.find(([key]) => key === value);
+    if (!option) return;
+    setError("");
+    if (option[0] === "custom") {
+      setDraft(range);
+      setCustom(true);
+    } else {
+      setCustom(false);
+      onChange(option[0], periodRange(option[0], anchor));
+    }
+  }
   return (
-    <SectionCard
-      title="ช่วงเวลาวิเคราะห์"
-      subtitle="ข้อมูลสาธิตรายวัน · วันที่ในอนาคตและนอกชุดข้อมูลแสดงเป็นศูนย์"
-    >
-      <div className="flex flex-wrap gap-2" aria-label="เลือกช่วงเวลา">
-        {(
-          [
-            ["today", "วันนี้"],
-            ["week", "7 วัน"],
-            ["month", "เดือนนี้"],
-            ["year", "ปีนี้"],
-            ["custom", "กำหนดเอง"],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            variant={
-              (custom ? value === "custom" : value === period)
-                ? "default"
-                : "outline"
-            }
-            aria-pressed={custom ? value === "custom" : value === period}
-            onClick={() => {
-              setError("");
-              setCustom(value === "custom");
-              if (value === "custom") setDraft(range);
-              else onChange(value, periodRange(value, anchor));
+    <div className="flex flex-wrap items-center gap-2">
+      <Tabs value={period} onValueChange={choose} className="hidden md:block">
+        <TabsList className="h-9">
+          {periods.map(([key, label]) => (
+            <TabsTrigger key={key} value={key} className="text-xs">
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <Select value={period} onValueChange={choose}>
+        <SelectTrigger aria-label="เลือกช่วงเวลา" className="w-36 md:hidden">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {periods.map(([key, label]) => (
+            <SelectItem key={key} value={key}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Popover
+        open={custom}
+        onOpenChange={(open) => {
+          setCustom(open);
+          if (open) {
+            setDraft(range);
+            setError("");
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="กำหนดช่วงวันที่">
+            <CalendarDays />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-[min(360px,calc(100vw-32px))]">
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!validRange(draft)) {
+                setError(
+                  "ระบุวันที่ให้ถูกต้อง โดยวันเริ่มต้นต้องไม่เกินวันสิ้นสุด",
+                );
+                return;
+              }
+              onChange("custom", draft);
+              setCustom(false);
             }}
           >
-            {label}
-          </Button>
-        ))}
-      </div>
-      {custom && (
-        <form
-          className="mt-5 grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!validRange(draft)) {
-              setError(
-                "ระบุวันที่ให้ถูกต้อง โดยวันเริ่มต้นต้องไม่เกินวันสิ้นสุด",
-              );
-              return;
-            }
-            setError("");
-            onChange("custom", draft);
-          }}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="analytics-from">วันที่เริ่มต้น</Label>
-            <Input
-              id="analytics-from"
-              type="date"
-              required
-              value={draft.from}
-              aria-invalid={!!error}
-              aria-describedby={error ? "analytics-range-error" : undefined}
-              onChange={(event) =>
-                setDraft({ ...draft, from: event.target.value })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="analytics-to">วันที่สิ้นสุด</Label>
-            <Input
-              id="analytics-to"
-              type="date"
-              required
-              value={draft.to}
-              aria-invalid={!!error}
-              aria-describedby={error ? "analytics-range-error" : undefined}
-              onChange={(event) =>
-                setDraft({ ...draft, to: event.target.value })
-              }
-            />
-          </div>
-          <Button type="submit">ใช้ช่วงเวลา</Button>
-          {error && (
-            <p
-              id="analytics-range-error"
-              role="alert"
-              className="text-sm text-danger sm:col-span-3"
-            >
-              {error}
-            </p>
-          )}
-        </form>
-      )}
-    </SectionCard>
+            <p className="text-sm font-semibold">กำหนดช่วงเวลา</p>
+            {(["from", "to"] as const).map((key) => (
+              <div className="space-y-2" key={key}>
+                <Label htmlFor={`analytics-${key}`}>
+                  {key === "from" ? "วันที่เริ่มต้น" : "วันที่สิ้นสุด"}
+                </Label>
+                <Input
+                  id={`analytics-${key}`}
+                  type="date"
+                  required
+                  value={draft[key]}
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "analytics-range-error" : undefined}
+                  onChange={(event) =>
+                    setDraft({ ...draft, [key]: event.target.value })
+                  }
+                />
+              </div>
+            ))}
+            {error && (
+              <p
+                id="analytics-range-error"
+                role="alert"
+                className="text-sm text-danger"
+              >
+                {error}
+              </p>
+            )}
+            <Button type="submit" className="w-full">
+              ใช้ช่วงเวลา
+            </Button>
+          </form>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

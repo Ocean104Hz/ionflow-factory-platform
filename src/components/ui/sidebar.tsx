@@ -184,6 +184,7 @@ function Sidebar({
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
+          id={props.id}
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
@@ -196,8 +197,8 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>เมนูโรงงาน</SheetTitle>
+            <SheetDescription>เลือกหน้าในโรงงานสาธิต</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
