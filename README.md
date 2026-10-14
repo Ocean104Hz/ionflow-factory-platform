@@ -9,13 +9,14 @@ cd "D:\Program Files\Project\ionflow-factory-platform"
 npm run dev
 ```
 
-Open the localhost URL printed by Next.js. The root redirects to `/dashboard`.
+Open the localhost URL printed by Next.js. The root redirects to `/login`.
 No environment variables, credentials, database, or authentication are required.
 
 ## Pages
 
 | Route | Implementation |
 | --- | --- |
+| /login | Branded mock Login, password visibility, mock recovery dialog, demo entry |
 | /dashboard | Summary cards, grouped statuses, recent orders, work queue |
 | /production-orders | Applied filters, source tabs, standard columns, pagination, explicit loading/empty/error demos |
 | /production-orders/po-01 | Eleven ordered detail sections, workflow, schedule proposal, images, masked driver, timeline |
@@ -43,7 +44,7 @@ app/
 src/
   components/
     ui/                  16 installed shadcn primitives
-    factory/             shell, patterns, demo-provider, dialogs, gallery, item-table, timeline
+    factory/             shell, patterns, demo-provider, branding-provider/editor/logo, dialogs, gallery, item-table, timeline
   features/
     dashboard/
     production-orders/
@@ -51,19 +52,23 @@ src/
     invoices/
     products/
     documents/           shared delivery/invoice list pattern
+    login/               mock Login only, outside the factory shell
   lib/
     constants/status.ts
     formatters/
     mock-data/
     utils.ts
+    branding.ts          defaults, storage validation, logo restrictions, theme derivation
 public/demo/              three original local SVG illustrations
 scripts/
   factory-ui.contract.test.mjs
+  factory-branding.unit.test.mjs
 ```
 
 ## Shared UI standard
 
-- `app/globals.css`: one light theme using semantic tokens; change primary tokens to brand a future factory.
+- `src/lib/branding.ts`: centralized `FactoryBranding` defaults and theme presets. New factories change this configuration rather than individual business pages.
+- `app/globals.css`: one light theme using semantic tokens; branding derives primary/foreground/accent/ring values globally, including portaled dialogs. Status success/warning/danger tones stay semantic.
 - `components/ui`: generated shadcn primitives, following the [official installation conventions](https://ui.shadcn.com/docs/installation/manual).
 - `components/factory/patterns.tsx`: PageHeader, SectionCard, InfoRow/InfoGrid, StatusBadge, FilterBar, FactoryDataTable, Pagination, EmptyState, LoadingState, ErrorState, back/refresh actions.
 - `FormDialog`: labeled fields, required trimmed reasons, numeric validation, local error messages, modal focus management.
@@ -74,9 +79,24 @@ scripts/
 - Refresh only confirms reading the local demo state; it does not fetch or reset the state.
 - Print/export are explicitly UI-only confirmation actions. They do not print, generate, or download business files.
 
+## Factory branding and Login
+
+Open **ปรับแต่งโรงงาน** on Login or the sidebar. Configure factory name, short name, logo and primary color; choose a preset or a custom six-digit hex color. Saving updates Login, sidebar, topbar, navigation, buttons, focus styling and selected tabs without changing feature pages.
+
+- Defaults and presets: `src/lib/branding.ts`; the initial factory is Ionflow Factory / IF.
+- Browser persistence: only `{ factoryName, shortName, logoDataUrl, primaryColor }` in `ionflow.factory-branding.v1`. No password, token, account details or business data is stored.
+- Logo: PNG/JPEG/WebP, up to 512 KB, decoded in the browser; no SVG, external URL, or upload request.
+- Invalid/corrupted storage falls back safely. If browser storage is blocked/full, customization works in memory and the editor reports that it cannot persist.
+- Reset restores the default branding. Browser-local configuration is a demo convenience, not deployment configuration or protected tenant settings.
+- Initial server HTML uses default branding; saved browser branding is restored after hydration. A brief default-theme flash can occur.
+- Desktop sidebar collapses to an icon rail with accessible labels/tooltips. Mobile Sheet remains fully expanded regardless of the desktop state. Collapse state is not persisted.
+- `/login` is outside the factory shell. The supplied email/password are fictional; submitting resets the fields and navigates to `/dashboard` without reading/saving credentials or checking a real account.
+- Forgot-password opens an explanatory mock dialog; it sends no email. The user menu can return to Login, but this is not a real logout.
+- Business routes remain directly accessible; **no authentication or route guard exists**.
+
 ## Responsive and accessibility behavior
 
-Desktop: fixed sidebar, topbar, shared page spacing, multi-column cards and form grids.
+Desktop: collapsible fixed sidebar, topbar, shared page spacing, multi-column cards and form grids.
 Tablet/mobile: Sheet navigation, stacked cards/forms and wrapped action buttons.
 Enterprise tables keep a minimum readable width and scroll horizontally inside a keyboard-focusable region.
 Radix dialogs provide keyboard/focus behavior; all modal content has titles/descriptions.
@@ -85,7 +105,7 @@ Status tones use the semantic palette, not per-page hexadecimal colors.
 
 ## Verification record
 
-No existing focused UI test runner or component test framework was found. None was installed.
+No component/browser UI framework is installed. The existing narrow Node source-contract file and the new branding-logic tests use built-in Node tests and the already-installed TypeScript transpiler (not type checking).
 
 | Check / command | Result |
 | --- | --- |
@@ -96,7 +116,7 @@ No existing focused UI test runner or component test framework was found. None w
 | `git diff --check` | PASS — no whitespace errors (Git reports LF/CRLF notices) |
 | `rg -n '\\bany\\b\|fetch\\(\|process\\.env\|https?://' app src -g '*.ts' -g '*.tsx'` | PASS — no matches in application source |
 | Component/browser UI tests | NOT RUN - no existing scoped UI test runner available |
-| `node --test scripts/factory-ui.contract.test.mjs` | NOT RUN — newly added narrow source contract checks; not a component/browser runner |
+| `node --test scripts/factory-ui.contract.test.mjs scripts/factory-branding.unit.test.mjs` | PASS — focused source/branding checks; sandbox spawn was blocked (EPERM), then rerun with approval |
 | Build / lint / typecheck / E2E / coverage | NOT RUN — not authorized |
 | Desktop/tablet/mobile visual inspection | NOT RUN — responsive classes implemented, browser appearance not verified |
 
@@ -118,6 +138,10 @@ Dependency installation reported **5 high-severity audit findings** in the insta
 10. Set a price for DEMO-P003 and change another price; verify unchanged existing order amounts.
 11. Review at 1440, 768 and 390 pixels. Check horizontal tables, mobile Sheet and stacked grids.
 12. Reload the browser; all state must return to the centralized fixtures.
+13. Customize factory name/short name and choose Gold; verify Login, sidebar, topbar, buttons, focus and tabs update. Reload: branding remains while business state resets.
+14. Upload an allowed small logo; reject SVG/oversized/corrupt files. Remove logo and restore defaults.
+15. Collapse desktop sidebar, use icon tooltips and expand again; at mobile width, open Sheet and verify full labels.
+16. Submit the mock Login, reveal/hide the dummy password, open mock recovery and return via the user menu. Verify no credential data appears in browser storage.
 
 ## Boundaries and Phase 2
 
