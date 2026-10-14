@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Factory UI component policy
+
+- Use installed official shadcn/ui primitives for every UI control/pattern, wrapped by shared Ionflow components where needed. Do not build competing primitives in features.
+- Use shadcn Sidebar, Collapsible, Progress, Avatar, Table, Button and Input instead of hand-written equivalents.
+- Standard HTML remains appropriate for structural/semantic layout (main, nav, headings, lists and links), not to replace an available UI primitive.
+- Preserve branding tokens, semantic status colors, mock-only workflows and accessibility.
+- Add missing primitives from the official registry; inspect and preserve customized primitives rather than overwriting them.

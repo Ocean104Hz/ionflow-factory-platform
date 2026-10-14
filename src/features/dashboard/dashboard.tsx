@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
   ClipboardList,
@@ -14,32 +15,48 @@ import {
   PageHeader,
   SectionCard,
   StatusBadge,
+  RefreshButton,
   type Column,
 } from "@/src/components/factory/patterns";
 import { Button } from "@/src/components/ui/button";
+import { Card, CardContent } from "@/src/components/ui/card";
+import { useBranding } from "@/src/components/factory/branding-provider";
+import {
+  dashboardAnalytics,
+  periodRange,
+  type DashboardPeriod,
+  type DateRange,
+} from "@/src/lib/mock-data/dashboard";
+import { PeriodFilter } from "./period-filter";
+import { FactoryDailyOverviewChart } from "./factory-daily-overview-chart";
+import { ProductionStatusOverview } from "./production-status-overview";
+import { TopOrderedProducts } from "./top-ordered-products";
 import { demoDate, type ProductionOrder } from "@/src/lib/mock-data";
 import { date, dateTime } from "@/src/lib/formatters";
 export function Dashboard() {
   const { orders, deliveries, invoices } = useDemo();
+  const { branding } = useBranding();
+  const [period, setPeriod] = useState<DashboardPeriod>("week");
+  const [range, setRange] = useState<DateRange>(() =>
+    periodRange("week", demoDate),
+  );
+  const [refresh, setRefresh] = useState(0);
+  const analytics = useMemo(
+    () => dashboardAnalytics(range, demoDate, period === "year"),
+    [range, period],
+  );
   const active = orders.filter((r) => r.document !== "ยกเลิกแล้ว");
   const counts = [
-    active.filter((r) => r.date === demoDate).length,
+    analytics.orderCount,
     active.filter((r) => r.material === "รอตรวจสอบวัตถุดิบ").length,
     active.filter((r) => r.production === "กำลังผลิต").length,
     active.filter((r) => r.production === "พร้อมรับสินค้า").length,
   ];
   const cards = [
-    { title: "คำสั่งการผลิตวันนี้", icon: ClipboardList },
+    { title: "คำสั่งการผลิต", icon: ClipboardList },
     { title: "รอตรวจสอบวัตถุดิบ", icon: Boxes },
     { title: "กำลังผลิต", icon: Factory },
     { title: "พร้อมรับสินค้า", icon: Truck },
-  ];
-  const statuses = [
-    "รอตรวจสอบวัตถุดิบ",
-    "รอการอนุมัติจากโรงงาน",
-    "กำลังผลิต",
-    "ผลิตเสร็จแล้ว",
-    "พร้อมรับสินค้า",
   ];
   const columns: Column<ProductionOrder>[] = [
     {
@@ -103,70 +120,69 @@ export function Dashboard() {
         title="แดชบอร์ด"
         description="ภาพรวมการดำเนินงานของโรงงาน"
         actions={
-          <span className="flex items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-xs text-muted-foreground">
-            <CalendarDays className="size-4" />
-            {date(demoDate)} · วันที่สาธิต
-          </span>
+          <>
+            <span className="flex items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-xs text-muted-foreground">
+              <CalendarDays aria-hidden="true" className="size-4" />
+              {branding.factoryName} · {date(range.from)} – {date(range.to)}
+            </span>
+            <RefreshButton onClick={() => setRefresh((value) => value + 1)} />
+          </>
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c, i) => (
-          <div
+          <Card
             key={c.title}
-            className="factory-metric rounded-xl border bg-surface p-5"
+            className="factory-metric rounded-xl border bg-surface py-0 shadow-none"
           >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                {c.title}
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {c.title}
+                </p>
+                <span className="rounded-lg bg-accent p-2 text-primary">
+                  <c.icon aria-hidden="true" className="size-4" />
+                </span>
+              </div>
+              <p className="mt-5 text-4xl font-semibold tabular-nums tracking-tight">
+                {counts[i]}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  รายการ
+                </span>
               </p>
-              <span className="rounded-lg bg-accent p-2 text-primary">
-                <c.icon className="size-4" />
-              </span>
-            </div>
-            <p className="mt-5 text-4xl font-semibold tabular-nums tracking-tight">
-              {counts[i]}
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                รายการ
-              </span>
-            </p>
-            <div className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
-              ข้อมูลจาก workspace สาธิต
-            </div>
-          </div>
+              <div className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
+                {i === 0
+                  ? "ยอด analytics สาธิตในช่วงที่เลือก"
+                  : "งานปัจจุบันใน demo workspace"}
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
-      <SectionCard
-        title="ภาพรวมสถานะการผลิต"
-        subtitle="จำนวนคำสั่งตามแต่ละสถานะ · ไม่นับเอกสารยกเลิก"
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {statuses.map((status) => {
-            const count = active.filter((r) =>
-              [r.material, r.approval, r.production].some(
-                (value) => value === status,
-              ),
-            ).length;
-            return (
-              <div key={status} className="rounded-lg bg-surface-muted p-4">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {status}
-                  </p>
-                  <strong className="text-2xl tabular-nums">{count}</strong>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{
-                      width: `${(count / Math.max(active.length, 1)) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </SectionCard>
+      <PeriodFilter
+        period={period}
+        range={range}
+        anchor={demoDate}
+        onChange={(value, selectedRange) => {
+          setPeriod(value);
+          setRange(selectedRange);
+        }}
+      />
+      <FactoryDailyOverviewChart
+        key={`${range.from}:${range.to}:${period}:${refresh}`}
+        rows={analytics.rows}
+        hasData={analytics.hasData}
+      />
+      <ProductionStatusOverview
+        orders={active}
+        anchor={demoDate}
+        draftCount={
+          [...deliveries, ...invoices].filter(
+            (row) => row.status === "ฉบับร่าง",
+          ).length
+        }
+      />
+      <TopOrderedProducts products={analytics.topProducts} />
       <SectionCard
         title="คำสั่งการผลิตล่าสุด"
         subtitle="เอกสารที่อัปเดตล่าสุด"
@@ -186,45 +202,6 @@ export function Dashboard() {
             .slice(0, 5)}
           rowKey={(r) => r.id}
         />
-      </SectionCard>
-      <SectionCard title="รายการที่ต้องดำเนินการ">
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            {
-              label: "วัตถุดิบรอตรวจสอบ",
-              count: counts[1],
-              href: "/production-orders",
-            },
-            {
-              label: "คำสั่งรออนุมัติ",
-              count: active.filter(
-                (r) => r.approval === "รอการอนุมัติจากโรงงาน",
-              ).length,
-              href: "/production-orders",
-            },
-            {
-              label: "เอกสารรอดำเนินการ",
-              count: [...deliveries, ...invoices].filter(
-                (r) => r.status === "ฉบับร่าง",
-              ).length,
-              href: "/invoices",
-            },
-          ].map((row) => (
-            <Link
-              key={row.label}
-              href={row.href}
-              className="flex items-center justify-between rounded-lg border p-4 hover:bg-accent"
-            >
-              <div>
-                <p className="font-medium">{row.label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {row.count} รายการ
-                </p>
-              </div>
-              <ArrowUpRight className="size-4 text-primary" />
-            </Link>
-          ))}
-        </div>
       </SectionCard>
     </>
   );

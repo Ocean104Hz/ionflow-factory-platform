@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "../ui/empty";
 import {
   Card,
   CardContent,
@@ -202,33 +211,36 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-4 py-14 text-center">
-      <Inbox className="size-9 text-muted-foreground" />
-      <p className="font-semibold">{title}</p>
-      <p className="text-sm text-muted-foreground">{description}</p>
-      {action}
-    </div>
+    <Empty className="px-4 py-14">
+      <EmptyHeader>
+        <EmptyMedia>
+          <Inbox className="size-9 text-muted-foreground" />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
+    </Empty>
   );
 }
 export function ErrorState({ retry }: { retry?: () => void }) {
   return (
-    <div
-      role="alert"
-      className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/20 bg-danger/5 p-5"
-    >
+    <Alert variant="destructive" className="border-danger/20 bg-danger/5 p-5">
       <AlertCircle className="text-danger" />
-      <div className="flex-1">
-        <p className="font-semibold text-danger">ไม่สามารถแสดงข้อมูลได้</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          ตัวอย่างสถานะผิดพลาด · ไม่มีการเรียก API
-        </p>
-      </div>
+      <AlertTitle>ไม่สามารถแสดงข้อมูลได้</AlertTitle>
+      <AlertDescription className="mt-1 text-xs">
+        ตัวอย่างสถานะผิดพลาด · ไม่มีการเรียก API
+      </AlertDescription>
       {retry && (
-        <Button variant="outline" onClick={retry}>
+        <Button
+          variant="outline"
+          className="col-start-2 mt-3 w-fit"
+          onClick={retry}
+        >
           ลองใหม่
         </Button>
       )}
-    </div>
+    </Alert>
   );
 }
 export function LoadingState() {

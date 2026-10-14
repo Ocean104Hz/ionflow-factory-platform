@@ -15,11 +15,43 @@ test("factory shell includes the five module links and mobile Sheet", () => {
     "products",
   ])
     assert.ok(shell.includes(`href: "/${route}"`));
-  assert.match(shell, /<Sheet /);
-  assert.match(shell, /aria-label="เปิดเมนู"/);
-  assert.match(shell, /renderNavigation\(collapsed\)/);
-  assert.match(shell, /aria-expanded=\{!collapsed\}/);
-  assert.match(shell, /renderNavigation\(\)/);
+  for (const primitive of [
+    "SidebarProvider",
+    "SidebarInset",
+    "SidebarMenuButton",
+    "SidebarTrigger",
+    "CollapsibleTrigger",
+    "CollapsibleContent",
+    "AvatarFallback",
+  ])
+    assert.ok(shell.includes(`<${primitive}`), primitive);
+  assert.match(
+    read("src/components/ui/sidebar.tsx"),
+    /<Sheet open=\{openMobile\}/,
+  );
+  assert.match(shell, /setOpenMobile\(false\)/);
+  for (const group of ["จัดซื้อ", "จ่าย", "ข้อมูลหลัก"])
+    assert.ok(shell.includes(`title: "${group}"`));
+  assert.doesNotMatch(shell, /renderNavigation|closedGroups|<aside/);
+});
+
+test("factory UI uses shared shadcn primitives instead of native control substitutes", () => {
+  for (const path of [
+    "src/components/factory/branding-editor.tsx",
+    "src/components/factory/attachment-gallery.tsx",
+    "src/features/dashboard/factory-daily-overview-chart.tsx",
+  ])
+    assert.doesNotMatch(
+      read(path),
+      /<(button|input|table|details|summary)(?:\s|>)/,
+    );
+  for (const path of [
+    "src/features/dashboard/top-ordered-products.tsx",
+    "src/features/dashboard/production-status-overview.tsx",
+  ])
+    assert.match(read(path), /<Progress/);
+  assert.match(read("src/components/ui/progress.tsx"), /value=\{value\}/);
+  assert.match(read("AGENTS.md"), /official shadcn\/ui/);
 });
 test("production detail has the eleven sections in the required order", () => {
   const detail = read(

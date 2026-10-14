@@ -1,4 +1,6 @@
 "use client";
+import { Card } from "@/src/components/ui/card";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -95,7 +97,7 @@ export function Login() {
             }
           />
         </div>
-        <div className="login-form-card mx-auto w-full max-w-lg px-2 py-6 sm:px-9 sm:py-9">
+        <Card className="login-form-card block gap-0 mx-auto w-full max-w-lg px-2 py-6 sm:px-9 sm:py-9">
           <span className="mb-5 inline-flex size-11 items-center justify-center rounded-xl bg-accent text-primary">
             <LockKeyhole />
           </span>
@@ -105,10 +107,12 @@ export function Login() {
           <p className="mt-3 break-words leading-relaxed text-muted-foreground">
             ยินดีต้อนรับสู่ {branding.factoryName}
           </p>
-          <div className="my-6 rounded-lg border border-info/20 bg-info/5 p-3 text-xs leading-relaxed text-info">
-            MOCK LOGIN · ใช้ข้อมูลตัวอย่างเท่านั้น ห้ามกรอกรหัสผ่านจริง
-            ไม่มีการส่งหรือเก็บข้อมูลบัญชี
-          </div>
+          <Alert role="note" className="my-6 border-info/20 bg-info/5">
+            <AlertDescription className="text-xs leading-relaxed text-info">
+              MOCK LOGIN · ใช้ข้อมูลตัวอย่างเท่านั้น ห้ามกรอกรหัสผ่านจริง
+              ไม่มีการส่งหรือเก็บข้อมูลบัญชี
+            </AlertDescription>
+          </Alert>
           <form
             className="space-y-5"
             onSubmit={(e) => {
@@ -182,7 +186,7 @@ export function Login() {
           <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">
             หน้า workspace เปิดได้โดยตรง ไม่มี route guard หรือ authentication
           </p>
-        </div>
+        </Card>
         <footer className="text-center text-xs text-muted-foreground">
           {branding.shortName} · Factory Template · UI only
         </footer>

@@ -173,7 +173,7 @@ export function BrandingEditor({ trigger }: { trigger: ReactElement }) {
           <div className="space-y-2">
             <Label htmlFor={`${id}-color`}>สีหลัก</Label>
             <div className="flex gap-2">
-              <input
+              <Input
                 id={`${id}-color`}
                 type="color"
                 value={
@@ -230,7 +230,11 @@ export function BrandingEditor({ trigger }: { trigger: ReactElement }) {
               onClick={() => {
                 setDraft(defaultBranding);
                 const saved = updateBranding(defaultBranding);
-                setMessage(saved ? "คืนค่าเริ่มต้นแล้ว" : "คืนค่าแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้บันทึกถาวร");
+                setMessage(
+                  saved
+                    ? "คืนค่าเริ่มต้นแล้ว"
+                    : "คืนค่าแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้บันทึกถาวร",
+                );
               }}
             >
               คืนค่าเริ่มต้น

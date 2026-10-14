@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { FileText, Expand } from "lucide-react";
 import { attachments } from "@/src/lib/mock-data";
+import { Button } from "../ui/button";
 import {
   Dialog,
   DialogContent,
@@ -22,11 +23,12 @@ export function AttachmentGallery({
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (
-          <button
+          <Button
+            variant="outline"
             key={item.id}
             type="button"
             onClick={() => setSelected(item)}
-            className="overflow-hidden rounded-lg border text-left transition-shadow hover:shadow-md"
+            className="block h-auto overflow-hidden rounded-lg border p-0 text-left whitespace-normal transition-shadow hover:shadow-md"
             aria-label={`ดู ${item.label}`}
           >
             <div className="relative flex h-40 items-center justify-center bg-surface-muted">
@@ -52,7 +54,7 @@ export function AttachmentGallery({
                   : "ภาพจำลอง · Local asset"}
               </p>
             </div>
-          </button>
+          </Button>
         ))}
       </div>
       <Dialog

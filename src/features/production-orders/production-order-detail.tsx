@@ -1,4 +1,5 @@
 "use client";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import Link from "next/link";
 import { useState } from "react";
 import { CalendarPlus, Check, Play, X, ArrowUpRight } from "lucide-react";
@@ -69,12 +70,9 @@ export function ProductionOrderDetail({ id }: { id: string }) {
         <StatusBadge tone="neutral">{order.source}</StatusBadge>
       </div>
       {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-info/20 bg-info/5 p-3 text-info"
-        >
-          {notice}
-        </p>
+        <Alert role="status" className="border-info/20 bg-info/5 text-info">
+          <AlertDescription className="text-info">{notice}</AlertDescription>
+        </Alert>
       )}
       <SectionCard title={productionSections[0]}>
         <InfoGrid>
