@@ -113,7 +113,7 @@ export const navigation: FactoryNavigationItem[] = [
   { group: "PRODUCTION", title: "ใบรายงานการผลิต", icon: FileText },
   { group: "PRODUCTION", title: "ใบเบิกวัตถุดิบ", icon: FileText },
   { group: "PRODUCTION", title: "คลัง BOM", icon: Database },
-  { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", icon: Beaker },
+  { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", href: "/bom", icon: Beaker },
   { group: "PACKING", title: "ใบแจ้งสั่งแพ็คสินค้า", icon: Archive },
   {
     group: "LOGISTICS",

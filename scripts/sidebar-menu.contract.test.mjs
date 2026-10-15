@@ -71,6 +71,7 @@ test("sidebar catalog retains the combined factory menu names without duplicate 
         "/settings",
         "/pr",
         "/qc_raw_material",
+        "/bom",
       ].includes(href),
       href,
     );

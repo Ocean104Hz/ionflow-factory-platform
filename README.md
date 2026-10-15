@@ -180,6 +180,18 @@ Open `/audit_log` or **ประวัติการแก้ไข** in the si
 
 Focused check: `node --test scripts/audit-log.unit.test.mjs scripts/sidebar-menu.contract.test.mjs`.
 
+## BOM formula UI demo
+
+Open `/bom` from **สูตรผสมวัตถุดิบ**. The isolated `BOMProvider` owns masters, versioned formulas, ingredients, packaging, defaults, timestamps and per-formula demo history. Shared shadcn dialogs keep the header/close control visible while the body scrolls. Search, metadata filters, pagination and normal/loading/empty demo modes use existing Factory patterns.
+
+- Normalized master codes and per-master versions are unique. Existing version identities are locked; new versions are separate records. RAW_MATERIAL/SUB_MATERIAL masters are components, not formula parents, matching iCON.
+- Defaults must belong to the master and be ACTIVE. Changing defaults never changes other formula statuses. Confirmed deletion rejects formula/default/component references; there is no cascade.
+- Quantities and batch sizes must be finite and positive. At least one ingredient is required, packaging is optional, and duplicate components within a group or missing/self references are rejected. No stock deduction or multi-level explosion.
+- Excel selection displays the filename only. Loading sample data uses fictional fixtures, not file contents. Preview reports duplicate codes/versions and row errors; confirmation atomically adds valid selected rows to BOM state without overwrites. No real file parser or upload.
+- State survives modal switches while `/bom` remains mounted, but resets on navigation away or reload. No unrelated providers, APIs, database, auth or production integration was changed.
+
+Focused check: `node --test scripts/bom.unit.test.mjs scripts/sidebar-menu.contract.test.mjs`.
+
 ## Integration boundaries
 
 Settings now includes **แผนก/ฝ่าย** and **คลังสินค้า** tabs. Both use shared shadcn tables, search/type/status filters, inline add/edit forms, active/inactive controls and confirmed deletion. Mock records live in `src/lib/mock-data/master-settings.ts`; changes survive tab switches only while Settings remains mounted. These new catalogs are not yet wired to PR or user-assignment options and have no backend/persistence. Focused validation check: `node --test scripts/master-settings.unit.test.mjs`.
