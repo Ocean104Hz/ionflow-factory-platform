@@ -7,6 +7,7 @@ const read = (path) =>
 
 test("factory shell includes the five module links and mobile Sheet", () => {
   const shell = read("src/components/factory/app-shell.tsx");
+  const catalog = read("src/lib/constants/navigation.ts");
   for (const route of [
     "dashboard",
     "production-orders",
@@ -14,7 +15,7 @@ test("factory shell includes the five module links and mobile Sheet", () => {
     "invoices",
     "products",
   ])
-    assert.ok(shell.includes(`href: "/${route}"`));
+    assert.ok(catalog.includes(`href: "/${route}"`));
   for (const primitive of [
     "SidebarProvider",
     "SidebarInset",
@@ -38,11 +39,48 @@ test("factory shell includes the five module links and mobile Sheet", () => {
     "MASTER DATA",
     "SYSTEM",
   ])
-    assert.ok(shell.includes(group));
+    assert.ok((shell + catalog).includes(group));
   assert.doesNotMatch(shell, /renderNavigation|closedGroups|<aside/);
   assert.match(shell, /ionflow.sidebar.open/);
   assert.match(shell, /<AppSidebar/);
   assert.match(shell, /<SiteHeader/);
+});
+
+test("sidebar menu hover motion preserves shadcn states and reduced motion", () => {
+  const sidebar = read("src/components/ui/sidebar.tsx");
+  const styles = sidebar.slice(
+    sidebar.indexOf("const sidebarMenuButtonVariants"),
+    sidebar.indexOf("function SidebarMenuButton"),
+  );
+  for (const token of [
+    "motion-safe:hover:scale-[1.02]",
+    "motion-safe:active:scale-[0.98]",
+    "motion-safe:hover:[&>svg]:scale-110",
+    "motion-safe:hover:[&>span]:scale-[1.03]",
+    "duration-200",
+    "ease-out",
+    "origin-left",
+    "group-data-[collapsible=icon]:origin-center",
+    "group-data-[collapsible=icon]:justify-center",
+    "motion-reduce:transition-none",
+    "motion-reduce:[&>svg]:transition-none",
+    "motion-reduce:[&>span]:transition-none",
+    "hover:bg-sidebar-accent",
+    "hover:text-sidebar-accent-foreground",
+    "focus-visible:ring-2",
+    "data-[active=true]:bg-sidebar-accent",
+  ])
+    assert.ok(styles.includes(token), token);
+  assert.doesNotMatch(
+    styles,
+    /hover:(?:h-|p-|text-\[|text-(?:xs|sm|base|lg|xl))/,
+  );
+  assert.match(sidebar, /<TooltipTrigger asChild>\{button\}<\/TooltipTrigger>/);
+  assert.match(sidebar, /hidden=\{state !== "collapsed" \|\| isMobile\}/);
+  assert.match(
+    read("src/components/factory/app-shell.tsx"),
+    /!compact && <span>ตั้งค่า<\/span>/,
+  );
 });
 
 test("factory UI uses shared shadcn primitives instead of native control substitutes", () => {
@@ -55,11 +93,14 @@ test("factory UI uses shared shadcn primitives instead of native control substit
       read(path),
       /<(button|input|table|details|summary)(?:\s|>)/,
     );
-  for (const path of [
-    "src/features/dashboard/top-ordered-products.tsx",
-    "src/features/dashboard/production-status-overview.tsx",
-  ])
-    assert.match(read(path), /<Progress/);
+  assert.match(
+    read("src/features/dashboard/production-status-overview.tsx"),
+    /<Progress/,
+  );
+  assert.match(
+    read("src/features/dashboard/top-ordered-products.tsx"),
+    /<ChartContainer/,
+  );
   assert.match(read("src/components/ui/progress.tsx"), /value=\{value\}/);
   assert.match(read("AGENTS.md"), /official shadcn\/ui/);
 });
@@ -73,6 +114,85 @@ test("production detail has the eleven sections in the required order", () => {
   assert.deepEqual(
     matches,
     Array.from({ length: 11 }, (_, i) => i),
+  );
+});
+
+test("settings groups reuse shadcn Tabs and keep user data mock only", () => {
+  const settings = read("src/components/factory/settings-page.tsx");
+  assert.match(settings, /<PageHeader[\s\S]*?title="ตั้งค่า"/);
+  assert.match(settings, /<Tabs defaultValue="users"/);
+  for (const label of ["ตั้งค่าผู้ใช้", "ตั้งค่าโรงงาน"])
+    assert.ok(settings.includes(label));
+  assert.match(settings, /<TabsContent[\s\S]*?value="users"/);
+  assert.match(settings, /<TabsContent[\s\S]*?value="factory"/);
+  assert.match(settings, /<UserSettings/);
+  assert.match(
+    read("src/components/factory/branding-editor.tsx"),
+    /updateBranding\(draft\)/,
+  );
+  assert.match(read("app/(factory)/settings/page.tsx"), /<SettingsPage/);
+  assert.doesNotMatch(
+    settings + read("src/components/factory/branding-editor.tsx"),
+    /<Dialog/,
+  );
+  for (const path of [
+    "src/components/factory/app-shell.tsx",
+    "src/features/login/login.tsx",
+  ]) {
+    assert.doesNotMatch(read(path), /ปรับแต่งโรงงาน/);
+    assert.match(read(path), /href="\/settings"/);
+  }
+  const user = read("src/components/factory/user-settings.tsx");
+  for (const primitive of [
+    "Input",
+    "Label",
+    "Button",
+    "FactoryDataTable",
+    "SelectField",
+  ])
+    assert.ok(user.includes(`<${primitive}`));
+  assert.match(user, /validateDemoUser\(profile, users\)/);
+  assert.match(user, /type="email"/);
+  assert.match(user, /aria-pressed=\{profile.modules.includes\(module.key\)\}/);
+  assert.doesNotMatch(
+    user,
+    /localStorage|sessionStorage|fetch\(|type="password"|DialogClose|DialogFooter|<Dialog/,
+  );
+  assert.match(read("src/lib/mock-data/settings.ts"), /admin@example\.test/);
+});
+
+test("filter layout shares control sizing and field spacing across list pages", () => {
+  const patterns = read("src/components/factory/patterns.tsx");
+  const selectField = patterns.slice(
+    patterns.indexOf("export function SelectField"),
+    patterns.indexOf("export function FilterBar"),
+  );
+  assert.match(selectField, /className="grid min-w-0 gap-2"/);
+  assert.match(
+    selectField,
+    /<SelectTrigger id=\{id\} className="w-full bg-surface"/,
+  );
+  assert.doesNotMatch(selectField, /space-y-2|h-10/);
+  const filters = patterns.slice(patterns.indexOf("export function FilterBar"));
+  assert.doesNotMatch(filters, /h-10|space-y-2/);
+  assert.match(filters, /sm:grid-cols-2/);
+  assert.match(filters, /grid items-end gap-3/);
+  for (const path of [
+    "src/features/production-orders/production-order-list.tsx",
+    "src/features/documents/document-list.tsx",
+    "src/features/products/products.tsx",
+  ])
+    assert.match(read(path), /<FilterBar/);
+  for (const path of [
+    "src/features/production-orders/production-order-list.tsx",
+    "src/features/products/products.tsx",
+  ]) {
+    const page = read(path);
+    assert.ok(page.indexOf("<FilterBar") < page.indexOf("<Tabs"));
+  }
+  assert.match(
+    patterns,
+    /\{actions && <div className="no-print flex flex-wrap gap-2"/,
   );
 });
 
@@ -153,7 +273,10 @@ test("operations composition retains chart, ranking, latest orders and Appearanc
     "บันทึกการปรับแต่ง",
   ])
     assert.ok(editor.includes(label));
-  assert.match(read("src/components/factory/app-shell.tsx"), /<BrandingEditor/);
+  assert.match(
+    read("src/components/factory/settings-page.tsx"),
+    /<BrandingEditor/,
+  );
   assert.match(read("src/features/dashboard/period-filter.tsx"), /<Tabs /);
 });
 

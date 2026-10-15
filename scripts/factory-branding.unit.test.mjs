@@ -36,6 +36,7 @@ test("branding storage accepts only known non-sensitive fields", () => {
     shortName: "ABC",
     primaryColor: "#b8954f",
     logoDataUrl: null,
+    loginImageDataUrl: null,
   });
 });
 
@@ -102,7 +103,7 @@ test("sidebar text remains readable for presets and extreme custom colors", () =
 });
 test("corrupt, oversized and unsafe stored values fall back safely", () => {
   assert.deepEqual(readBranding("broken JSON"), defaultBranding);
-  assert.deepEqual(readBranding("x".repeat(751001)), defaultBranding);
+  assert.deepEqual(readBranding("x".repeat(1501001)), defaultBranding);
   assert.equal(
     parseBranding({ primaryColor: "red; background:url(x)" }).primaryColor,
     defaultBranding.primaryColor,
@@ -117,5 +118,40 @@ test("light and dark themes choose readable button foregrounds", () => {
   assert.equal(
     themeVariables("invalid")["--primary"],
     defaultBranding.primaryColor,
+  );
+});
+
+test("branding accepts a bounded Login image and restores older saved settings", () => {
+  const image = "data:image/png;base64,aA==";
+  assert.equal(
+    parseBranding({ loginImageDataUrl: image }).loginImageDataUrl,
+    image,
+  );
+  assert.equal(
+    parseBranding({ loginImageDataUrl: "https://example.test/image.png" })
+      .loginImageDataUrl,
+    null,
+  );
+  assert.equal(
+    parseBranding({ loginImageDataUrl: "data:image/svg+xml;base64,PHN2Zz4=" })
+      .loginImageDataUrl,
+    null,
+  );
+  assert.equal(
+    parseBranding({
+      loginImageDataUrl: "data:image/png;base64," + "A".repeat(750000),
+    }).loginImageDataUrl,
+    null,
+  );
+  assert.equal(
+    readBranding(
+      JSON.stringify({ factoryName: "Old Factory", primaryColor: "#176c65" }),
+    ).factoryName,
+    "Old Factory",
+  );
+  assert.equal(
+    readBranding(JSON.stringify({ factoryName: "Old Factory" }))
+      .loginImageDataUrl,
+    null,
   );
 });

@@ -65,11 +65,13 @@ export function FactoryDailyOverviewChart({
   const active = rows[hovered ?? selected];
   return (
     <SectionCard
+      className="xl:flex-1"
+      contentClassName="xl:flex xl:flex-1 xl:flex-col"
       title="ภาพรวมการผลิต"
       subtitle="แนวโน้มคำสั่งการผลิตและสถานะงานตามช่วงเวลา"
     >
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
+        <div className="grid min-w-0 gap-2">
           <Label htmlFor="analytics-day">
             เลือก{rows[0]?.date.length === 7 ? "เดือน" : "วัน"}เพื่อดูค่าจริง
           </Label>
@@ -124,14 +126,14 @@ export function FactoryDailyOverviewChart({
         แตะกราฟเพื่อเลือก หรือใช้ตัวเลือกวันด้านบน
       </p>
       <div
-        className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary"
+        className="relative min-h-64 overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary xl:flex-1"
         tabIndex={0}
         role="region"
         aria-label="กราฟเปรียบเทียบ เลื่อนแนวนอนเพื่อดูทุกวันที่"
       >
         <ChartContainer
           config={config}
-          className="h-64 w-full aspect-auto [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
+          className="h-64 w-full aspect-auto xl:absolute xl:inset-0 xl:h-full [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
           style={{ minWidth: Math.max(360, rows.length * 64 + 80) }}
         >
           <BarChart

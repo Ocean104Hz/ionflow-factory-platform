@@ -1,4 +1,6 @@
 "use client";
+import Image from "next/image";
+import Link from "next/link";
 import { Card } from "@/src/components/ui/card";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { useId, useState, useTransition } from "react";
@@ -25,7 +27,6 @@ import {
   DialogHeader,
 } from "@/src/components/ui/dialog";
 import { FactoryLogo } from "@/src/components/factory/factory-logo";
-import { BrandingEditor } from "@/src/components/factory/branding-editor";
 import { useBranding } from "@/src/components/factory/branding-provider";
 
 export function Login() {
@@ -37,6 +38,15 @@ export function Login() {
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
       <section className="login-showcase relative hidden flex-col justify-between p-10 lg:flex">
+        {branding.loginImageDataUrl && (
+          <Image
+            src={branding.loginImageDataUrl}
+            alt=""
+            fill
+            unoptimized
+            className="pointer-events-none object-cover opacity-15"
+          />
+        )}
         <FactoryLogo />
         <div className="relative mx-auto w-full max-w-md space-y-5">
           <Factory aria-hidden="true" className="size-12 text-primary" />
@@ -69,14 +79,12 @@ export function Login() {
           <div className="min-w-0 flex-1 lg:hidden">
             <FactoryLogo />
           </div>
-          <BrandingEditor
-            trigger={
-              <Button variant="outline" size="sm" className="ml-auto">
-                <Palette aria-hidden="true" />
-                ปรับแต่งโรงงาน
-              </Button>
-            }
-          />
+          <Button asChild variant="outline" size="sm" className="ml-auto">
+            <Link href="/settings">
+              <Palette aria-hidden="true" />
+              ตั้งค่า
+            </Link>
+          </Button>
         </div>
         <div className="flex flex-1 items-center justify-center py-8">
           <Card className="login-form-card w-full max-w-sm gap-0 border-0 bg-transparent p-0 shadow-none">

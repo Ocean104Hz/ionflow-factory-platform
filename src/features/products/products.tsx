@@ -202,6 +202,14 @@ export function Products() {
         title="สินค้าและราคากลาง"
         description="ข้อมูลสินค้ามาตรฐานและราคาขายของโรงงาน · เปลี่ยนราคาเฉพาะใน demo state"
       />
+      <FilterBar
+        product
+        statuses={["ใช้งาน", "ไม่ใช้งาน"]}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+      />
       <Tabs
         value={tab}
         onValueChange={(v) => {
@@ -214,14 +222,6 @@ export function Products() {
           <TabsTrigger value="prices">ราคากลาง</TabsTrigger>
         </TabsList>
       </Tabs>
-      <FilterBar
-        product
-        statuses={["ใช้งาน", "ไม่ใช้งาน"]}
-        onApply={(f) => {
-          setFilters(f);
-          setPage(1);
-        }}
-      />
       <FactoryDataTable
         columns={tab === "products" ? productColumns : priceColumns}
         rows={rows.slice(

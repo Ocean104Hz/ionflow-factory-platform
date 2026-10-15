@@ -87,7 +87,7 @@ export function PageHeader({
         </Breadcrumb>
       )}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {description && (
             <p className="mt-2 max-w-2xl leading-relaxed text-muted-foreground">
@@ -95,7 +95,9 @@ export function PageHeader({
             </p>
           )}
         </div>
-        <div className="no-print flex flex-wrap gap-2">{actions}</div>
+        {actions && (
+          <div className="no-print flex flex-wrap gap-2">{actions}</div>
+        )}
       </div>
     </div>
   );
@@ -161,14 +163,23 @@ export function SectionCard({
   subtitle,
   action,
   children,
+  className,
+  contentClassName,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
+  className?: string;
+  contentClassName?: string;
 }) {
   return (
-    <Card className="factory-section gap-4 overflow-hidden border py-5 shadow-none">
+    <Card
+      className={cn(
+        "factory-section gap-4 overflow-hidden border py-5 shadow-none",
+        className,
+      )}
+    >
       <CardHeader className="flex flex-col gap-2 px-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base leading-relaxed">
@@ -184,7 +195,9 @@ export function SectionCard({
           <div className="no-print flex flex-wrap gap-2">{action}</div>
         )}
       </CardHeader>
-      <CardContent className="px-5">{children}</CardContent>
+      <CardContent className={cn("px-5", contentClassName)}>
+        {children}
+      </CardContent>
     </Card>
   );
 }
@@ -419,10 +432,10 @@ export function SelectField({
 }) {
   const id = useId();
   return (
-    <div className="space-y-2">
+    <div className="grid min-w-0 gap-2">
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} className="h-10 w-full bg-surface">
+        <SelectTrigger id={id} className="w-full bg-surface">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -473,14 +486,13 @@ export function FilterBar({
       }}
       className="factory-filter grid items-end gap-3 sm:grid-cols-2 @[900px]/main:grid-cols-[minmax(160px,1fr)_170px_auto_auto]"
     >
-      <div className="space-y-2">
+      <div className="grid min-w-0 gap-2">
         <Label htmlFor={`${id}-search`}>ค้นหา</Label>
         <Input
           id={`${id}-search`}
           value={draft.search}
           onChange={(e) => field("search", e.target.value)}
           placeholder="เลขที่เอกสาร ลูกค้า หรือสินค้า"
-          className="h-10"
         />
       </div>
       <SelectField
@@ -538,7 +550,7 @@ export function FilterBar({
             {!product && (
               <>
                 {(["from", "to"] as const).map((key) => (
-                  <div key={key} className="space-y-2">
+                  <div key={key} className="grid min-w-0 gap-2">
                     <Label htmlFor={`${id}-${key}`}>
                       {key === "from" ? "วันที่เริ่มต้น" : "วันที่สิ้นสุด"}
                     </Label>
@@ -553,7 +565,6 @@ export function FilterBar({
                       value={draft[key]}
                       min={key === "to" ? draft.from : undefined}
                       onChange={(e) => field(key, e.target.value)}
-                      className="h-10"
                     />
                   </div>
                 ))}

@@ -149,15 +149,15 @@ export function Dashboard() {
           ],
         }))}
       />
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <div className="min-w-0">
+      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <div className="min-w-0 xl:flex xl:flex-col">
           <FactoryDailyOverviewChart
             key={`${range.from}:${range.to}:${period}:${refresh}`}
             rows={analytics.rows}
             hasData={analytics.hasData}
           />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 xl:flex xl:flex-col">
           <TopOrderedProducts products={analytics.topProducts} />
         </div>
       </div>

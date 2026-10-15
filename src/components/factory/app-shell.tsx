@@ -10,18 +10,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import {
-  LayoutDashboard,
-  ClipboardList,
-  Truck,
-  ReceiptText,
-  Package,
-  Settings,
-  Bell,
-  ChevronDown,
-  CircleHelp,
-  X,
-} from "lucide-react";
+import { Settings, Bell, ChevronDown, CircleHelp, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 
@@ -53,47 +42,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Separator } from "../ui/separator";
 import { useBranding } from "./branding-provider";
-import { BrandingEditor } from "./branding-editor";
 import { FactoryLogo } from "./factory-logo";
-const navigation = [
-  {
-    group: "OVERVIEW",
-    title: "แดชบอร์ด",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    group: "PRODUCTION",
-    title: "คำสั่งการผลิต",
-    href: "/production-orders",
-    icon: ClipboardList,
-  },
-  {
-    group: "LOGISTICS",
-    title: "ใบส่งสินค้า",
-    href: "/delivery-orders",
-    icon: Truck,
-  },
-  {
-    group: "SALES DOCUMENTS",
-    title: "ใบแจ้งหนี้",
-    href: "/invoices",
-    icon: ReceiptText,
-  },
-  {
-    group: "MASTER DATA",
-    title: "สินค้าและราคากลาง",
-    href: "/products",
-    icon: Package,
-  },
-];
-const navigationGroups = [
-  "OVERVIEW",
-  "PRODUCTION",
-  "LOGISTICS",
-  "SALES DOCUMENTS",
-  "MASTER DATA",
-];
+import { navigation, navigationGroups } from "@/src/lib/constants/navigation";
+import { Alert, AlertDescription } from "../ui/alert";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -123,7 +74,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 function FactoryShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { branding } = useBranding();
-  const current = navigation.find((item) => pathname.startsWith(item.href));
+  const current = navigation.find(
+    (item) => !item.alias && item.href && pathname.startsWith(item.href),
+  );
+  const [previewMenu, setPreviewMenu] = useState("");
   return (
     <>
       <a
@@ -132,13 +86,37 @@ function FactoryShell({ children }: { children: ReactNode }) {
       >
         ข้ามไปเนื้อหา
       </a>
-      <AppSidebar />
+      <AppSidebar onPreview={setPreviewMenu} />
       <SidebarInset className="min-w-0 bg-background">
-        <SiteHeader title={current?.title ?? branding.factoryName} />
+        <SiteHeader
+          title={
+            pathname.startsWith("/settings")
+              ? "ตั้งค่า"
+              : (current?.title ?? branding.factoryName)
+          }
+        />
         <div
           id="main-content"
           className="factory-content @container/main mx-auto w-full max-w-[1680px] space-y-5 px-4 py-5 lg:px-6"
         >
+          {previewMenu && (
+            <Alert role="status">
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {previewMenu} · เพิ่มชื่อเมนูแล้ว แต่ยังไม่มีหน้าสาธิตใน
+                  Factory Platform
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPreviewMenu("")}
+                >
+                  ปิดข้อความ
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           {children}
           <footer className="no-print flex flex-wrap justify-between gap-2 pt-4 text-[10px] tracking-wide text-muted-foreground">
             <span>{branding.shortName} FACTORY · UI STANDARD / 01</span>
@@ -149,7 +127,7 @@ function FactoryShell({ children }: { children: ReactNode }) {
     </>
   );
 }
-function AppSidebar() {
+function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
   const pathname = usePathname();
   const { branding } = useBranding();
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -160,25 +138,57 @@ function AppSidebar() {
         {navigation
           .filter((item) => item.group === group)
           .map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href)}
-                tooltip={item.title}
-                className="h-9"
-                aria-label={item.title}
-              >
-                <Link
-                  href={item.href}
-                  onClick={() => setOpenMobile(false)}
-                  aria-current={
-                    pathname.startsWith(item.href) ? "page" : undefined
-                  }
+            <SidebarMenuItem key={item.title}>
+              {item.href ? (
+                <SidebarMenuButton
+                  asChild
+                  isActive={!item.alias && pathname.startsWith(item.href)}
+                  tooltip={item.title}
+                  className="h-9"
+                  aria-label={item.title}
+                >
+                  <Link
+                    href={item.href}
+                    onClick={() => {
+                      onPreview("");
+                      setOpenMobile(false);
+                    }}
+                    aria-current={
+                      !item.alias && pathname.startsWith(item.href)
+                        ? "page"
+                        : undefined
+                    }
+                  >
+                    <item.icon aria-hidden="true" />
+                    {!compact && <span>{item.title}</span>}
+                  </Link>
+                </SidebarMenuButton>
+              ) : (
+                <SidebarMenuButton
+                  tooltip={`${item.title} · ยังไม่มีหน้าสาธิต`}
+                  aria-label={`${item.title} · ยังไม่มีหน้าสาธิต`}
+                  className="h-9"
+                  onClick={() => {
+                    onPreview(item.title);
+                    setOpenMobile(false);
+                  }}
                 >
                   <item.icon aria-hidden="true" />
-                  {!compact && <span>{item.title}</span>}
-                </Link>
-              </SidebarMenuButton>
+                  {!compact && (
+                    <>
+                      <span
+                        title={item.title}
+                        className="min-w-0 flex-1 truncate text-muted-foreground"
+                      >
+                        {item.title}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        เร็วๆนี้
+                      </span>
+                    </>
+                  )}
+                </SidebarMenuButton>
+              )}
             </SidebarMenuItem>
           ))}
       </SidebarMenu>
@@ -214,13 +224,13 @@ function AppSidebar() {
       <SidebarContent>
         <nav aria-label="เมนูโรงงาน">
           {navigationGroups.map((group) => (
-            <SidebarGroup key={group}>
+            <SidebarGroup key={group.key}>
               {!compact && (
                 <SidebarGroupLabel className="text-[11px] tracking-wide text-muted-foreground">
-                  {group}
+                  {group.title}
                 </SidebarGroupLabel>
               )}
-              <SidebarGroupContent>{menu(group)}</SidebarGroupContent>
+              <SidebarGroupContent>{menu(group.key)}</SidebarGroupContent>
             </SidebarGroup>
           ))}
         </nav>
@@ -231,20 +241,24 @@ function AppSidebar() {
             SYSTEM
           </SidebarGroupLabel>
         )}
-        <BrandingEditor
-          trigger={
-            <SidebarMenuButton
-              tooltip="ปรับแต่งโรงงาน"
-              aria-label="ปรับแต่งโรงงาน"
-              className={
-                compact ? "w-full justify-center px-0" : "w-full justify-start"
-              }
-            >
-              <Settings />
-              {!compact && "ปรับแต่งโรงงาน"}
-            </SidebarMenuButton>
+        <SidebarMenuButton
+          asChild
+          isActive={pathname.startsWith("/settings")}
+          tooltip="ตั้งค่า"
+          aria-label="ตั้งค่า"
+          className={
+            compact ? "w-full justify-center px-0" : "w-full justify-start"
           }
-        />
+        >
+          <Link
+            href="/settings"
+            onClick={() => setOpenMobile(false)}
+            aria-current={pathname.startsWith("/settings") ? "page" : undefined}
+          >
+            <Settings aria-hidden="true" />
+            {!compact && <span>ตั้งค่า</span>}
+          </Link>
+        </SidebarMenuButton>
         <div className="flex min-w-0 items-center gap-2 rounded-lg bg-sidebar-accent/40 p-2">
           <Avatar className="size-8 shrink-0">
             <AvatarFallback className="bg-accent text-primary text-xs">

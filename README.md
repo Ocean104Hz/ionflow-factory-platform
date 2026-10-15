@@ -81,6 +81,10 @@ scripts/
 
 ## Factory branding and Login
 
+### Combined factory navigation
+
+`src/lib/constants/navigation.ts` inventories the sidebar labels from iCON, iTech and iFoam (read-only reference). It contains 39 distinct menu labels grouped by operation, plus the existing Settings footer. Different legacy names remain visible; identical labels are listed once. Implemented links stay within the template. Unimplemented modules show **เร็วๆนี้** and an inline explanation rather than a fabricated route or a link to production. Legacy aliases that share a template route do not receive a second active highlight. This adds menu names only: no new workflows, integrations or access enforcement. iCON's configured-but-hidden goods-issue label and iFoam's legacy Kanchan 3 report label are retained for completeness, not as implemented features.
+
 ### Visual polish pass
 
 The shared UI now uses an enterprise/minimal hierarchy informed by ui-ux-pro-max: a dark neutral navigation rail, light workspace, clearer page/section headings, coordinated card/table/filter spacing, and a framed Login form. Factory primary/accent configuration remains unchanged. The search's marketing hero recommendation was rejected because it does not fit the ERP workspace; no generated design-system output was persisted.
@@ -89,10 +93,10 @@ Thai typography uses a self-hosted Noto Sans Thai variable font from [Google Fon
 
 Checks for this pass: the two focused Node test files passed **9 tests**; `git diff --check` passed. Login and Dashboard were visually reviewed at 1440×900 and 375×812, with mock entry, mobile Sheet, desktop collapse/expand and Gold branding save/restore exercised. The existing dev server at localhost:3002 was reused; the attempted second dev server at 3010 exited without replacing it. No production build, lint, typecheck, full E2E suite or real integration check ran. This is not an exhaustive accessibility or all-workflow certification.
 
-Open **ปรับแต่งโรงงาน** on Login or the sidebar. Configure factory name, short name, logo and primary color; choose a preset or a custom six-digit hex color. Saving updates Login, sidebar, topbar, navigation, buttons, focus styling and selected tabs without changing feature pages.
+Open **ตั้งค่า** on Login or the sidebar to navigate to the full **/settings** page (not a modal). **ตั้งค่าโรงงาน** configures factory name, short name, logo, primary color and an optional desktop Login background image. PNG/JPEG/WebP images are limited to 512 KB each, validated and stored browser-locally; old branding records remain compatible. Saving updates branding without changing business pages. **ตั้งค่าผู้ใช้** edits fictional users, departments, roles, active status and explicit per-user module visibility, with a saved visibility summary. Roles/departments do not implicitly grant modules. User edits live only in page memory and reset when leaving; no accounts are created, no user data is stored and no routes/API are protected. This is NOT real access control. iTech users and iCON permissions were read-only behavioral references; no reference UI source was copied.
 
 - Defaults and presets: `src/lib/branding.ts`; the initial factory is Ionflow Factory / IF.
-- Browser persistence: only `{ factoryName, shortName, logoDataUrl, primaryColor }` in `ionflow.factory-branding.v1`. No password, token, account details or business data is stored.
+- Browser persistence: only `{ factoryName, shortName, logoDataUrl, loginImageDataUrl, primaryColor }` in `ionflow.factory-branding.v1`. No password, token, account details or business data is stored.
 - Logo: PNG/JPEG/WebP, up to 512 KB, decoded in the browser; no SVG, external URL, or upload request.
 - Invalid/corrupted storage falls back safely. If browser storage is blocked/full, customization works in memory and the editor reports that it cannot persist.
 - Reset restores the default branding. Browser-local configuration is a demo convenience, not deployment configuration or protected tenant settings.
@@ -152,6 +156,16 @@ Dependency installation reported **5 high-severity audit findings** in the insta
 16. Submit the mock Login, reveal/hide the dummy password, open mock recovery and return via the user menu. Verify no credential data appears in browser storage.
 
 ## Boundaries and Phase 2
+
+## Audit history demo
+
+Open `/audit_log` or **ประวัติการแก้ไข** in the sidebar. Search by actor/document/summary, combine action/module/user/date filters, paginate, and inspect read-only before/after snapshots. Dates use Asia/Bangkok; both date endpoints are inclusive. Fixtures live in `src/lib/mock-data/audit-log.ts` and do not record interactions from other pages. No audit API, persistence, real user data, or credentials are included.
+
+“Old projects” / “โปรเจคเก่า” means iCON (`ionflow-icon`), iTech (`ionflow-itech`), and iFoam (`ionique-ifoam`), used as read-only references.
+
+Focused check: `node --test scripts/audit-log.unit.test.mjs scripts/sidebar-menu.contract.test.mjs`.
+
+## Integration boundaries
 
 Backend integration: **not implemented**.
 Database/migrations: **not implemented**.

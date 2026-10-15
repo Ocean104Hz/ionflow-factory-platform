@@ -2,6 +2,7 @@ export type FactoryBranding = {
   factoryName: string;
   shortName: string;
   logoDataUrl: string | null;
+  loginImageDataUrl: string | null;
   primaryColor: string;
 };
 
@@ -9,6 +10,7 @@ export const defaultBranding: FactoryBranding = {
   factoryName: "Ionflow Factory",
   shortName: "IF",
   logoDataUrl: null,
+  loginImageDataUrl: null,
   primaryColor: "#176c65",
 };
 export const brandingStorageKey = "ionflow.factory-branding.v1";
@@ -39,6 +41,9 @@ export function parseBranding(value: unknown): FactoryBranding {
         ? fields.shortName.trim().slice(0, 12)
         : defaultBranding.shortName,
     logoDataUrl: isLogoDataUrl(fields.logoDataUrl) ? fields.logoDataUrl : null,
+    loginImageDataUrl: isLogoDataUrl(fields.loginImageDataUrl)
+      ? fields.loginImageDataUrl
+      : null,
     primaryColor:
       typeof fields.primaryColor === "string" &&
       /^#[0-9a-f]{6}$/i.test(fields.primaryColor)
@@ -47,7 +52,7 @@ export function parseBranding(value: unknown): FactoryBranding {
   };
 }
 export function readBranding(raw: string): FactoryBranding {
-  if (raw.length > 751000) return { ...defaultBranding };
+  if (raw.length > 1501000) return { ...defaultBranding };
   try {
     return parseBranding(JSON.parse(raw));
   } catch {
