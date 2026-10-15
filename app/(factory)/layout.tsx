@@ -1,7 +1,10 @@
+
 import { Suspense } from "react";
 import { AppShell } from "@/src/components/factory/app-shell";
 import { DemoProvider } from "@/src/components/factory/demo-provider";
+import { PRProvider } from "@/src/features/purchase-requisitions/pr-provider";
 import { LoadingState } from "@/src/components/factory/patterns";
+
 export default function FactoryLayout({
   children,
 }: {
@@ -9,9 +12,11 @@ export default function FactoryLayout({
 }) {
   return (
     <DemoProvider>
-      <Suspense fallback={<LoadingState />}>
-        <AppShell>{children}</AppShell>
-      </Suspense>
+      <PRProvider>
+        <Suspense fallback={<LoadingState />}>
+          <AppShell>{children}</AppShell>
+        </Suspense>
+      </PRProvider>
     </DemoProvider>
   );
 }

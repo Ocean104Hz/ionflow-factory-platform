@@ -10,7 +10,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { Settings, Bell, ChevronDown, CircleHelp, X } from "lucide-react";
+import { Bell, ChevronDown, CircleHelp, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 
@@ -236,35 +236,13 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
         </nav>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-3">
-        {!compact && (
-          <SidebarGroupLabel className="text-[11px] text-muted-foreground">
-            SYSTEM
-          </SidebarGroupLabel>
-        )}
-        <SidebarMenuButton
-          asChild
-          isActive={pathname.startsWith("/settings")}
-          tooltip="ตั้งค่า"
-          aria-label="ตั้งค่า"
-          className={
-            compact ? "w-full justify-center px-0" : "w-full justify-start"
-          }
-        >
-          <Link
-            href="/settings"
-            onClick={() => setOpenMobile(false)}
-            aria-current={pathname.startsWith("/settings") ? "page" : undefined}
-          >
-            <Settings aria-hidden="true" />
-            {!compact && <span>ตั้งค่า</span>}
-          </Link>
-        </SidebarMenuButton>
         <div className="flex min-w-0 items-center gap-2 rounded-lg bg-sidebar-accent/40 p-2">
           <Avatar className="size-8 shrink-0">
             <AvatarFallback className="bg-accent text-primary text-xs">
               {branding.shortName.slice(0, 2)}
             </AvatarFallback>
           </Avatar>
+
           {!compact && (
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">

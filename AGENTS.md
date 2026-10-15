@@ -15,3 +15,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Standard HTML remains appropriate for structural/semantic layout (main, nav, headings, lists and links), not to replace an available UI primitive.
 - Preserve branding tokens, semantic status colors, mock-only workflows and accessibility.
 - Add missing primitives from the official registry; inspect and preserve customized primitives rather than overwriting them.
+- Use subtle shared transitions and transform feedback for interactive controls and content entry when useful (roughly 180–240ms, ease-out). Preserve layout stability, avoid continuous/decorative motion, and disable scaling/entry motion for prefers-reduced-motion. Reuse centralized motion/theme tokens instead of per-page effects.

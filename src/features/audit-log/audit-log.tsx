@@ -38,6 +38,7 @@ import {
   type AuditFilters,
 } from "@/src/lib/mock-data/audit-log";
 import type { Tone } from "@/src/lib/constants/status";
+import { usePR } from "@/src/features/purchase-requisitions/pr-provider";
 
 const actionTones: Record<AuditEntry["action"], Tone> = {
   CREATE: "success",
@@ -56,12 +57,14 @@ const formatTime = (value: string) =>
 const allOption = { value: "all", label: "ทั้งหมด" };
 
 export function AuditLog() {
+  const { audit } = usePR();
+  const entries = [...audit, ...auditEntries];
   const [draft, setDraft] = useState<AuditFilters>(emptyAuditFilters);
   const [filters, setFilters] = useState<AuditFilters>(emptyAuditFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState("10");
   const [selected, setSelected] = useState<AuditEntry | null>(null);
-  const rows = filterAuditEntries(auditEntries, filters);
+  const rows = filterAuditEntries(entries, filters);
   const invalidRange = Boolean(draft.from && draft.to && draft.from > draft.to);
   const additionalCount = [
     draft.user !== "all",
@@ -142,8 +145,8 @@ export function AuditLog() {
         <History aria-hidden="true" />
         <AlertTitle>ประวัติสาธิต · อ่านอย่างเดียว</AlertTitle>
         <AlertDescription>
-          ข้อมูลสมมติ ณ 14 ต.ค. 2569 ไม่ใช่บันทึกจริง
-          และยังไม่บันทึกการทำรายการจากหน้าอื่น
+          ข้อมูลสมมติ พร้อมกิจกรรม PR ที่ทำในรอบใช้งานนี้ · ไม่ใช่ audit จริง
+          และจะหายเมื่อโหลดแอปใหม่ ไม่บันทึกกิจกรรมจากโมดูลอื่น
         </AlertDescription>
       </Alert>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -212,9 +215,9 @@ export function AuditLog() {
             onChange={(value) => update("module", value)}
             options={[
               allOption,
-              ...Array.from(
-                new Set(auditEntries.map((entry) => entry.module)),
-              ).map((value) => ({ value, label: value })),
+              ...Array.from(new Set(entries.map((entry) => entry.module))).map(
+                (value) => ({ value, label: value }),
+              ),
             ]}
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +244,7 @@ export function AuditLog() {
                     allOption,
                     ...Array.from(
                       new Map(
-                        auditEntries.map((entry) => [
+                        entries.map((entry) => [
                           entry.email,
                           { value: entry.email, label: entry.user },
                         ]),

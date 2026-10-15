@@ -67,6 +67,8 @@ scripts/
 
 ## Shared UI standard
 
+Workspace surface hierarchy uses a cool neutral canvas with white cards/controls, clearer input borders and brand-tinted table headers. PR filters/actions share one shadcn Card toolbar; bulk commands appear after selection. Shared button feedback uses 180ms ease-out hover/press transforms, with 240ms header/toolbar/tab entry motion. Reduced-motion disables entry animation and button transforms. These patterns are recorded in AGENTS.md for subsequent UI work; no animation dependency was added.
+
 - `src/lib/branding.ts`: centralized `FactoryBranding` defaults and theme presets. New factories change this configuration rather than individual business pages.
 - `app/globals.css`: one light theme using semantic tokens; branding derives primary/foreground/accent/ring values globally, including portaled dialogs. Status success/warning/danger tones stay semantic.
 - `components/ui`: generated shadcn primitives, following the [official installation conventions](https://ui.shadcn.com/docs/installation/manual).
@@ -77,7 +79,7 @@ scripts/
 - `DemoProvider`: typed in-memory state shared across navigation. Reloading the browser resets changes. No localStorage or persistence.
 - Price changes do not retroactively alter amounts stored in existing mock order items.
 - Refresh only confirms reading the local demo state; it does not fetch or reset the state.
-- Print/export are explicitly UI-only confirmation actions. They do not print, generate, or download business files.
+- PR printing opens an isolated A4 requisition preview and calls the browser print dialog (including user-managed Save as PDF). PR data remains mock; other document print/export actions remain UI-only unless separately implemented.
 
 ## Factory branding and Login
 
@@ -155,17 +157,32 @@ Dependency installation reported **5 high-severity audit findings** in the insta
 15. Collapse desktop sidebar, use icon tooltips and expand again; at mobile width, open Sheet and verify full labels.
 16. Submit the mock Login, reveal/hide the dummy password, open mock recovery and return via the user menu. Verify no credential data appears in browser storage.
 
-## Boundaries and Phase 2
+## Purchase requisitions (PR) demo
 
-## Audit history demo
+Routes `/pr`, `/pr/new`, `/pr/[prId]`, `/pr/[prId]/edit` use shared shadcn patterns. PR state and its audit events live in `PRProvider` for the current app session only; reload resets them. Other existing module workflows are unchanged.
 
-Open `/audit_log` or **ประวัติการแก้ไข** in the sidebar. Search by actor/document/summary, combine action/module/user/date filters, paginate, and inspect read-only before/after snapshots. Dates use Asia/Bangkok; both date endpoints are inclusive. Fixtures live in `src/lib/mock-data/audit-log.ts` and do not record interactions from other pages. No audit API, persistence, real user data, or credentials are included.
+- Drafts may be incomplete but reject invalid dates, non-positive quantities, negative/invalid prices and mismatched mock master data. Submission requires complete fields. Quantities support four decimal places, prices two.
+- Mock requester/department, warehouse, product/unit and supplier selectors maintain matching names/codes. The actor switcher has been removed. Commands use the fixed mock administrator shown by the template, with no real authentication or production authorization. The assigned approver remains document metadata; production must enforce authenticated permissions on the server rather than trust a client-side actor name.
+- Estimated amounts use exclusive demo VAT 7%, rounded per line to satang. Missing prices remain incomplete; known subtotal is labelled partial. Mixed units are never summed together.
+- Workflow: draft/rejected → pending → approved → partial/full demo PO → closed. Negative actions require reasons. Cancelling an approved/partial PR stops further ordering but preserves existing demo PO records; it does not cancel POs.
+- Related demo POs track ordered/remaining quantities and forbid oversupply. These are allocations for UI testing, not a real PO module or supplier order.
+- Copy creates a new draft with zero ordered quantities and no inherited approval history. Delete is draft-only, with session audit retained and document number reserved. Stale editor revisions cannot overwrite newer changes. Bulk actions validate every selected record before applying any changes.
+- PR list create/view/edit actions use shared shadcn Dialog with the existing editor/detail components and callbacks; direct routes remain available. Official shadcn Checkbox supports row selection and checked/mixed/select-all-current-page states. Page size sits beside bottom pagination. Browser printing uses isolated iframe `srcDoc`, escaped content, restrictive CSP, no scripts and an A4 requisition layout using current branding, items, totals and signature placeholders; it never labels PR as PO. Real printer output is user-managed. Excel export remains a mock preview. Import uses a predefined fictional example, rejects duplicate references, never reads an Excel file and never overwrites an existing PR.
+- PR create/edit/workflow/delete events appear in `/audit_log` with actor and before/after fields until reload. Other module actions are not recorded.
+
+Focused verification: `node --test scripts/pr-workflow.unit.test.mjs scripts/audit-log.unit.test.mjs scripts/sidebar-menu.contract.test.mjs`. No new dependencies, APIs, database, credentials or cloud resources were added.
+
+## Audit snapshots
+
+Open `/audit_log` or **ประวัติการแก้ไข** in the sidebar. Search by actor/document/summary, combine action/module/user/date filters, paginate, and inspect read-only before/after snapshots. Dates use Asia/Bangkok; both date endpoints are inclusive. Fictional fixtures in `src/lib/mock-data/audit-log.ts` are combined with in-memory PR events only. No audit API, persistence, real user data, or credentials are included.
 
 “Old projects” / “โปรเจคเก่า” means iCON (`ionflow-icon`), iTech (`ionflow-itech`), and iFoam (`ionique-ifoam`), used as read-only references.
 
 Focused check: `node --test scripts/audit-log.unit.test.mjs scripts/sidebar-menu.contract.test.mjs`.
 
 ## Integration boundaries
+
+Settings now includes **แผนก/ฝ่าย** and **คลังสินค้า** tabs. Both use shared shadcn tables, search/type/status filters, inline add/edit forms, active/inactive controls and confirmed deletion. Mock records live in `src/lib/mock-data/master-settings.ts`; changes survive tab switches only while Settings remains mounted. These new catalogs are not yet wired to PR or user-assignment options and have no backend/persistence. Focused validation check: `node --test scripts/master-settings.unit.test.mjs`.
 
 Backend integration: **not implemented**.
 Database/migrations: **not implemented**.

@@ -69,6 +69,8 @@ test("sidebar catalog retains the combined factory menu names without duplicate 
         "/delivery-orders",
         "/invoices",
         "/settings",
+        "/pr",
+        "/qc_raw_material",
       ].includes(href),
       href,
     );

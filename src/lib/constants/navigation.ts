@@ -53,9 +53,19 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/production-orders",
     icon: ClipboardList,
   },
-  { group: "PURCHASING", title: "PR", icon: FileText },
+  {
+    group: "PURCHASING",
+    title: "PR",
+    href: "/pr",
+    icon: FileText,
+  },
   { group: "PURCHASING", title: "PO", icon: ShoppingCart },
-  { group: "QC", title: "ใบตรวจสอบวัตถุดิบ", icon: FlaskConical },
+  {
+    group: "QC",
+    title: "ใบตรวจสอบวัตถุดิบ",
+    href: "/qc_raw_material",
+    icon: FlaskConical,
+  },
   { group: "QC", title: "ใบตรวจวัตถุดิบ", icon: FlaskConical },
   { group: "QC", title: "ใบรายงานผสมปุ๋ยผง", icon: Beaker },
   {

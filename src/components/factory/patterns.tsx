@@ -277,6 +277,7 @@ export function LoadingState() {
 export interface Column<T> {
   key: string;
   label: string;
+  header?: ReactNode;
   render: (row: T, index: number) => ReactNode;
   numeric?: boolean;
 }
@@ -316,7 +317,7 @@ export function FactoryDataTable<T>({
                     c.numeric && "text-right",
                   )}
                 >
-                  {c.label}
+                  {c.header ?? c.label}
                 </TableHead>
               ))}
             </TableRow>
