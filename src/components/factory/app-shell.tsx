@@ -221,7 +221,7 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
         )}
       </SidebarHeader>
       <SidebarSeparator />
-      <SidebarContent>
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         <nav aria-label="เมนูโรงงาน">
           {navigationGroups.map((group) => (
             <SidebarGroup key={group.key}>

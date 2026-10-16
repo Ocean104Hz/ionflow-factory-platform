@@ -25,7 +25,7 @@ export type FactoryNavigationItem = {
   alias?: boolean;
 };
 
-// Menu labels only, collected from iCON sidebar, iTech SIDEBAR_SECTIONS and iFoam SidebarPreview.
+// Business navigation consolidated from verified iCON/iTech/iFoam module identities.
 // Missing href means this template does not yet implement that module.
 export const navigation: FactoryNavigationItem[] = [
   {
@@ -41,17 +41,10 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/audit_log",
   },
   {
-    group: "OVERVIEW",
+    group: "SYSTEM",
     title: "ตั้งค่าระบบ",
     href: "/settings",
-    alias: true,
     icon: Wrench,
-  },
-  {
-    group: "PURCHASING",
-    title: "คำสั่งการผลิต",
-    href: "/production-orders",
-    icon: ClipboardList,
   },
   {
     group: "PURCHASING",
@@ -61,57 +54,53 @@ export const navigation: FactoryNavigationItem[] = [
   },
   { group: "PURCHASING", title: "PO", icon: ShoppingCart },
   {
+    group: "PURCHASING",
+    title: "คำสั่งการผลิต",
+    href: "/production-orders",
+    icon: ClipboardList,
+  },
+  {
     group: "QC",
-    title: "ใบตรวจสอบวัตถุดิบ",
+    title: "ตรวจสอบวัตถุดิบ",
     href: "/qc_raw_material",
     icon: FlaskConical,
   },
-  { group: "QC", title: "ใบตรวจวัตถุดิบ", icon: FlaskConical },
-  { group: "QC", title: "ใบรายงานผสมปุ๋ยผง", icon: Beaker },
+  { group: "QC", title: "รายงานผสมปุ๋ยผง", icon: Beaker },
   {
     group: "QC",
-    title:
-      "รายงานการตรวจสอบคุณภาพการผลิตปุ๋ยอินทรีย์/สารปรับสภาพดิน/หัวเชื้ออะมิโน, หัวเชื้อโอเอ็ม",
+    title: "ตรวจสอบคุณภาพการผลิต",
     icon: FlaskConical,
   },
   {
-    group: "QC",
-    title:
-      "ใบรายงานการบรรจุปุ๋ยอินทรีย์/ปุ๋ยอินทรีย์เคมี/ปุ๋ยเคมี/สารปรับสภาพดิน",
+    group: "PACKING",
+    title: "รายงานการบรรจุ",
     icon: FileText,
   },
-  { group: "QC", title: "ใบรายงานผลิตปุ๋ยอินทรีย์เคมี", icon: FileText },
+  { group: "QC", title: "ตรวจคุณภาพปุ๋ยอินทรีย์เคมี", icon: FileText },
   { group: "QC", title: "ใบ NC", icon: ClipboardList },
   { group: "QC", title: "ใบส่งตัวอย่าง", icon: Archive },
   { group: "QC", title: "แบบบันทึกการส่งตัวอย่าง", icon: FileText },
-  { group: "WAREHOUSE", title: "ใบรับวัตถุดิบ/วัสดุ", icon: Package },
-  { group: "WAREHOUSE", title: "ใบรับวัตถุดิบ", icon: Package },
-  { group: "WAREHOUSE", title: "ใบเบิกวัสดุ/วัตถุดิบ", icon: FileText },
+  { group: "WAREHOUSE", title: "รับวัตถุดิบและวัสดุ", icon: Package },
+  { group: "WAREHOUSE", title: "รับวัตถุดิบ (PO/QC/รับตรง)", icon: Package },
+  { group: "WAREHOUSE", title: "เบิกวัสดุ/วัตถุดิบ", icon: FileText },
+  { group: "WAREHOUSE", title: "เบิกวัตถุดิบการผลิต", icon: FileText },
   { group: "WAREHOUSE", title: "สต็อกวัตถุดิบ", icon: Boxes },
-  {
-    group: "WAREHOUSE",
-    title: "ตั้งราคาสินค้า",
-    href: "/products",
-    alias: true,
-    icon: ReceiptText,
-  },
   { group: "PRODUCTION", title: "ใบสั่งผลิต", icon: ClipboardList },
   { group: "PRODUCTION", title: "ใบสูตรผลิต", icon: FileText },
   { group: "PRODUCTION", title: "ใบสั่งผลิตสินค้า", icon: Factory },
   { group: "PRODUCTION", title: "รายงานการผลิต", icon: Factory },
   {
     group: "PRODUCTION",
-    title: "รายงานการผลิตปุ๋ยเม็ด ประจำโรงงานกาญ 1",
+    title: "รายงานการผลิตปุ๋ยเม็ด (กาญ 1)",
     icon: Factory,
   },
   {
     group: "PRODUCTION",
-    title: "รายงานการผลิตปุ๋ยเม็ด ประจำโรงงานกาญ 3",
+    title: "รายงานการผลิตปุ๋ยเม็ด (กาญ 3)",
     icon: Factory,
   },
-  { group: "PRODUCTION", title: "ใบรับยอดผลิต", icon: ClipboardList },
+  { group: "PRODUCTION", title: "รับยอดผลิต", icon: ClipboardList },
   { group: "PRODUCTION", title: "ใบรายงานการผลิต", icon: FileText },
-  { group: "PRODUCTION", title: "ใบเบิกวัตถุดิบ", icon: FileText },
   { group: "PRODUCTION", title: "คลัง BOM", icon: Database },
   { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", href: "/bom", icon: Beaker },
   { group: "PACKING", title: "ใบแจ้งสั่งแพ็คสินค้า", icon: Archive },
@@ -119,13 +108,6 @@ export const navigation: FactoryNavigationItem[] = [
     group: "LOGISTICS",
     title: "ใบส่งสินค้า",
     href: "/delivery-orders",
-    icon: Truck,
-  },
-  {
-    group: "LOGISTICS",
-    title: "ส่งสินค้า",
-    href: "/delivery-orders",
-    alias: true,
     icon: Truck,
   },
   { group: "LOGISTICS", title: "ใบจ่ายสินค้า", icon: Package },
@@ -148,12 +130,13 @@ export const navigation: FactoryNavigationItem[] = [
 export const navigationGroups = [
   { key: "OVERVIEW", title: "ภาพรวม" },
   { key: "PURCHASING", title: "จัดซื้อ" },
-  { key: "QC", title: "QC" },
+  { key: "QC", title: "ตรวจสอบคุณภาพ (QC)" },
   { key: "WAREHOUSE", title: "คลังสินค้า" },
   { key: "PRODUCTION", title: "การผลิต" },
-  { key: "PACKING", title: "แพ็ค / FG" },
-  { key: "LOGISTICS", title: "จ่าย / ขนส่ง" },
+  { key: "PACKING", title: "บรรจุสินค้า" },
+  { key: "LOGISTICS", title: "จ่ายและขนส่ง" },
   { key: "SALES DOCUMENTS", title: "เอกสารขาย" },
-  { key: "MAINTENANCE", title: "แจ้งซ่อม" },
+  { key: "MAINTENANCE", title: "ซ่อมบำรุง" },
   { key: "MASTER DATA", title: "ข้อมูลหลัก" },
+  { key: "SYSTEM", title: "ระบบ" },
 ];
