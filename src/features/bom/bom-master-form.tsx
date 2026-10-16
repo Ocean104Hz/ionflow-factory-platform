@@ -14,6 +14,8 @@ import {
   type FieldErrors,
 } from "./bom-domain";
 import { useBOM } from "./bom-provider";
+import { MasterSelect } from "@/src/features/master-data/master-select";
+import type { MasterKind } from "@/src/features/master-data/master-domain";
 
 export function BOMMasterForm({
   initial,
@@ -40,27 +42,47 @@ export function BOMMasterForm({
       | "department",
     label: string,
     required = false,
-  ) => (
-    <div className="grid gap-2" key={key}>
-      <Label htmlFor={`bom-master-${key}`}>
-        {label}
-        {required && " *"}
-      </Label>
-      <Input
-        id={`bom-master-${key}`}
-        required={required}
+  ) =>
+    ["unit", "process", "category", "brand", "department"].includes(key) ? (
+      <MasterSelect
+        key={key}
+        kind={
+          (
+            {
+              unit: "units",
+              process: "processes",
+              category: "categories",
+              brand: "brands",
+              department: "departments",
+            } as Record<string, MasterKind>
+          )[key]
+        }
+        label={`${label}${required ? " *" : ""}`}
         value={form[key]}
-        aria-invalid={!!errors[key]}
-        aria-describedby={errors[key] ? `bom-master-error-${key}` : undefined}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        reference={form.masterRefs?.[key]}
+        onChange={(value) => setForm({ ...form, [key]: value })}
       />
-      {errors[key] && (
-        <p id={`bom-master-error-${key}`} className="text-xs text-danger">
-          {errors[key]}
-        </p>
-      )}
-    </div>
-  );
+    ) : (
+      <div className="grid gap-2" key={key}>
+        <Label htmlFor={`bom-master-${key}`}>
+          {label}
+          {required && " *"}
+        </Label>
+        <Input
+          id={`bom-master-${key}`}
+          required={required}
+          value={form[key]}
+          aria-invalid={!!errors[key]}
+          aria-describedby={errors[key] ? `bom-master-error-${key}` : undefined}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        />
+        {errors[key] && (
+          <p id={`bom-master-error-${key}`} className="text-xs text-danger">
+            {errors[key]}
+          </p>
+        )}
+      </div>
+    );
   return (
     <form
       className="space-y-5"

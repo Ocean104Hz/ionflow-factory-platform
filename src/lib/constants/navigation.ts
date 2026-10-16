@@ -65,7 +65,12 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/qc_raw_material",
     icon: FlaskConical,
   },
-  { group: "QC", title: "รายงานผสมปุ๋ยผง", icon: Beaker },
+  {
+    group: "QC",
+    title: "รายงานผสมปุ๋ยผง",
+    href: "/fertilizer-powder-mixing",
+    icon: Beaker,
+  },
   {
     group: "QC",
     title: "ตรวจสอบคุณภาพการผลิต",
@@ -89,14 +94,10 @@ export const navigation: FactoryNavigationItem[] = [
   { group: "PRODUCTION", title: "ใบสูตรผลิต", icon: FileText },
   { group: "PRODUCTION", title: "ใบสั่งผลิตสินค้า", icon: Factory },
   { group: "PRODUCTION", title: "รายงานการผลิต", icon: Factory },
+  // Factory/site variants belong inside the future report module, not separate menus.
   {
     group: "PRODUCTION",
-    title: "รายงานการผลิตปุ๋ยเม็ด (กาญ 1)",
-    icon: Factory,
-  },
-  {
-    group: "PRODUCTION",
-    title: "รายงานการผลิตปุ๋ยเม็ด (กาญ 3)",
+    title: "รายงานการผลิตปุ๋ยเม็ด",
     icon: Factory,
   },
   { group: "PRODUCTION", title: "รับยอดผลิต", icon: ClipboardList },

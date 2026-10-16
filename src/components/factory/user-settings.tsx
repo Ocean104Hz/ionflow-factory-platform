@@ -21,10 +21,13 @@ import {
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { useMasterData } from "@/src/features/master-data/master-provider";
+import { MasterSelect } from "@/src/features/master-data/master-select";
 
 export function UserSettings() {
   const id = useId();
-  const [users, setUsers] = useState(demoUsers);
+  const masters = useMasterData();
+  const users = masters.state.personnel as DemoUser[];
   const [profile, setProfile] = useState<DemoUser>(demoUsers[0]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -83,8 +86,8 @@ export function UserSettings() {
         <AlertDescription>
           กำหนดแผนก บทบาท และการมองเห็นรายผู้ใช้ · ข้อมูลสมมติ
           ไม่ได้บังคับสิทธิ์จริงหรือป้องกันการเปิด URL
-          ข้อมูลผู้ใช้จะคืนค่าเมื่อออกจากหน้าตั้งค่า
-          และไม่ถูกบันทึกลงเบราว์เซอร์
+          ข้อมูลจำลองคงอยู่เมื่อเปลี่ยนหน้า และคืนค่าเมื่อรีโหลด
+          ไม่บันทึกลงเบราว์เซอร์
         </AlertDescription>
       </Alert>
       <FactoryDataTable
@@ -101,21 +104,22 @@ export function UserSettings() {
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            const validation = validateDemoUser(profile, users);
+            const validation = validateDemoUser(profile, users, [
+              ...masters.state.rows
+                .filter((r) => r.kind === "departments" && r.active)
+                .flatMap((r) => [r.name, ...r.aliases]),
+              ...(profile.department === saved.department
+                ? [saved.department]
+                : []),
+            ]);
             setError(validation);
             if (validation) return;
-            setUsers((previous) =>
-              previous.map((user) =>
-                user.id === profile.id
-                  ? {
-                      ...profile,
-                      displayName: profile.displayName.trim(),
-                      email: profile.email.trim(),
-                      modules: [...profile.modules],
-                    }
-                  : user,
-              ),
-            );
+            masters.savePersonnel({
+              ...profile,
+              displayName: profile.displayName.trim(),
+              email: profile.email.trim(),
+              modules: [...profile.modules],
+            });
             setMessage(
               "บันทึกสิทธิ์ตัวอย่างแล้ว · ไม่มีการเปลี่ยนบัญชีหรือสิทธิ์จริง",
             );
@@ -151,14 +155,14 @@ export function UserSettings() {
                 }}
               />
             </div>
-            <SelectField
+            <MasterSelect
+              kind="departments"
               label="แผนก"
               value={profile.department}
               onChange={(department) => {
                 setProfile({ ...profile, department });
                 setMessage("");
               }}
-              options={departments.map((value) => ({ value, label: value }))}
             />
             <SelectField
               label="บทบาท"

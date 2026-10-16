@@ -1,3 +1,4 @@
+import type { MasterReferences } from "@/src/features/master-data/master-domain";
 export const inspectionChecks = [
   {
     key: "color",
@@ -30,6 +31,7 @@ export const inspectionChecks = [
 export type CheckKey = (typeof inspectionChecks)[number]["key"];
 export type CheckResult = "pending" | "pass" | "fail" | "na";
 export type Inspection = {
+  masterRefs?: MasterReferences;
   id: string;
   number: string;
   date: string;

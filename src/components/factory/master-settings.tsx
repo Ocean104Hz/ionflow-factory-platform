@@ -15,19 +15,22 @@ import {
   StatusBadge,
   type Column,
 } from "./patterns";
+import { masterSettingTypes } from "@/src/lib/mock-data/master-settings";
 import {
-  demoMasterSettings,
-  masterSettingTypes,
-  validateMasterSetting,
-  type MasterSettingKind,
-  type MasterSettingRow,
-} from "@/src/lib/mock-data/master-settings";
+  blankMaster,
+  masterKinds,
+  parentKinds,
+  type MasterKind,
+  type MasterRow as MasterSettingRow,
+} from "@/src/features/master-data/master-domain";
+import { useMasterData } from "@/src/features/master-data/master-provider";
 
-export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
+export function MasterSettings({ kind }: { kind: MasterKind }) {
   const id = useId();
   const isDepartment = kind === "departments";
-  const title = isDepartment ? "แผนก/ฝ่าย" : "คลังสินค้า";
-  const [rows, setRows] = useState(demoMasterSettings[kind]);
+  const title = masterKinds[kind];
+  const { state, save, remove } = useMasterData();
+  const rows = state.rows.filter((row) => row.kind === kind);
   const [draft, setDraft] = useState<MasterSettingRow | null>(null);
   const [search, setSearch] = useState("");
   const [type, setType] = useState("all");
@@ -35,7 +38,12 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const types = masterSettingTypes[kind];
+  const types =
+    kind === "departments" || kind === "warehouses"
+      ? masterSettingTypes[kind]
+      : kind === "vehicleTypes"
+        ? ["รถตัก", "รถยก", "อื่นๆ"]
+        : [];
   const filtered = rows.filter(
     (row) =>
       `${row.code} ${row.name}`
@@ -53,13 +61,7 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
     setDraft(
       row
         ? { ...row }
-        : {
-            id: crypto.randomUUID(),
-            code: "",
-            name: "",
-            type: types[0],
-            active: true,
-          },
+        : { ...blankMaster(kind, crypto.randomUUID()), type: types[0] ?? "" },
     );
     setError("");
     setMessage("");
@@ -67,8 +69,21 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
   const columns: Column<MasterSettingRow>[] = [
     {
       key: "type",
-      label: "ประเภท",
-      render: (row) => <StatusBadge>{row.type}</StatusBadge>,
+      label: "ประเภท / สังกัด",
+      render: (row) => (
+        <span>
+          {[
+            row.type,
+            state.rows.find((r) => r.id === row.parentId)?.name,
+            state.rows.find((r) => r.id === row.typeId)?.name,
+            kind === "shifts"
+              ? `${row.start}–${row.end}${row.end < row.start ? " (ข้ามวัน)" : ""}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ") || "—"}
+        </span>
+      ),
     },
     {
       key: "code",
@@ -79,7 +94,7 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
     },
     {
       key: "name",
-      label: isDepartment ? "ชื่อแผนก/ฝ่าย" : "ชื่อคลังสินค้า / สถานที่",
+      label: `ชื่อ${title}`,
       render: (row) => row.name,
     },
     {
@@ -112,11 +127,12 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
             variant="outline"
             aria-label={`${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code}`}
             onClick={() => {
-              setRows((previous) =>
-                previous.map((item) =>
-                  item.id === row.id ? { ...item, active: !item.active } : item,
-                ),
-              );
+              try {
+                save({ ...row, active: !row.active });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "ทำรายการไม่ได้");
+                return;
+              }
               setDraft((previous) =>
                 previous?.id === row.id
                   ? { ...previous, active: !row.active }
@@ -131,7 +147,7 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
           </Button>
           <ConfirmDialog
             title={`ลบ${title}`}
-            description={`ลบ ${row.code} · ${row.name} จากรายการสาธิต ข้อมูลจะคืนค่าเมื่อเปิดหน้าตั้งค่าใหม่`}
+            description={`ลบ ${row.code} · ${row.name} ได้เฉพาะเมื่อไม่ถูกอ้างอิง หากใช้แล้วให้ปิดใช้งานแทน`}
             trigger={
               <Button
                 type="button"
@@ -145,9 +161,12 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
               </Button>
             }
             onConfirm={() => {
-              setRows((previous) =>
-                previous.filter((item) => item.id !== row.id),
-              );
+              try {
+                remove(row.id);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "ลบไม่ได้");
+                return;
+              }
               setDraft((previous) =>
                 previous?.id === row.id ? null : previous,
               );
@@ -162,18 +181,13 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
     <div className="space-y-4">
       <Alert>
         <AlertDescription>
-          จัดการข้อมูล{title}สาธิต · เก็บเฉพาะขณะอยู่หน้าตั้งค่า สลับแท็บได้
-          แต่เมื่อออกจากหน้าหรือโหลดใหม่จะคืนค่า ยังไม่เชื่อมตัวเลือก PR
-          หรือบัญชีผู้ใช้
+          ข้อมูลหลักภายใน{title} · เปลี่ยนหน้าแล้วยังคงอยู่
+          รีโหลดเพื่อคืนข้อมูลจำลอง · ไม่เชื่อม Sales Hub
         </AlertDescription>
       </Alert>
       <SectionCard
         title={`ตั้งค่า${title}`}
-        subtitle={
-          isDepartment
-            ? "จัดการชื่อ รหัส ประเภท และสถานะของแผนก/ฝ่าย"
-            : "จัดการคลังสินค้า สถานที่ โรงงาน และสถานะการใช้งาน"
-        }
+        subtitle={`จัดการรหัส ชื่อ ความสัมพันธ์ และสถานะ${title}สำหรับงานภายใน`}
         action={
           <Button type="button" onClick={() => openEditor()}>
             <Plus aria-hidden="true" />
@@ -194,18 +208,20 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
               }}
             />
           </div>
-          <SelectField
-            label="ประเภท"
-            value={type}
-            onChange={(value) => {
-              setType(value);
-              setPage(1);
-            }}
-            options={[
-              { value: "all", label: "ทุกประเภท" },
-              ...types.map((value) => ({ value, label: value })),
-            ]}
-          />
+          {types.length > 0 && (
+            <SelectField
+              label="ประเภท"
+              value={type}
+              onChange={(value) => {
+                setType(value);
+                setPage(1);
+              }}
+              options={[
+                { value: "all", label: "ทุกประเภท" },
+                ...types.map((value) => ({ value, label: value })),
+              ]}
+            />
+          )}
           <SelectField
             label="สถานะ"
             value={status}
@@ -247,6 +263,14 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
           }
         />
       </SectionCard>
+      {error && !draft && (
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/20 bg-danger/5 p-3 text-danger"
+        >
+          {error}
+        </p>
+      )}
       {draft && (
         <SectionCard
           title={`${isEditing ? "แก้ไข" : "เพิ่ม"}${title}`}
@@ -256,19 +280,18 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              const issue = validateMasterSetting(draft, rows, kind);
-              setError(issue);
-              if (issue) return;
               const saved = {
                 ...draft,
                 code: draft.code.trim().toUpperCase(),
                 name: draft.name.trim(),
               };
-              setRows((previous) =>
-                isEditing
-                  ? previous.map((row) => (row.id === saved.id ? saved : row))
-                  : [saved, ...previous],
-              );
+              try {
+                save(saved);
+                setError("");
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "บันทึกไม่ได้");
+                return;
+              }
               setDraft(null);
               setPage(1);
               setMessage(
@@ -302,12 +325,83 @@ export function MasterSettings({ kind }: { kind: MasterSettingKind }) {
                   }
                 />
               </div>
-              <SelectField
-                label="ประเภท *"
-                value={draft.type}
-                onChange={(value) => setDraft({ ...draft, type: value })}
-                options={types.map((value) => ({ value, label: value }))}
-              />
+              {types.length > 0 && (
+                <SelectField
+                  label="ประเภท *"
+                  value={draft.type}
+                  onChange={(value) => setDraft({ ...draft, type: value })}
+                  options={types.map((value) => ({ value, label: value }))}
+                />
+              )}
+              {parentKinds[kind] && (
+                <SelectField
+                  label="หน่วยงาน / พื้นที่ต้นสังกัด"
+                  value={draft.parentId || "none"}
+                  onChange={(v) =>
+                    setDraft({ ...draft, parentId: v === "none" ? "" : v })
+                  }
+                  options={[
+                    { value: "none", label: "ไม่ระบุ" },
+                    ...state.rows
+                      .filter(
+                        (r) =>
+                          r.id !== draft.id &&
+                          parentKinds[kind]?.includes(r.kind) &&
+                          (r.active || r.id === draft.parentId),
+                      )
+                      .map((r) => ({
+                        value: r.id,
+                        label: `${r.code} · ${r.name}${r.active ? "" : " (ปิดใช้งาน)"}`,
+                      })),
+                  ]}
+                />
+              )}
+              {kind === "vehicles" && (
+                <SelectField
+                  label="ประเภทรถ *"
+                  value={draft.typeId || "none"}
+                  onChange={(v) =>
+                    setDraft({ ...draft, typeId: v === "none" ? "" : v })
+                  }
+                  options={[
+                    { value: "none", label: "เลือกประเภทรถ" },
+                    ...state.rows
+                      .filter(
+                        (r) =>
+                          r.kind === "vehicleTypes" &&
+                          (r.active || r.id === draft.typeId),
+                      )
+                      .map((r) => ({ value: r.id, label: r.name })),
+                  ]}
+                />
+              )}
+              {(kind === "shifts"
+                ? (["start", "end"] as const)
+                : kind === "suppliers"
+                  ? (["contact", "phone"] as const)
+                  : []
+              ).map((key) => (
+                <div className="grid gap-2" key={key}>
+                  <Label htmlFor={`${id}-${key}`}>
+                    {
+                      {
+                        start: "เวลาเริ่มกะ *",
+                        end: "เวลาสิ้นสุดกะ *",
+                        contact: "ผู้ติดต่อ (จำลอง)",
+                        phone: "โทรศัพท์ (จำลอง)",
+                      }[key]
+                    }
+                  </Label>
+                  <Input
+                    id={`${id}-${key}`}
+                    type={kind === "shifts" ? "time" : "text"}
+                    value={draft[key]}
+                    onChange={(e) =>
+                      setDraft({ ...draft, [key]: e.target.value })
+                    }
+                  />
+                </div>
+              ))}
               <SelectField
                 label="สถานะการใช้งาน"
                 value={draft.active ? "active" : "inactive"}

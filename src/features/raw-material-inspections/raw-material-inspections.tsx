@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMasterData } from "@/src/features/master-data/master-provider";
+import { MasterSelect } from "@/src/features/master-data/master-select";
+import {
+  inspectionFields,
+  fieldsForSave,
+} from "@/src/features/master-data/internal-references";
 import { FilePlus2, Eye, Pencil, FlaskConical } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -58,8 +64,17 @@ const resultOptions = [
 ];
 
 export function RawMaterialInspections() {
+  const masters = useMasterData();
   // shortcut: demo state resets on navigation/reload; replace with a repository when backend wiring is authorized.
-  const [records, setRecords] = useState<Inspection[]>(mockInspections);
+  const [records, setRecords] = useState<Inspection[]>(() =>
+    mockInspections.map((row) => ({
+      ...row,
+      masterRefs: masters.capture(inspectionFields(row), {}, true),
+    })),
+  );
+  useEffect(() => {
+    for (const row of records) masters.retain(row.masterRefs ?? {});
+  }, [records]);
   const [draftFilters, setDraftFilters] = useState(filtersInitial);
   const [filters, setFilters] = useState(filtersInitial);
   const [page, setPage] = useState(1);
@@ -403,10 +418,11 @@ function InspectionForm({
   onEdit: () => void;
   onSave: (row: Inspection) => void;
 }) {
+  const masters = useMasterData();
   const [form, setForm] = useState(initial);
   const [error, setError] = useState("");
   const fields: {
-    key: keyof Omit<Inspection, "checks" | "finalized">;
+    key: keyof Omit<Inspection, "checks" | "finalized" | "masterRefs">;
     label: string;
     type?: string;
     required?: boolean;
@@ -424,34 +440,60 @@ function InspectionForm({
     setForm((r) => ({ ...r, [key]: value }));
   }
   function save(finalized: boolean) {
-    const row = { ...form, finalized };
+    let row = { ...form, finalized };
+    try {
+      row = {
+        ...row,
+        masterRefs: masters.capture(
+          fieldsForSave(
+            inspectionFields(row),
+            inspectionFields(initial),
+            initial.masterRefs,
+          ),
+          initial.masterRefs,
+        ),
+      };
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ข้อมูลอ้างอิงไม่ถูกต้อง");
+      return;
+    }
     const issue = validateInspection(row, records);
     setError(issue);
     if (!issue) onSave(row);
   }
   const input = (
-    key: keyof Omit<Inspection, "checks" | "finalized">,
+    key: keyof Omit<Inspection, "checks" | "finalized" | "masterRefs">,
     label: string,
     type = "text",
     required = false,
-  ) => (
-    <div key={key} className="grid gap-2">
-      <Label htmlFor={`inspection-${key}`}>
-        {label}
-        {required ? " *" : ""}
-      </Label>
-      <Input
-        id={`inspection-${key}`}
-        type={type}
-        required={required}
-        readOnly={readOnly}
-        min={type === "number" ? 1 : undefined}
-        step={type === "number" ? 1 : undefined}
-        value={form[key]}
-        onChange={(e) => field(key, e.target.value)}
+  ) =>
+    !readOnly && ["location", "inspector", "approver"].includes(key) ? (
+      <MasterSelect
+        key={key}
+        kind={key === "location" ? "areas" : "personnel"}
+        label={label}
+        value={String(form[key] ?? "")}
+        reference={form.masterRefs?.[key]}
+        onChange={(value) => field(key, value)}
       />
-    </div>
-  );
+    ) : (
+      <div key={key} className="grid gap-2">
+        <Label htmlFor={`inspection-${key}`}>
+          {label}
+          {required ? " *" : ""}
+        </Label>
+        <Input
+          id={`inspection-${key}`}
+          type={type}
+          required={required}
+          readOnly={readOnly}
+          min={type === "number" ? 1 : undefined}
+          step={type === "number" ? 1 : undefined}
+          value={form[key]}
+          onChange={(e) => field(key, e.target.value)}
+        />
+      </div>
+    );
   return (
     <form
       className="space-y-5"
@@ -471,6 +513,27 @@ function InspectionForm({
       <SectionCard title="ข้อมูลการตรวจรับ">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {fields.map((f) => input(f.key, f.label, f.type, f.required))}
+          {!readOnly && (
+            <MasterSelect
+              kind="suppliers"
+              label="เลือกผู้จำหน่ายจากทะเบียน (ไม่บังคับ)"
+              value={
+                form.masterRefs?.sender?.value === form.sender
+                  ? form.sender
+                  : ""
+              }
+              reference={form.masterRefs?.sender}
+              onChange={(sender, ref) =>
+                setForm((r) => ({
+                  ...r,
+                  sender,
+                  masterRefs: ref
+                    ? { ...r.masterRefs, sender: ref }
+                    : r.masterRefs,
+                }))
+              }
+            />
+          )}
         </div>
       </SectionCard>
       <SectionCard

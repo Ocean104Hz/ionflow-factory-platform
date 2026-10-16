@@ -26,6 +26,8 @@ import {
 } from "./pr-domain";
 import { PRTotals, money } from "./pr-components";
 import { lineAmounts } from "./pr-domain";
+import { MasterSelect } from "@/src/features/master-data/master-select";
+import { useMasterData } from "@/src/features/master-data/master-provider";
 
 export function PREditor({
   original,
@@ -38,6 +40,7 @@ export function PREditor({
 }) {
   const router = useRouter();
   const { create, save } = usePR();
+  const masters = useMasterData();
   const [form, setForm] = useState<PR>(() =>
     original ? structuredClone(original) : newPR(),
   );
@@ -88,47 +91,45 @@ export function PREditor({
               onChange={(event) => update("date", event.target.value)}
             />
           </div>
-          <SelectField
+          <MasterSelect
+            kind="personnel"
+            reference={form.masterRefs?.requester}
             label="ผู้ขอซื้อ *"
-            value={form.requester || "none"}
-            onChange={(value) => {
-              const user = prUsers.find((row) => row.name === value);
+            value={form.requester}
+            onChange={(value, ref) => {
+              const user = masters.state.personnel.find(
+                (row) => row.id === ref?.id,
+              );
               setForm((current) => ({
                 ...current,
-                requester: user?.name ?? "",
+                requester: value,
                 department: user?.department ?? "",
+                masterRefs: ref
+                  ? { ...current.masterRefs, requester: ref }
+                  : current.masterRefs,
               }));
             }}
-            options={[
-              { value: "none", label: "เลือกผู้ขอซื้อ" },
-              ...prUsers.map((user) => ({
-                value: user.name,
-                label: user.name,
-              })),
-            ]}
           />
           <div className="grid gap-2">
             <Label htmlFor="pr-department">ฝ่าย/แผนก</Label>
             <Input id="pr-department" readOnly value={form.department} />
           </div>
-          <SelectField
+          <MasterSelect
+            kind="warehouses"
+            code
+            reference={form.masterRefs?.warehouse}
             label="คลัง / Site *"
-            value={form.warehouseCode || "none"}
-            onChange={(value) => {
-              const warehouse = prWarehouses.find((row) => row.code === value);
+            value={form.warehouseCode}
+            onChange={(value, ref) => {
               setForm((current) => ({
                 ...current,
-                warehouseCode: warehouse?.code ?? "",
-                warehouseName: warehouse?.name ?? "",
+                warehouseCode: value,
+                warehouseName: ref?.name ?? "",
+                masterRefs: ref
+                  ? { ...current.masterRefs, warehouse: ref }
+                  : current.masterRefs,
               }));
             }}
-            options={[
-              { value: "none", label: "เลือกคลัง" },
-              ...prWarehouses.map((row) => ({
-                value: row.code,
-                label: `${row.code} · ${row.name}`,
-              })),
-            ]}
           />
           <SelectField
             label="ประเภทคำขอ *"
@@ -162,18 +163,27 @@ export function PREditor({
               onChange={(event) => update("referenceNo", event.target.value)}
             />
           </div>
-          <SelectField
-            label="ผู้อนุมัติที่กำหนด *"
-            value={form.approver || "none"}
-            onChange={(value) =>
-              update("approver", value === "none" ? "" : value)
+          <MasterSelect
+            kind="personnel"
+            reference={form.masterRefs?.approver}
+            filter={(id) =>
+              masters.state.personnel.some(
+                (p) =>
+                  p.id === id &&
+                  ["ผู้ดูแลโรงงาน", "หัวหน้าแผนก"].includes(p.role),
+              )
             }
-            options={[
-              { value: "none", label: "เลือกผู้อนุมัติ" },
-              ...prUsers
-                .slice(2)
-                .map((user) => ({ value: user.name, label: user.name })),
-            ]}
+            label="ผู้อนุมัติที่กำหนด *"
+            value={form.approver}
+            onChange={(value, ref) =>
+              setForm((current) => ({
+                ...current,
+                approver: value,
+                masterRefs: ref
+                  ? { ...current.masterRefs, approver: ref }
+                  : current.masterRefs,
+              }))
+            }
           />
           <SelectField
             label="ความเร่งด่วน"
@@ -274,32 +284,61 @@ export function PREditor({
                     })),
                   ]}
                 />
-                <SelectField
+                <MasterSelect
+                  kind="suppliers"
+                  code
+                  reference={form.masterRefs?.[`supplier:${item.id}`]}
                   label={`ผู้ขาย รายการ ${index + 1}`}
-                  value={item.supplierCode || "none"}
-                  onChange={(value) => {
-                    const supplier = prSuppliers.find(
-                      (row) => row.code === value,
-                    );
-                    updateItem(item.id, {
-                      supplierCode: supplier?.code ?? "",
-                      supplierName: supplier?.name ?? "",
-                    });
+                  value={item.supplierCode}
+                  onChange={(value, ref) => {
+                    setForm((current) => ({
+                      ...current,
+                      items: current.items.map((r) =>
+                        r.id === item.id
+                          ? {
+                              ...r,
+                              supplierCode: value,
+                              supplierName: ref?.name ?? "",
+                            }
+                          : r,
+                      ),
+                      masterRefs: ref
+                        ? {
+                            ...current.masterRefs,
+                            [`supplier:${item.id}`]: ref,
+                          }
+                        : current.masterRefs,
+                    }));
                   }}
-                  options={[
-                    { value: "none", label: "ยังไม่ระบุผู้ขาย" },
-                    ...prSuppliers.map((row) => ({
-                      value: row.code,
-                      label: `${row.code} · ${row.name}`,
-                    })),
-                  ]}
                 />
-                <div className="grid gap-2">
-                  <Label htmlFor={`${item.id}-unit`}>
-                    หน่วย รายการ {index + 1}
-                  </Label>
-                  <Input id={`${item.id}-unit`} value={item.unit} readOnly />
-                </div>
+                <MasterSelect
+                  kind="units"
+                  label={`หน่วย รายการ ${index + 1}`}
+                  value={item.unit}
+                  reference={form.masterRefs?.[`unit:${item.id}`]}
+                  filter={(id) => {
+                    const source = prMaterials.find(
+                      (r) => r.code === item.code,
+                    );
+                    return masters.state.rows.some(
+                      (r) =>
+                        r.id === id &&
+                        (r.name === source?.unit ||
+                          r.aliases.includes(source?.unit ?? "")),
+                    );
+                  }}
+                  onChange={(unit, ref) =>
+                    setForm((current) => ({
+                      ...current,
+                      items: current.items.map((r) =>
+                        r.id === item.id ? { ...r, unit } : r,
+                      ),
+                      masterRefs: ref
+                        ? { ...current.masterRefs, [`unit:${item.id}`]: ref }
+                        : current.masterRefs,
+                    }))
+                  }
+                />
                 <div className="grid gap-2">
                   <Label htmlFor={`${item.id}-quantity`}>
                     จำนวน รายการ {index + 1} *

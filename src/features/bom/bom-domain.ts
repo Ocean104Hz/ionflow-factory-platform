@@ -1,3 +1,4 @@
+import type { MasterReferences } from "@/src/features/master-data/master-domain";
 export const productTypes = {
   FINISHED_GOOD: "สินค้าสำเร็จรูป",
   SEMI_FINISHED: "สินค้ากึ่งสำเร็จรูป",
@@ -13,6 +14,7 @@ export const formulaStatuses = {
 export type ProductType = keyof typeof productTypes;
 export type FormulaStatus = keyof typeof formulaStatuses;
 export type Master = {
+  masterRefs?: MasterReferences;
   id: string;
   code: string;
   name: string;
@@ -37,6 +39,7 @@ export type Component = {
   remarks: string;
 };
 export type Formula = {
+  masterRefs?: MasterReferences;
   id: string;
   masterId: string;
   code: string;

@@ -4,6 +4,7 @@ import {
   useContext,
   useRef,
   useState,
+  useEffect,
   type ReactNode,
 } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   demoPRs,
   demoPRUser,
   prUsers,
+  prMaterials,
   savePRRecord,
   transitionPR,
   type PR,
@@ -23,6 +25,11 @@ import {
   type PREvent,
 } from "./pr-domain";
 import type { AuditEntry } from "@/src/lib/mock-data/audit-log";
+import { useMasterData } from "@/src/features/master-data/master-provider";
+import {
+  prFields,
+  fieldsForSave,
+} from "@/src/features/master-data/internal-references";
 type PRContextValue = {
   records: PR[];
   audit: AuditEntry[];
@@ -59,11 +66,20 @@ function auditEvent(pr: PR, event: PREvent): AuditEntry {
   };
 }
 export function PRProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ records: PR[]; audit: AuditEntry[] }>({
-    records: demoPRs,
-    audit: [],
-  });
+  const masters = useMasterData();
+  const [state, setState] = useState<{ records: PR[]; audit: AuditEntry[] }>(
+    () => ({
+      records: demoPRs.map((row) => ({
+        ...row,
+        masterRefs: masters.capture(prFields(row), {}, true),
+      })),
+      audit: [],
+    }),
+  );
   const current = useRef(state);
+  useEffect(() => {
+    for (const row of state.records) masters.retain(row.masterRefs ?? {});
+  }, [state.records]);
   const actor = demoPRUser.name;
   // Synchronous snapshot prevents rapid demo commands from reading stale React state.
   function commit(records: PR[], events: AuditEntry[]) {
@@ -84,6 +100,8 @@ export function PRProvider({ children }: { children: ReactNode }) {
     );
   }
   function create(draft: PR, submit = false, imported = false) {
+    draft = { ...draft, masterRefs: masters.capture(prFields(draft)) };
+    validateUnits(draft);
     if (
       imported &&
       current.current.records.some((pr) => pr.referenceNo === draft.referenceNo)
@@ -108,7 +126,32 @@ export function PRProvider({ children }: { children: ReactNode }) {
   }
   function save(draft: PR, submit = false) {
     const old = get(draft.id);
+    draft = {
+      ...draft,
+      masterRefs: masters.capture(
+        fieldsForSave(prFields(draft), prFields(old), old.masterRefs),
+        old.masterRefs,
+      ),
+    };
+    validateUnits(draft);
     replace(savePRRecord(old, draft, actor, submit), old);
+  }
+  function validateUnits(row: PR) {
+    for (const item of row.items) {
+      const source = prMaterials.find((m) => m.code === item.code);
+      const ref = row.masterRefs?.[`unit:${item.id}`];
+      if (
+        source &&
+        item.unit !== source.unit &&
+        !masters.state.rows.some(
+          (m) =>
+            m.kind === "units" &&
+            m.id === ref?.id &&
+            [m.name, ...m.aliases].includes(source.unit),
+        )
+      )
+        throw new Error("หน่วยต้องตรงกับสินค้าเดิม · ยังไม่รองรับการแปลงหน่วย");
+    }
   }
   function act(id: string, action: PRAction, note = "") {
     const old = get(id);

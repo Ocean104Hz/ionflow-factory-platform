@@ -54,7 +54,11 @@ export function visibleModules(user: DemoUser) {
   );
 }
 
-export function validateDemoUser(user: DemoUser, users: DemoUser[]): string {
+export function validateDemoUser(
+  user: DemoUser,
+  users: DemoUser[],
+  allowedDepartments = departments,
+): string {
   if (!user.displayName.trim()) return "กรุณาระบุชื่อที่แสดง";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email.trim()))
     return "กรุณาระบุอีเมลที่ถูกต้อง";
@@ -66,7 +70,10 @@ export function validateDemoUser(user: DemoUser, users: DemoUser[]): string {
     )
   )
     return "อีเมลนี้ถูกใช้กับผู้ใช้สาธิตคนอื่นแล้ว";
-  if (!departments.includes(user.department) || !userRoles.includes(user.role))
+  if (
+    !allowedDepartments.includes(user.department) ||
+    !userRoles.includes(user.role)
+  )
     return "กรุณาเลือกแผนกและบทบาทที่ถูกต้อง";
   if (
     user.modules.some(

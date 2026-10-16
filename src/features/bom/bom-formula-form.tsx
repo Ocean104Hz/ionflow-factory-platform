@@ -27,6 +27,7 @@ import {
 } from "./bom-domain";
 import { useBOM } from "./bom-provider";
 import { BOMMaterialPicker } from "./bom-material-picker";
+import { MasterSelect } from "@/src/features/master-data/master-select";
 
 export function BOMFormulaForm({
   master,
@@ -50,29 +51,38 @@ export function BOMFormulaForm({
     label: string,
     required = false,
     type = "text",
-  ) => (
-    <div className="grid gap-2">
-      <Label htmlFor={`formula-${key}`}>
-        {label}
-        {required && " *"}
-      </Label>
-      <Input
-        id={`formula-${key}`}
-        type={type}
-        required={required}
-        readOnly={key === "version" && !!initial}
-        value={form[key]}
-        aria-invalid={!!errors[key]}
-        aria-describedby={errors[key] ? `formula-error-${key}` : undefined}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+  ) =>
+    key === "unit" ? (
+      <MasterSelect
+        kind="units"
+        label={label}
+        value={form.unit}
+        reference={form.masterRefs?.unit}
+        onChange={(unit) => setForm({ ...form, unit })}
       />
-      {errors[key] && (
-        <p id={`formula-error-${key}`} className="text-xs text-danger">
-          {errors[key]}
-        </p>
-      )}
-    </div>
-  );
+    ) : (
+      <div className="grid gap-2">
+        <Label htmlFor={`formula-${key}`}>
+          {label}
+          {required && " *"}
+        </Label>
+        <Input
+          id={`formula-${key}`}
+          type={type}
+          required={required}
+          readOnly={key === "version" && !!initial}
+          value={form[key]}
+          aria-invalid={!!errors[key]}
+          aria-describedby={errors[key] ? `formula-error-${key}` : undefined}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        />
+        {errors[key] && (
+          <p id={`formula-error-${key}`} className="text-xs text-danger">
+            {errors[key]}
+          </p>
+        )}
+      </div>
+    );
   function components(group: "ingredients" | "packaging", title: string) {
     const rows = form[group];
     function update(index: number, patch: Partial<Component>) {
@@ -174,12 +184,11 @@ export function BOMFormulaForm({
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          className="w-24"
-                          required
-                          aria-label={`หน่วย ${title} ${material?.code ?? i + 1}`}
+                        <MasterSelect
+                          kind="units"
+                          label={`หน่วย ${title} ${material?.code ?? i + 1}`}
                           value={r.unit}
-                          onChange={(e) => update(i, { unit: e.target.value })}
+                          onChange={(unit) => update(i, { unit })}
                         />
                       </TableCell>
                       <TableCell>

@@ -1,3 +1,4 @@
+import type { MasterReferences } from "@/src/features/master-data/master-domain";
 export type PRStatus =
   | "draft"
   | "pending_approval"
@@ -40,6 +41,7 @@ export type DemoPO = {
   lines: { itemId: string; quantity: number }[];
 };
 export type PR = {
+  masterRefs?: MasterReferences;
   id: string;
   number: string;
   date: string;
@@ -309,6 +311,7 @@ export function validatePR(pr: PR, submit = true): string | null {
     return "ยอดเงินสูงเกินขอบเขตที่รองรับ";
   if (
     pr.requester &&
+    !pr.masterRefs?.requester &&
     !prUsers.some(
       (user) => user.name === pr.requester && user.department === pr.department,
     )
@@ -316,6 +319,10 @@ export function validatePR(pr: PR, submit = true): string | null {
     return "ผู้ขอซื้อและแผนกไม่ตรงกับข้อมูลหลักสาธิต";
   if (
     (pr.warehouseCode || pr.warehouseName) &&
+    !(
+      pr.masterRefs?.warehouse?.value === pr.warehouseCode &&
+      pr.masterRefs.warehouse.name === pr.warehouseName
+    ) &&
     !prWarehouses.some(
       (warehouse) =>
         warehouse.code === pr.warehouseCode &&
@@ -325,6 +332,7 @@ export function validatePR(pr: PR, submit = true): string | null {
     return "รหัสคลังไม่ตรงกับชื่อคลัง";
   if (
     pr.approver &&
+    !pr.masterRefs?.approver &&
     !prUsers.slice(2).some((user) => user.name === pr.approver)
   )
     return "กรุณาเลือกผู้อนุมัติจากข้อมูลสาธิต";
@@ -336,9 +344,15 @@ export function validatePR(pr: PR, submit = true): string | null {
             (material) =>
               material.code === item.code &&
               material.name === item.name &&
-              material.unit === item.unit,
+              (material.unit === item.unit ||
+                pr.masterRefs?.[`unit:${item.id}`]?.value === item.unit),
           )) ||
         ((item.supplierCode || item.supplierName) &&
+          !(
+            pr.masterRefs?.[`supplier:${item.id}`]?.value ===
+              item.supplierCode &&
+            pr.masterRefs[`supplier:${item.id}`].name === item.supplierName
+          ) &&
           !prSuppliers.some(
             (supplier) =>
               supplier.code === item.supplierCode &&
