@@ -59,6 +59,7 @@ const routes = {
   ตรวจสอบวัตถุดิบ: "/qc_raw_material",
   รายงานผสมปุ๋ยผง: "/fertilizer-powder-mixing",
   ตรวจสอบคุณภาพการผลิต: "/production-quality",
+  ตรวจคุณภาพปุ๋ยอินทรีย์เคมี: "/qc-organic-fertilizer",
   รายงานการบรรจุ: "/packaging-report",
   "ใบ NC": "/nc-reports",
   ใบส่งตัวอย่าง: "/sample-submissions",
@@ -133,10 +134,10 @@ test("pellet production report appears once as a production placeholder with the
   assert.equal(reports[0].icon, "Factory");
   assert.equal(reports[0].href, undefined);
 });
-test("all seventeen implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all eighteen implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 17);
+  assert.equal(linked.length, 18);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);

@@ -6,6 +6,10 @@ import { Checkbox } from "@/src/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/src/components/ui/radio-group";
 import { SectionCard, StatusBadge } from "@/src/components/factory/patterns";
 import {
+  parseRequesterAddress,
+  editRequesterAddress,
+} from "./submission-log-address";
+import {
   analysisItems,
   typeOptions,
   formOptions,
@@ -33,13 +37,14 @@ export function SubmissionLogSections({
     prefix = readOnly ? "read-log" : "log",
     q = row.quantity,
     rr = q.receive_result,
-    staff = row.staff_section;
+    staff = row.staff_section,
+    address = parseRequesterAddress(row.requester_address);
   const patch = (value: Partial<SubmissionLog>) =>
     onChange?.({ ...row, ...value });
   const fieldError = (key: string) =>
-    errors[key] && (
+    errors[key === "sample_code_info" ? "sample_code" : key] && (
       <p id={`log-error-${key}`} className="text-xs text-danger">
-        {errors[key]}
+        {errors[key === "sample_code_info" ? "sample_code" : key]}
       </p>
     );
   function field(
@@ -51,9 +56,14 @@ export function SubmissionLogSections({
     type = "text",
     multiline = false,
   ) {
-    const id = `${prefix}-${key}`;
+    const id = `${prefix}-${key}`,
+      issue = errors[key === "sample_code_info" ? "sample_code" : key];
     return (
-      <div className="grid min-w-0 content-start gap-2" key={key}>
+      <div
+        className="grid min-w-0 content-start gap-2"
+        key={key}
+        data-log-field={key}
+      >
         {readOnly ? (
           <p className="text-xs text-muted-foreground">{label}</p>
         ) : (
@@ -72,8 +82,8 @@ export function SubmissionLogSections({
             rows={3}
             value={value}
             aria-required={required}
-            aria-invalid={!!errors[key]}
-            aria-describedby={errors[key] ? `log-error-${key}` : undefined}
+            aria-invalid={!!issue}
+            aria-describedby={issue ? `log-error-${key}` : undefined}
             onChange={(e) => set(e.target.value)}
           />
         ) : (
@@ -83,8 +93,8 @@ export function SubmissionLogSections({
             inputMode={key === "quantity_amount" ? "decimal" : undefined}
             value={value}
             aria-required={required}
-            aria-invalid={!!errors[key]}
-            aria-describedby={errors[key] ? `log-error-${key}` : undefined}
+            aria-invalid={!!issue}
+            aria-describedby={issue ? `log-error-${key}` : undefined}
             onChange={(e) => set(e.target.value)}
           />
         )}
@@ -186,18 +196,86 @@ export function SubmissionLogSections({
           <div className="sm:col-span-2 xl:col-span-3">
             {field(
               "requester_address",
-              "ที่อยู่",
-              row.requester_address,
-              (requester_address) => patch({ requester_address }),
+              "รายละเอียดที่อยู่",
+              address.detail,
+              (value) =>
+                patch({
+                  requester_address: editRequesterAddress(
+                    row.requester_address,
+                    "detail",
+                    value,
+                  ),
+                }),
               false,
               "text",
               true,
             )}
           </div>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          กรอกที่อยู่เอง · ไม่มีการค้นหาจากบริการภายนอก
+          ข้อความเดิมที่แยกไม่ได้จะอยู่ในรายละเอียดที่อยู่ครบถ้วน
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {field("requester_province", "จังหวัด", address.province, (value) =>
+            patch({
+              requester_address: editRequesterAddress(
+                row.requester_address,
+                "province",
+                value,
+              ),
+            }),
+          )}
+          {field(
+            "requester_district",
+            "อำเภอ / เขต",
+            address.district,
+            (value) =>
+              patch({
+                requester_address: editRequesterAddress(
+                  row.requester_address,
+                  "district",
+                  value,
+                ),
+              }),
+          )}
+          {field(
+            "requester_subdistrict",
+            "ตำบล / แขวง",
+            address.subdistrict,
+            (value) =>
+              patch({
+                requester_address: editRequesterAddress(
+                  row.requester_address,
+                  "subdistrict",
+                  value,
+                ),
+              }),
+          )}
+          {field(
+            "requester_zipcode",
+            "รหัสไปรษณีย์",
+            address.zipcode,
+            (value) =>
+              patch({
+                requester_address: editRequesterAddress(
+                  row.requester_address,
+                  "zipcode",
+                  value,
+                ),
+              }),
+          )}
+        </div>
       </SectionCard>
       <SectionCard title="ข้อมูลตัวอย่าง">
         <div className="grid gap-4 sm:grid-cols-2">
+          {field(
+            "sample_code_info",
+            "รหัสตัวอย่าง (ข้อมูลตัวอย่าง)",
+            row.sample_code,
+            (sample_code) => patch({ sample_code }),
+            true,
+          )}
           {field(
             "sample_name",
             "ชื่อตัวอย่าง",
@@ -210,6 +288,9 @@ export function SubmissionLogSections({
             "ลักษณะตัวอย่าง",
             row.sample_characteristics,
             (sample_characteristics) => patch({ sample_characteristics }),
+            false,
+            "text",
+            true,
           )}
         </div>
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -327,6 +408,7 @@ export function SubmissionLogSections({
             true,
           )}
         </div>
+        <p className="mt-2 text-sm text-muted-foreground">กิโลกรัม / กรัม</p>
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           {labSampleNote}
         </p>
@@ -376,6 +458,10 @@ export function SubmissionLogSections({
               }),
           )}
         </div>
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          รายงานผลการทดสอบจัดทำเป็นฉบับภาษาไทยเท่านั้น
+          เว้นแต่รายการวิเคราะห์เป็นภาษาอังกฤษ
+        </p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {field(
             "sender_name",

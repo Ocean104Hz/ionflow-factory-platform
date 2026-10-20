@@ -16,3 +16,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Preserve branding tokens, semantic status colors, mock-only workflows and accessibility.
 - Add missing primitives from the official registry; inspect and preserve customized primitives rather than overwriting them.
 - Use subtle shared transitions and transform feedback for interactive controls and content entry when useful (roughly 180–240ms, ease-out). Preserve layout stability, avoid continuous/decorative motion, and disable scaling/entry motion for prefers-reduced-motion. Reuse centralized motion/theme tokens instead of per-page effects.
+
+## UI Form Completeness Verification
+
+Whenever creating or modifying a form based on an existing business document or reference form:
+
+1. Build an authoritative field checklist from the reference.
+2. Check every required visible input, selection, conditional field, and informational note.
+3. Verify the connection between UI controls, form state, validation, save, edit, and detail/print views.
+4. Run a focused form completeness regression check.
+5. Report missing, intentionally changed, and unverified fields explicitly.
+6. Never claim a form is complete based only on domain/unit test results.
+7. Keep verification scoped to the changed form; do not run full repository tests by default.

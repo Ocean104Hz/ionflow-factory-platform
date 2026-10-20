@@ -87,7 +87,12 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/packaging-report",
     icon: FileText,
   },
-  { group: "QC", title: "ตรวจคุณภาพปุ๋ยอินทรีย์เคมี", icon: FileText },
+  {
+    group: "QC",
+    title: "ตรวจคุณภาพปุ๋ยอินทรีย์เคมี",
+    href: "/qc-organic-fertilizer",
+    icon: FileText,
+  },
   { group: "QC", title: "ใบ NC", href: "/nc-reports", icon: ClipboardList },
   {
     group: "QC",

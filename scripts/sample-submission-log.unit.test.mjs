@@ -16,6 +16,9 @@ const domainURL = url(
   js(read("src/features/sample-submission-log/submission-log-domain.ts")),
 );
 const d = await import(domainURL);
+const address = await import(
+  url(js(read("src/features/sample-submission-log/submission-log-address.ts")))
+);
 const fixtures = (
   await import(
     url(
@@ -73,7 +76,7 @@ test("all 32 original analysis keys map uniquely to their verified labels and pe
   assert.equal(new Set(d.analysisItems.map(([, label]) => label)).size, 32);
   assert.equal(
     d.analysisItems.find(([key]) => key === "ws")[1],
-    "กำมะถันที่ละลลายน้ำ (WS)",
+    "กำมะถันที่ละลายน้ำ (WS)",
   );
   const r = valid();
   for (const [key] of d.analysisItems) r.requested_items[key] = true;
@@ -196,4 +199,281 @@ test("create/edit preserve identity, reject duplicates and stale edits; filters 
     0,
   );
   assert.equal(d.pageLogs(fixtures.slice(0, 5), 2, 5).page, 1);
+});
+
+test("five address parts round-trip, preserve unparseable text and reset dependent fields", () => {
+  const raw = "  อาคารตัวอย่าง ชั้น 2\nข้อความที่แยกไม่ได้  ";
+  assert.equal(address.parseRequesterAddress(raw).detail, raw);
+  assert.equal(
+    address.composeRequesterAddress(address.parseRequesterAddress(raw)),
+    raw,
+  );
+  assert.equal(address.editRequesterAddress(raw, "detail", raw), raw);
+  let value = raw;
+  for (const [key, part] of Object.entries({
+    province: "นครปฐม",
+    district: "เมือง",
+    subdistrict: "สนามจันทร์",
+    zipcode: "73000",
+  }))
+    value = address.editRequesterAddress(value, key, part);
+  const parts = address.parseRequesterAddress(value);
+  assert.deepEqual(parts, {
+    detail: raw,
+    province: "นครปฐม",
+    district: "เมือง",
+    subdistrict: "สนามจันทร์",
+    zipcode: "73000",
+  });
+  assert.equal(address.composeRequesterAddress(parts), value);
+  assert.deepEqual(
+    address.parseRequesterAddress(
+      address.editRequesterAddress(value, "province", "กรุงเทพมหานคร"),
+    ),
+    {
+      detail: raw,
+      province: "กรุงเทพมหานคร",
+      district: "",
+      subdistrict: "",
+      zipcode: "",
+    },
+  );
+  assert.deepEqual(
+    address.parseRequesterAddress(
+      address.editRequesterAddress(value, "district", "ใหม่"),
+    ),
+    { ...parts, district: "ใหม่", subdistrict: "", zipcode: "" },
+  );
+  assert.equal(
+    address.parseRequesterAddress(
+      address.editRequesterAddress(value, "subdistrict", "ใหม่"),
+    ).zipcode,
+    "",
+  );
+  const legacy = "99 อาคาร ก ต.สนามจันทร์ อ.เมือง จ.นครปฐม 73000";
+  assert.equal(address.parseRequesterAddress(legacy).detail, "99 อาคาร ก");
+  assert.equal(
+    address.editRequesterAddress(legacy, "province", "นครปฐม"),
+    legacy,
+  );
+  const created = d.saveLog(
+    [],
+    {
+      ...valid(),
+      requester_address: value,
+      sample_characteristics: "ข้อความ\nหลายบรรทัด",
+      sample_code: "SHARED",
+    },
+    "address",
+  );
+  const updated = d.saveLog(
+    created.records,
+    {
+      ...created.saved,
+      requester_address: address.editRequesterAddress(
+        created.saved.requester_address,
+        "detail",
+        raw + "เพิ่มเติม",
+      ),
+    },
+    "unused",
+  );
+  assert.equal(updated.saved.id, "address");
+  assert.equal(
+    address.parseRequesterAddress(updated.saved.requester_address).detail,
+    raw + "เพิ่มเติม",
+  );
+  assert.equal(updated.saved.sample_characteristics, "ข้อความ\nหลายบรรทัด");
+  assert.equal(updated.saved.sample_code, "SHARED");
+});
+
+// Independent visible-field contract transcribed from the iCON business form.
+// These are UI call sites/bindings, not the TypeScript interface being tested.
+const formFields = [
+  ["doc_no", "row.doc_no", "doc_no"],
+  ["sample_code", "row.sample_code", "sample_code"],
+  ["requester_name", "row.requester_name", "requester_name"],
+  ["requester_phone", "row.requester_phone", "requester_phone"],
+  ["requester_email", "row.requester_email", "requester_email"],
+  ["requester_address", "address.detail", "detail", true],
+  ["requester_province", "address.province", "province"],
+  ["requester_district", "address.district", "district"],
+  ["requester_subdistrict", "address.subdistrict", "subdistrict"],
+  ["requester_zipcode", "address.zipcode", "zipcode"],
+  ["sample_code_info", "row.sample_code", "sample_code"],
+  ["sample_name", "row.sample_name", "sample_name"],
+  [
+    "sample_characteristics",
+    "row.sample_characteristics",
+    "sample_characteristics",
+    true,
+  ],
+  ["sample_type_other", "row.sample_type.other_detail", "sample_type"],
+  ["sample_form_other", "row.sample_form.other_detail", "sample_form"],
+  ["analysis_other", "row.requested_items.other_detail", "requested_items"],
+  ["quantity_amount", "q.amount", "quantity"],
+  ["quantity_packaging", "q.packaging", "quantity"],
+  ["sender_name", "row.sender_sign.signer_name", "sender_sign"],
+  ["sender_date", "row.sender_sign.signed_date", "sender_sign"],
+  [
+    "abnormal_detail",
+    "staff.sample_condition.abnormal_detail",
+    "sample_condition",
+    true,
+  ],
+  [
+    "reject_reason",
+    "staff.job_acceptance.reject_reason",
+    "job_acceptance",
+    true,
+  ],
+  ["received_by", "staff.received_by", "received_by"],
+  ["received_date", "staff.received_date", "received_date"],
+  ["accepted_by", "staff.accepted_by", "accepted_by"],
+  ["accepted_date", "staff.accepted_date", "accepted_date"],
+];
+
+test("visible UI contract: 26 fields, 6 choice groups, conditional controls and shared detail/print mapping", () => {
+  const source = read(
+    "src/features/sample-submission-log/submission-log-form.tsx",
+  );
+  const ast = ts.createSourceFile(
+    "form.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const calls = [];
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ["field", "choice"].includes(node.expression.getText(ast))
+    )
+      calls.push(node);
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  const fields = calls.filter((n) => n.expression.getText(ast) === "field");
+  assert.equal(fields.length, 26);
+  for (const [key, value, target, multiline = false] of formFields) {
+    const matches = fields.filter((n) => n.arguments[0]?.text === key);
+    assert.equal(matches.length, 1, key);
+    const args = matches[0].arguments;
+    assert.equal(args[2].getText(ast), value, key + " current value");
+    assert.ok(args[1].text.length > 0, key + " visible label");
+    assert.ok(args[3].getText(ast).includes(target), key + " state target");
+    assert.match(args[3].getText(ast), /patch\(/, key + " state update");
+    assert.equal(
+      args[6]?.kind === ts.SyntaxKind.TrueKeyword,
+      multiline,
+      key + " Textarea",
+    );
+    if (key.startsWith("requester_") && value.startsWith("address.")) {
+      assert.match(
+        args[3].getText(ast),
+        /editRequesterAddress\(\s*row\.requester_address/,
+      );
+      assert.ok(args[3].getText(ast).includes(`"${target}"`));
+    }
+  }
+  assert.deepEqual(
+    calls
+      .filter((n) => n.expression.getText(ast) === "choice")
+      .map((n) => n.arguments[0].text),
+    [
+      "sample_type",
+      "sample_form",
+      "sample_return",
+      "result_delivery",
+      "sample_condition",
+      "job_acceptance",
+    ],
+  );
+  for (const [key, condition] of [
+    ["sample_type_other", "row.sample_type.other_detail !== null"],
+    ["sample_form_other", "row.sample_form.other_detail !== null"],
+    ["analysis_other", "row.requested_items.other"],
+    ["abnormal_detail", "staff.sample_condition.abnormal"],
+    ["reject_reason", "staff.job_acceptance.rejected"],
+  ]) {
+    let node = fields.find((n) => n.arguments[0].text === key),
+      guarded = false;
+    while (node.parent) {
+      node = node.parent;
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+        node.left.getText(ast) === condition
+      )
+        guarded = true;
+    }
+    assert.ok(guarded, key + " conditional visibility");
+  }
+  assert.match(
+    source,
+    /<Textarea[\s\S]*?value=\{value\}[\s\S]*?onChange=\{\(e\) => set\(e.target.value\)\}/,
+  );
+  assert.match(
+    source,
+    /<Input[\s\S]*?value=\{value\}[\s\S]*?onChange=\{\(e\) => set\(e.target.value\)\}/,
+  );
+  assert.match(
+    source,
+    /<RadioGroup[\s\S]*?value=\{value\}[\s\S]*?onValueChange=\{set\}/,
+  );
+  assert.match(source, /analysisItems.map/);
+  assert.match(source, /checked=\{row.requested_items\[key\]\}/);
+  assert.match(source, /\[key\]: v === true/);
+  for (const note of [
+    "กิโลกรัม / กรัม",
+    "รายงานผลการทดสอบจัดทำเป็นฉบับภาษาไทยเท่านั้น เว้นแต่รายการวิเคราะห์เป็นภาษาอังกฤษ",
+    "{labSampleNote}",
+  ])
+    assert.ok(source.replace(/\s+/g, " ").includes(note));
+  assert.match(
+    read("src/features/sample-submission-log/submission-log-detail.tsx"),
+    /<SubmissionLogSections row=\{row\} \/>/,
+  );
+});
+
+test("all 32 authoritative analysis labels are preserved with corrected water-soluble spelling", () => {
+  const labels = [
+    "ความเป็นกรด - ด่าง(pH)",
+    "ความชื้น (Moisture)",
+    "ความถ่วงจำเพาะ (Specific gravity)",
+    "ค่าการนำไฟฟ้า (EC)",
+    "ฮิวมิก แอซิด (Humic acid)",
+    "อินทรียวัตถุ (OM)",
+    "ไนโตรเจนทั้งหมด (Total N)",
+    "แอมโมเนียมไนโตรเจน (AN)",
+    "ฟอสฟอรัสทั้งหมด (Total P₂O₅)",
+    "ฟอสฟอรัสที่เป็นประโยชน์ (AVP)",
+    "ฟอสฟอรัสที่ไม่ละลายในสารละลายซิเตรท (CIP)",
+    "โพแทสเซียมทั้งหมด (Total K₂O)",
+    "โพแทสเซียมที่ละลายน้ำ (WK₂O)",
+    "แคลเซียมออกไซด์ (CaO)",
+    "แมกนีเซียมออกไซด์ (MgO)",
+    "กำมะถันทั้งหมด (S)",
+    "เหล็กทั้งหมด (Fe)",
+    "ทองแดงทั้งหมด (Cu)",
+    "แมงกานีสทั้งหมด (Mn)",
+    "สังกะสีทั้งหมด (Zn)",
+    "โบรอน (B)",
+    "แคลเซียมที่ละลายน้ำ (WCa)",
+    "แมกนีเซียมที่ละลายน้ำ (WMg)",
+    "กำมะถันที่ละลายน้ำ (WS)",
+    "เหล็กที่ละลายน้ำ (WFe)",
+    "ทองแดงที่ละลายน้ำ (WCu)",
+    "แมงกานีสที่ละลายน้ำ (WMn)",
+    "สังกะสีที่ละลายน้ำ (WZn)",
+    "โบรอนที่ละลายน้ำ (WB)",
+    "โมลิบดีนัมที่ละลายน้ำ (WMo)",
+    "การย่อยสลายสมบูรณ์ (GI)",
+    "อื่นๆ (ระบุ)",
+  ];
+  assert.deepEqual(
+    d.analysisItems.map(([, label]) => label),
+    labels,
+  );
 });
