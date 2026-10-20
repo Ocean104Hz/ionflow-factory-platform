@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -25,7 +25,13 @@ import {
 } from "@/src/features/master-data/master-domain";
 import { useMasterData } from "@/src/features/master-data/master-provider";
 
-export function MasterSettings({ kind }: { kind: MasterKind }) {
+export function MasterSettings({
+  kind,
+  onDirtyChange,
+}: {
+  kind: MasterKind;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const id = useId();
   const isDepartment = kind === "departments";
   const title = masterKinds[kind];
@@ -38,6 +44,12 @@ export function MasterSettings({ kind }: { kind: MasterKind }) {
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const savedDraft = draft ? rows.find((row) => row.id === draft.id) : null;
+  useEffect(() => {
+    onDirtyChange?.(
+      draft !== null && JSON.stringify(draft) !== JSON.stringify(savedDraft),
+    );
+  }, [draft, savedDraft, onDirtyChange]);
   const types =
     kind === "departments" || kind === "warehouses"
       ? masterSettingTypes[kind]
@@ -195,7 +207,7 @@ export function MasterSettings({ kind }: { kind: MasterKind }) {
           </Button>
         }
       >
-        <div className="grid items-end gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_160px_160px_auto]">
+        <div className="grid min-w-0 items-end gap-3 pb-4 sm:grid-cols-2 2xl:grid-cols-[minmax(180px,1fr)_140px_140px_auto]">
           <div className="grid gap-2">
             <Label htmlFor={`${id}-search`}>ค้นหารหัสหรือชื่อ{title}</Label>
             <Input

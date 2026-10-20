@@ -4,7 +4,7 @@ import { Separator } from "../ui/separator";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import type { CSSProperties } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -18,11 +18,24 @@ import {
 } from "@/src/lib/branding";
 import { useBranding } from "./branding-provider";
 
-export function BrandingEditor() {
+export function BrandingEditor({
+  onDirtyChange,
+}: {
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { branding, updateBranding } = useBranding();
   const [draft, setDraft] = useState<FactoryBranding>(branding);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const normalizedDraft = JSON.stringify({
+    ...draft,
+    factoryName: draft.factoryName.trim(),
+    shortName: draft.shortName.trim(),
+    primaryColor: draft.primaryColor.toLowerCase(),
+  });
+  useEffect(() => {
+    onDirtyChange?.(busy || normalizedDraft !== JSON.stringify(branding));
+  }, [busy, normalizedDraft, branding, onDirtyChange]);
   const id = useId();
   async function loadLogo(
     file: File | undefined,

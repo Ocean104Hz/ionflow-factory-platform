@@ -25,6 +25,10 @@ export type FactoryNavigationItem = {
   alias?: boolean;
 };
 
+export function isNavigationActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 // Business navigation consolidated from verified iCON/iTech/iFoam module identities.
 // Missing href means this template does not yet implement that module.
 export const navigation: FactoryNavigationItem[] = [
@@ -74,22 +78,39 @@ export const navigation: FactoryNavigationItem[] = [
   {
     group: "QC",
     title: "ตรวจสอบคุณภาพการผลิต",
+    href: "/production-quality",
     icon: FlaskConical,
   },
   {
     group: "PACKING",
     title: "รายงานการบรรจุ",
+    href: "/packaging-report",
     icon: FileText,
   },
   { group: "QC", title: "ตรวจคุณภาพปุ๋ยอินทรีย์เคมี", icon: FileText },
-  { group: "QC", title: "ใบ NC", icon: ClipboardList },
-  { group: "QC", title: "ใบส่งตัวอย่าง", icon: Archive },
-  { group: "QC", title: "แบบบันทึกการส่งตัวอย่าง", icon: FileText },
+  { group: "QC", title: "ใบ NC", href: "/nc-reports", icon: ClipboardList },
+  {
+    group: "QC",
+    title: "ใบส่งตัวอย่าง",
+    href: "/sample-submissions",
+    icon: Archive,
+  },
+  {
+    group: "QC",
+    title: "แบบบันทึกการส่งตัวอย่าง",
+    href: "/sample-submission-log",
+    icon: FileText,
+  },
   { group: "WAREHOUSE", title: "รับวัตถุดิบและวัสดุ", icon: Package },
   { group: "WAREHOUSE", title: "รับวัตถุดิบ (PO/QC/รับตรง)", icon: Package },
   { group: "WAREHOUSE", title: "เบิกวัสดุ/วัตถุดิบ", icon: FileText },
   { group: "WAREHOUSE", title: "เบิกวัตถุดิบการผลิต", icon: FileText },
-  { group: "WAREHOUSE", title: "สต็อกวัตถุดิบ", icon: Boxes },
+  {
+    group: "WAREHOUSE",
+    title: "สินค้าคงคลัง",
+    href: "/inventory",
+    icon: Boxes,
+  },
   { group: "PRODUCTION", title: "ใบสั่งผลิต", icon: ClipboardList },
   { group: "PRODUCTION", title: "ใบสูตรผลิต", icon: FileText },
   { group: "PRODUCTION", title: "ใบสั่งผลิตสินค้า", icon: Factory },

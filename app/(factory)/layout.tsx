@@ -6,6 +6,9 @@ import { BOMProvider } from "@/src/features/bom/bom-provider";
 import { MixingProvider } from "@/src/features/fertilizer-powder-mixing/mixing-provider";
 import { LoadingState } from "@/src/components/factory/patterns";
 import { MasterDataProvider } from "@/src/features/master-data/master-provider";
+import { InventoryOperationsProvider } from "@/src/features/inventory/inventory-operations-provider";
+import { ProductionQualityProvider } from "@/src/features/production-quality/production-quality-provider";
+import { PackagingProvider } from "@/src/features/packaging-reports/packaging-provider";
 
 export default function FactoryLayout({
   children,
@@ -18,9 +21,15 @@ export default function FactoryLayout({
         <DemoProvider>
           <PRProvider>
             <BOMProvider>
-              <Suspense fallback={<LoadingState />}>
-                <AppShell>{children}</AppShell>
-              </Suspense>
+              <InventoryOperationsProvider>
+                <ProductionQualityProvider>
+                  <PackagingProvider>
+                    <Suspense fallback={<LoadingState />}>
+                      <AppShell>{children}</AppShell>
+                    </Suspense>
+                  </PackagingProvider>
+                </ProductionQualityProvider>
+              </InventoryOperationsProvider>
             </BOMProvider>
           </PRProvider>
         </DemoProvider>

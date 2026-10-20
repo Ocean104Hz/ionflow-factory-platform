@@ -43,7 +43,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Separator } from "../ui/separator";
 import { useBranding } from "./branding-provider";
 import { FactoryLogo } from "./factory-logo";
-import { navigation, navigationGroups } from "@/src/lib/constants/navigation";
+import {
+  navigation,
+  navigationGroups,
+  isNavigationActive,
+} from "@/src/lib/constants/navigation";
 import { Alert, AlertDescription } from "../ui/alert";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -75,7 +79,8 @@ function FactoryShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { branding } = useBranding();
   const current = navigation.find(
-    (item) => !item.alias && item.href && pathname.startsWith(item.href),
+    (item) =>
+      !item.alias && item.href && isNavigationActive(pathname, item.href),
   );
   const [previewMenu, setPreviewMenu] = useState("");
   return (
@@ -142,7 +147,9 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
               {item.href ? (
                 <SidebarMenuButton
                   asChild
-                  isActive={!item.alias && pathname.startsWith(item.href)}
+                  isActive={
+                    !item.alias && isNavigationActive(pathname, item.href)
+                  }
                   tooltip={item.title}
                   className="h-9"
                   aria-label={item.title}
@@ -154,7 +161,7 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
                       setOpenMobile(false);
                     }}
                     aria-current={
-                      !item.alias && pathname.startsWith(item.href)
+                      !item.alias && isNavigationActive(pathname, item.href)
                         ? "page"
                         : undefined
                     }

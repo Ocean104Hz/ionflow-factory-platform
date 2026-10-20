@@ -1,9 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
-  demoUsers,
-  departments,
   userRoles,
   factoryModules,
   visibleModules,
@@ -24,14 +22,26 @@ import { Label } from "../ui/label";
 import { useMasterData } from "@/src/features/master-data/master-provider";
 import { MasterSelect } from "@/src/features/master-data/master-select";
 
-export function UserSettings() {
+export function UserSettings({
+  onDirtyChange,
+}: {
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const id = useId();
   const masters = useMasterData();
   const users = masters.state.personnel as DemoUser[];
-  const [profile, setProfile] = useState<DemoUser>(demoUsers[0]);
+  const [profile, setProfile] = useState<DemoUser>(users[0]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const saved = users.find((user) => user.id === profile.id)!;
+  const normalizedProfile = JSON.stringify({
+    ...profile,
+    displayName: profile.displayName.trim(),
+    email: profile.email.trim(),
+  });
+  useEffect(() => {
+    onDirtyChange?.(normalizedProfile !== JSON.stringify(saved));
+  }, [normalizedProfile, saved, onDirtyChange]);
   const columns: Column<DemoUser>[] = [
     {
       key: "displayName",

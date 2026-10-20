@@ -26,7 +26,7 @@ const expectedGroups = {
       "รับวัตถุดิบ (PO/QC/รับตรง)",
       "เบิกวัสดุ/วัตถุดิบ",
       "เบิกวัตถุดิบการผลิต",
-      "สต็อกวัตถุดิบ",
+      "สินค้าคงคลัง",
     ],
   ],
   PRODUCTION: [
@@ -58,10 +58,16 @@ const routes = {
   PR: "/pr",
   ตรวจสอบวัตถุดิบ: "/qc_raw_material",
   รายงานผสมปุ๋ยผง: "/fertilizer-powder-mixing",
+  ตรวจสอบคุณภาพการผลิต: "/production-quality",
+  รายงานการบรรจุ: "/packaging-report",
+  "ใบ NC": "/nc-reports",
+  ใบส่งตัวอย่าง: "/sample-submissions",
+  แบบบันทึกการส่งตัวอย่าง: "/sample-submission-log",
   สูตรผสมวัตถุดิบ: "/bom",
   ใบส่งสินค้า: "/delivery-orders",
   ใบแจ้งหนี้: "/invoices",
   สินค้าและราคากลาง: "/products",
+  สินค้าคงคลัง: "/inventory",
 };
 function catalog() {
   const source = read("src/lib/constants/navigation.ts");
@@ -127,10 +133,10 @@ test("pellet production report appears once as a production placeholder with the
   assert.equal(reports[0].icon, "Factory");
   assert.equal(reports[0].href, undefined);
 });
-test("all eleven implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all seventeen implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 11);
+  assert.equal(linked.length, 17);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);
@@ -143,6 +149,16 @@ test("all eleven implemented routes remain accessible once, with no fabricated p
   }
   for (const item of items.filter((item) => !Object.hasOwn(routes, item.title)))
     assert.equal(item.href, undefined, item.title);
+});
+
+test("inventory replaces the warehouse stock placeholder once without changing its icon or group", () => {
+  const { items } = catalog();
+  const inventory = items.filter((item) => item.title === "สินค้าคงคลัง");
+  assert.equal(inventory.length, 1);
+  assert.equal(inventory[0].href, "/inventory");
+  assert.equal(inventory[0].group, "WAREHOUSE");
+  assert.equal(inventory[0].icon, "Boxes");
+  assert.ok(!items.some((item) => item.title === "สต็อกวัตถุดิบ"));
 });
 
 test("sidebar keeps shared shadcn navigation and safe inline placeholders instead of broken routes", () => {
