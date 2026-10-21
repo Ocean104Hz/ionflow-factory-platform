@@ -51,6 +51,8 @@ const expectedGroups = {
   SYSTEM: ["ระบบ", ["ตั้งค่าระบบ"]],
 };
 const routes = {
+  "เบิกวัสดุ/วัตถุดิบ": "/material-requisitions",
+  รับวัตถุดิบและวัสดุ: "/raw-material-receiving",
   แดชบอร์ด: "/dashboard",
   ประวัติการแก้ไข: "/audit_log",
   ตั้งค่าระบบ: "/settings",
@@ -134,10 +136,10 @@ test("pellet production report appears once as a production placeholder with the
   assert.equal(reports[0].icon, "Factory");
   assert.equal(reports[0].href, undefined);
 });
-test("all eighteen implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all twenty implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 18);
+  assert.equal(linked.length, 20);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);
@@ -150,6 +152,16 @@ test("all eighteen implemented routes remain accessible once, with no fabricated
   }
   for (const item of items.filter((item) => !Object.hasOwn(routes, item.title)))
     assert.equal(item.href, undefined, item.title);
+});
+
+test("receiving activates the existing warehouse entry without duplicating the intake-mode placeholder", () => {
+  const { items } = catalog();
+  const receiving = items.filter((item) => item.title === "รับวัตถุดิบและวัสดุ");
+  assert.equal(receiving.length, 1);
+  assert.equal(receiving[0].href, "/raw-material-receiving");
+  assert.equal(receiving[0].group, "WAREHOUSE");
+  assert.equal(receiving[0].icon, "Package");
+  assert.equal(items.find((item) => item.title === "รับวัตถุดิบ (PO/QC/รับตรง)")?.href, undefined);
 });
 
 test("inventory replaces the warehouse stock placeholder once without changing its icon or group", () => {

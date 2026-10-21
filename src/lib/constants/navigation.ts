@@ -106,9 +106,14 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/sample-submission-log",
     icon: FileText,
   },
-  { group: "WAREHOUSE", title: "รับวัตถุดิบและวัสดุ", icon: Package },
+  {
+    group: "WAREHOUSE",
+    title: "รับวัตถุดิบและวัสดุ",
+    href: "/raw-material-receiving",
+    icon: Package,
+  },
   { group: "WAREHOUSE", title: "รับวัตถุดิบ (PO/QC/รับตรง)", icon: Package },
-  { group: "WAREHOUSE", title: "เบิกวัสดุ/วัตถุดิบ", icon: FileText },
+  { group: "WAREHOUSE", title: "เบิกวัสดุ/วัตถุดิบ", href: "/material-requisitions", icon: FileText },
   { group: "WAREHOUSE", title: "เบิกวัตถุดิบการผลิต", icon: FileText },
   {
     group: "WAREHOUSE",
