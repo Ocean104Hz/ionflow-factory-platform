@@ -51,6 +51,7 @@ const expectedGroups = {
   SYSTEM: ["ระบบ", ["ตั้งค่าระบบ"]],
 };
 const routes = {
+  ใบสั่งผลิต: "/bulk-production-orders",
   "เบิกวัสดุ/วัตถุดิบ": "/material-requisitions",
   รับวัตถุดิบและวัสดุ: "/raw-material-receiving",
   แดชบอร์ด: "/dashboard",
@@ -136,10 +137,10 @@ test("pellet production report appears once as a production placeholder with the
   assert.equal(reports[0].icon, "Factory");
   assert.equal(reports[0].href, undefined);
 });
-test("all twenty implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all twenty-one implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 20);
+  assert.equal(linked.length, 21);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);
