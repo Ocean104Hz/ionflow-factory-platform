@@ -121,9 +121,9 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/inventory",
     icon: Boxes,
   },
-  { group: "PRODUCTION", title: "ใบสั่งผลิต", href: "/bulk-production-orders", icon: ClipboardList },
+  { group: "PRODUCTION", title: "ใบสั่งผลิต", icon: ClipboardList },
   { group: "PRODUCTION", title: "ใบสูตรผลิต", icon: FileText },
-  { group: "PRODUCTION", title: "ใบสั่งผลิตสินค้า", icon: Factory },
+  { group: "PRODUCTION", title: "ใบสั่งผลิตสินค้า", href: "/bulk-production-orders", icon: Factory },
   { group: "PRODUCTION", title: "รายงานการผลิต", icon: Factory },
   // Factory/site variants belong inside the future report module, not separate menus.
   {

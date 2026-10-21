@@ -23,7 +23,7 @@ import {
   type MasterKind,
   type MasterRow as MasterSettingRow,
 } from "@/src/features/master-data/master-domain";
-import { useMasterData } from "@/src/features/master-data/master-provider";
+import { useSettingsPostgres } from "./use-settings-postgres";
 
 export function MasterSettings({
   kind,
@@ -35,7 +35,7 @@ export function MasterSettings({
   const id = useId();
   const isDepartment = kind === "departments";
   const title = masterKinds[kind];
-  const { state, save, remove } = useMasterData();
+  const { state, save, remove, loading, loadError, busy, retry } = useSettingsPostgres();
   const rows = state.rows.filter((row) => row.kind === kind);
   const [draft, setDraft] = useState<MasterSettingRow | null>(null);
   const [search, setSearch] = useState("");
@@ -47,9 +47,9 @@ export function MasterSettings({
   const savedDraft = draft ? rows.find((row) => row.id === draft.id) : null;
   useEffect(() => {
     onDirtyChange?.(
-      draft !== null && JSON.stringify(draft) !== JSON.stringify(savedDraft),
+      busy || (draft !== null && JSON.stringify(draft) !== JSON.stringify(savedDraft)),
     );
-  }, [draft, savedDraft, onDirtyChange]);
+  }, [draft, savedDraft, busy, onDirtyChange]);
   const types =
     kind === "departments" || kind === "warehouses"
       ? masterSettingTypes[kind]
@@ -138,9 +138,9 @@ export function MasterSettings({
             size="sm"
             variant="outline"
             aria-label={`${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code}`}
-            onClick={() => {
+            onClick={async () => {
               try {
-                save({ ...row, active: !row.active });
+                await save({ ...row, active: !row.active });
               } catch (e) {
                 setError(e instanceof Error ? e.message : "ทำรายการไม่ได้");
                 return;
@@ -151,7 +151,7 @@ export function MasterSettings({
                   : previous,
               );
               setMessage(
-                `${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code} แล้ว (สาธิต)`,
+                `${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code} แล้ว (PostgreSQL)`,
               );
             }}
           >
@@ -172,9 +172,9 @@ export function MasterSettings({
                 ลบ
               </Button>
             }
-            onConfirm={() => {
+            onConfirm={async () => {
               try {
-                remove(row.id);
+                await remove(row.id);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "ลบไม่ได้");
                 return;
@@ -182,19 +182,21 @@ export function MasterSettings({
               setDraft((previous) =>
                 previous?.id === row.id ? null : previous,
               );
-              setMessage(`ลบ ${row.code} แล้ว (สาธิต)`);
+              setMessage(`ลบ ${row.code} แล้ว (PostgreSQL)`);
             }}
           />
         </div>
       ),
     },
   ];
+  if (loading) return <p role="status">กำลังโหลด Settings จาก PostgreSQL…</p>;
+  if (loadError) return <Alert><AlertDescription><p role="alert">{loadError}</p><Button type="button" variant="outline" onClick={retry}>ลองใหม่</Button></AlertDescription></Alert>;
   return (
-    <div className="space-y-4">
+    <fieldset disabled={busy} aria-busy={busy} className="min-w-0 space-y-4">
       <Alert>
         <AlertDescription>
-          ข้อมูลหลักภายใน{title} · เปลี่ยนหน้าแล้วยังคงอยู่
-          รีโหลดเพื่อคืนข้อมูลจำลอง · ไม่เชื่อม Sales Hub
+          ข้อมูลหลักภายใน{title} · บันทึกใน PostgreSQL Local
+          ไม่มีข้อมูลจำลองสำรอง · ไม่เชื่อม Sales Hub · การลบยังปิดไว้ ให้ปิดใช้งานแทน
         </AlertDescription>
       </Alert>
       <SectionCard
@@ -290,7 +292,7 @@ export function MasterSettings({
         >
           <form
             className="space-y-4"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
               const saved = {
                 ...draft,
@@ -298,7 +300,7 @@ export function MasterSettings({
                 name: draft.name.trim(),
               };
               try {
-                save(saved);
+                await save(saved);
                 setError("");
               } catch (e) {
                 setError(e instanceof Error ? e.message : "บันทึกไม่ได้");
@@ -307,7 +309,7 @@ export function MasterSettings({
               setDraft(null);
               setPage(1);
               setMessage(
-                `บันทึก ${saved.code} แล้ว (สาธิต)${search || type !== "all" || status !== "all" ? " · ล้างตัวกรองหากไม่พบรายการ" : ""}`,
+                `บันทึก ${saved.code} แล้ว (PostgreSQL)${search || type !== "all" || status !== "all" ? " · ล้างตัวกรองหากไม่พบรายการ" : ""}`,
               );
             }}
           >
@@ -454,6 +456,6 @@ export function MasterSettings({
       <p role="status" className="text-sm text-muted-foreground">
         {message}
       </p>
-    </div>
+    </fieldset>
   );
 }

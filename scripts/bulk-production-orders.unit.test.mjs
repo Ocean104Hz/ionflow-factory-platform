@@ -410,7 +410,7 @@ test("only the internal Bulk sidebar destination is activated, not Sales Hub or 
     (source.match(/href: "\/bulk-production-orders"/g) || []).length,
     1,
   );
-  assert.match(source, /title: "ใบสั่งผลิตสินค้า", icon: Factory/);
+  assert.match(source, /title: "ใบสั่งผลิตสินค้า", href: "\/bulk-production-orders", icon: Factory/);
   assert.match(source, /title: "ใบสูตรผลิต", icon: FileText/);
   assert.ok(
     existsSync(

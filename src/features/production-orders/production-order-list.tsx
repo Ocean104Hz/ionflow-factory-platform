@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { useDemo } from "@/src/components/factory/demo-provider";
+import { useProductionOrders } from "./production-orders-provider";
+import { ProductionOrderEditor } from "./production-order-editor";
 import {
   FactoryDataTable,
   FilterBar,
@@ -10,7 +11,6 @@ import {
   Pagination,
   RefreshButton,
   StatusBadge,
-  SelectField,
   defaultFilters,
   type Column,
   type Filters,
@@ -113,11 +113,11 @@ export const datalinkColumns: Column<ProductionOrder>[] = [
   ...salesHubColumns.slice(12),
 ];
 export function ProductionOrderList() {
-  const { orders } = useDemo();
+  const { orders, loading, error, refresh, busy } = useProductionOrders();
+  const [creating, setCreating] = useState(false);
   const [source, setSource] = useState<Source>("Sales Hub");
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [page, setPage] = useState(1);
-  const [state, setState] = useState("normal");
   const filtered = orders.filter(
     (r) =>
       r.source === source &&
@@ -132,8 +132,9 @@ export function ProductionOrderList() {
           ? !r.cancellation
           : r.cancellation?.status === "รอพิจารณา")),
   );
-  const rows = state === "empty" ? [] : filtered;
+  const rows = filtered;
   const count = rows.length;
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(count / filters.pageSize)));
   const columns = (
     source === "Sales Hub" ? salesHubColumns : datalinkColumns
   ).map((c) =>
@@ -141,7 +142,7 @@ export function ProductionOrderList() {
       ? {
           ...c,
           render: (_: ProductionOrder, i: number) =>
-            (page - 1) * filters.pageSize + i + 1,
+            (currentPage - 1) * filters.pageSize + i + 1,
         }
       : c,
   );
@@ -150,8 +151,10 @@ export function ProductionOrderList() {
       <PageHeader
         title="คำสั่งการผลิต"
         description="รายการคำสั่งการผลิตจาก Sales Hub และ Datalink"
-        actions={<RefreshButton onClick={() => setState("normal")} />}
+        actions={<><Button disabled={busy} onClick={() => setCreating(true)}>เพิ่มคำสั่ง Local</Button><RefreshButton onClick={refresh} /></>}
       />
+      {creating && <ProductionOrderEditor onClose={() => setCreating(false)} />}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <FilterBar
         production
         statuses={["รับข้อมูลแล้ว", "ยกเลิกแล้ว"]}
@@ -173,42 +176,26 @@ export function ProductionOrderList() {
             <TabsTrigger value="Sales Hub">Sales Hub</TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="w-full sm:w-56">
-          <SelectField
-            label="ตัวอย่างสถานะตาราง"
-            value={state}
-            onChange={(v) => {
-              setState(v);
-              setPage(1);
-            }}
-            options={[
-              { value: "normal", label: "ข้อมูลปกติ" },
-              { value: "empty", label: "ไม่มีข้อมูล" },
-              { value: "loading", label: "กำลังโหลด" },
-              { value: "error", label: "เกิดข้อผิดพลาด" },
-            ]}
-          />
-        </div>
       </div>
       <FactoryDataTable
         columns={columns}
         rows={rows.slice(
-          (page - 1) * filters.pageSize,
-          page * filters.pageSize,
+          (currentPage - 1) * filters.pageSize,
+          currentPage * filters.pageSize,
         )}
         rowKey={(r) => r.id}
         state={
-          state === "loading"
+          loading
             ? "loading"
-            : state === "error"
+            : error
               ? "error"
               : "normal"
         }
-        retry={() => setState("normal")}
+        retry={refresh}
         minWidth={source === "Sales Hub" ? 1900 : 1250}
         pagination={
           <Pagination
-            page={page}
+            page={currentPage}
             pageSize={filters.pageSize}
             total={count}
             onChange={setPage}
@@ -216,7 +203,7 @@ export function ProductionOrderList() {
         }
       />
       <p className="text-xs text-muted-foreground">
-        ข้อมูลตัวอย่าง · จำนวนรวมอาจประกอบด้วยหลายหน่วย โปรดดูรายการสินค้า
+        PostgreSQL Local · ไม่มี Mock fallback · จำนวนต่างหน่วยไม่ใช่ยอดวัตถุดิบรวม
       </p>
     </>
   );

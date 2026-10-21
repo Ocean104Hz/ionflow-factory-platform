@@ -1,9 +1,10 @@
 "use client";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
-import Link from "next/link";
 import { useState } from "react";
-import { CalendarPlus, Check, Play, X, ArrowUpRight } from "lucide-react";
-import { useDemo } from "@/src/components/factory/demo-provider";
+import { CalendarPlus, Check, Play, X } from "lucide-react";
+import { useProductionOrders } from "./production-orders-provider";
+import { ProductionOrderEditor } from "./production-order-editor";
+import { ProductionOrderFormDialog as FormDialog, ProductionOrderConfirmDialog as ConfirmDialog } from "./production-order-form-dialog";
 import {
   BackButton,
   PageHeader,
@@ -14,15 +15,9 @@ import {
   StatusBadge,
   EmptyState,
 } from "@/src/components/factory/patterns";
-import {
-  ConfirmDialog,
-  FormDialog,
-} from "@/src/components/factory/confirm-dialog";
-import { AttachmentGallery } from "@/src/components/factory/attachment-gallery";
 import { ItemTable } from "@/src/components/factory/item-table";
 import {
   Timeline,
-  type TimelineEntry,
 } from "@/src/components/factory/timeline";
 import { Button } from "@/src/components/ui/button";
 import { productionSections } from "@/src/lib/constants/status";
@@ -30,21 +25,27 @@ import { date, dateTime } from "@/src/lib/formatters";
 import type { ProductionOrder } from "@/src/lib/mock-data";
 
 export function ProductionOrderDetail({ id }: { id: string }) {
-  const { orders, updateOrder } = useDemo();
-  const order = orders.find((row) => row.id === id)!;
-  const [events, setEvents] = useState<TimelineEntry[]>([]);
+  const { orders, updateOrder, history, loading, busy, error, refresh, remove } = useProductionOrders();
+  const order = orders.find((row) => row.id === id);
+  const [editing, setEditing] = useState(false);
+  const events = history[id] ?? [];
   const [notice, setNotice] = useState("");
-  const change = (
+  const change = async (
     patch: Partial<ProductionOrder>,
     title: string,
-    reason = "บันทึกใน demo state เท่านั้น",
+    reason = "บันทึกใน PostgreSQL Local เท่านั้น",
   ) => {
     const at = new Date().toISOString();
-    updateOrder(id, { ...patch, updated: at });
-    setEvents((previous) => [{ title, at, description: reason }, ...previous]);
-    setNotice(`${title} · ไม่ส่งข้อมูลไปยังระบบจริง`);
+    try {
+      await updateOrder(id, { ...patch, updated: at }, `${title}: ${reason}`);
+      setNotice(`${title} · PostgreSQL Local · ไม่ส่งไปต้นทาง`);
+      return true;
+    } catch (e) { setNotice(e instanceof Error ? e.message : reason); return false; }
   };
-  const active = order.document !== "ยกเลิกแล้ว";
+  if (loading) return <p role="status">กำลังโหลด Production Orders PostgreSQL…</p>;
+  if (error && !order) return <Alert><AlertDescription><p role="alert">{error}</p><Button onClick={refresh}>ลองโหลดใหม่</Button></AlertDescription></Alert>;
+  if (!order) return <EmptyState title="ไม่พบคำสั่งการผลิต" description="เอกสารอาจไม่มีในฐานข้อมูลหรือถูกเก็บถาวรแล้ว" action={<BackButton href="/production-orders" />} />;
+  const active = !busy && order.document !== "ยกเลิกแล้ว";
   const canReview = active && order.production === "ยังไม่เริ่มผลิต";
   const approveReady =
     canReview &&
@@ -55,15 +56,19 @@ export function ProductionOrderDetail({ id }: { id: string }) {
     <>
       <PageHeader
         title={order.number}
-        description={`${order.source} · รับข้อมูล ${dateTime(order.received)} · ข้อมูลสมมติ`}
+        description={`${order.source} · รับข้อมูล ${dateTime(order.received)} · PostgreSQL Local`}
         parent={{ title: "คำสั่งการผลิต", href: "/production-orders" }}
         actions={
           <>
             <BackButton href="/production-orders" />
-            <RefreshButton />
+            <Button disabled={busy} variant="outline" onClick={() => setEditing(true)}>แก้ไขเอกสาร Local</Button>
+            <ConfirmDialog title="เก็บเอกสารถาวร" description="นำออกจากรายการ แต่คง identity และประวัติใน PostgreSQL" trigger={<Button variant="outline" disabled={busy || order.production !== "ยังไม่เริ่มผลิต"}>เก็บถาวร</Button>} onConfirm={() => remove(id)} />
+            <RefreshButton onClick={refresh} />
           </>
         }
       />
+      {editing && <ProductionOrderEditor existing={order} onClose={() => setEditing(false)} />}
+      {error && <p role="alert" className="text-danger">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <StatusBadge>{order.document}</StatusBadge>
         <StatusBadge>{order.production}</StatusBadge>
@@ -94,7 +99,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
         action={
           <FormDialog
             title="เสนอวันใหม่"
-            description="กำหนดการของโรงงาน · ข้อมูลสาธิตเท่านั้น"
+            description="กำหนดการของโรงงาน · บันทึก PostgreSQL Local ไม่ส่งไปต้นทาง"
             trigger={
               <Button variant="outline" disabled={!active}>
                 <CalendarPlus />
@@ -186,7 +191,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
       </SectionCard>
       <SectionCard
         title={productionSections[2]}
-        subtitle="ตัวอย่าง workflow · ทุกการยืนยันเปลี่ยนเฉพาะข้อมูล demo"
+        subtitle="ทุกการยืนยันบันทึกเฉพาะ PostgreSQL Local · ไม่ตัด stock หรือสร้างใบเบิก"
       >
         <div className="grid gap-4 md:grid-cols-3">
           {[
@@ -305,7 +310,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
           {order.production === "กำลังผลิต" && (
             <ConfirmDialog
               title="ผลิตเสร็จแล้ว"
-              description="บันทึกผลผลิตเสร็จใน demo"
+              description="บันทึกสถานะผลิตเสร็จใน Local ไม่รับสินค้าเข้าคลัง"
               trigger={
                 <Button variant="outline" disabled={!active}>
                   ผลิตเสร็จแล้ว
@@ -342,29 +347,29 @@ export function ProductionOrderDetail({ id }: { id: string }) {
         <InfoGrid>
           <InfoRow label="รหัสลูกค้า">{order.customerCode}</InfoRow>
           <InfoRow label="ชื่อลูกค้า">{order.customer}</InfoRow>
-          <InfoRow label="โทรศัพท์">000-000-0000 (สมมติ)</InfoRow>
-          <InfoRow label="ผู้ติดต่อ">ผู้ประสานงานสาธิต</InfoRow>
+          <InfoRow label="โทรศัพท์">ยังไม่มีข้อมูลอ้างอิง</InfoRow>
+          <InfoRow label="ผู้ติดต่อ">ยังไม่มีข้อมูลอ้างอิง</InfoRow>
         </InfoGrid>
       </SectionCard>
       <SectionCard title={productionSections[5]}>
         <InfoGrid>
-          <InfoRow label="ชื่อผู้รับ">ผู้รับสินค้าสาธิต</InfoRow>
+          <InfoRow label="ชื่อผู้รับ">ยังไม่มีข้อมูลอ้างอิง</InfoRow>
           <InfoRow label="ที่อยู่">
-            อาคารตัวอย่าง เขตสาธิต ประเทศไทย (สมมติ)
+            ยังไม่มีข้อมูลอ้างอิง
           </InfoRow>
-          <InfoRow label="โทรศัพท์">000-000-0000 (สมมติ)</InfoRow>
+          <InfoRow label="โทรศัพท์">ยังไม่มีข้อมูลอ้างอิง</InfoRow>
           <InfoRow label="คลังสินค้า">{order.warehouse}</InfoRow>
         </InfoGrid>
       </SectionCard>
       <SectionCard
         title={productionSections[6]}
-        subtitle="ภาพจำลองในโปรเจกต์ · กดเพื่อเปิดภาพตัวอย่าง"
+        subtitle="ยังไม่มี approved attachment adapter"
       >
-        <AttachmentGallery />
+        <p className="text-muted-foreground">ยังไม่มีไฟล์แนบจากต้นทาง</p>
       </SectionCard>
       <SectionCard
         title={productionSections[7]}
-        subtitle="มีทั้งตัวอย่างไม่มีคำขอและคำขอรอพิจารณา"
+        subtitle="แสดงเฉพาะคำขอที่บันทึกไว้ ไม่มีการสร้างคำขอแทนต้นทาง"
       >
         {cancellation ? (
           <>
@@ -387,7 +392,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
               <div className="no-print mt-5 flex flex-wrap gap-2">
                 <FormDialog
                   title="ยอมรับการยกเลิก"
-                  description="คำสั่งสาธิตนี้จะเปลี่ยนเป็นยกเลิกแล้ว"
+                  description="บันทึกยกเลิกใน PostgreSQL Local ไม่ส่งการยกเลิกไปต้นทาง"
                   destructive
                   trigger={
                     <Button variant="destructive">ยอมรับการยกเลิก</Button>
@@ -408,7 +413,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
                           ...cancellation,
                           status: "ยกเลิกแล้ว",
                           decision: `ยอมรับ: ${v.reason}`,
-                          by: "ผู้ใช้งานสาธิต",
+                          by: "LOCAL_DEVELOPMENT",
                           decidedAt: new Date().toISOString(),
                         },
                       },
@@ -435,7 +440,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
                           ...cancellation,
                           status: "โรงงานปฏิเสธ",
                           decision: v.reason,
-                          by: "ผู้ใช้งานสาธิต",
+                          by: "LOCAL_DEVELOPMENT",
                           decidedAt: new Date().toISOString(),
                         },
                       },
@@ -449,29 +454,17 @@ export function ProductionOrderDetail({ id }: { id: string }) {
         ) : (
           <EmptyState
             title="ไม่มีคำขอยกเลิก"
-            description="ตัวอย่างคำขอรอพิจารณาอยู่ใน PDO-DEMO-0002"
-            action={
-              <Button variant="outline" asChild>
-                <Link href="/production-orders/po-02">
-                  ดูตัวอย่างคำขอ
-                  <ArrowUpRight />
-                </Link>
-              </Button>
-            }
+            description="ยังไม่มีคำขอยกเลิกอ้างอิงในเอกสารนี้"
           />
         )}
       </SectionCard>
       <SectionCard
         title={productionSections[8]}
-        subtitle="แสดงข้อมูลสมมติและเลขประจำตัวที่ปกปิดเท่านั้น"
+        subtitle="ยังไม่มี approved driver adapter"
       >
         {order.source === "Sales Hub" ? (
           <InfoGrid>
-            <InfoRow label="ชื่อคนขับ">คนขับสาธิต</InfoRow>
-            <InfoRow label="โทรศัพท์">000-000-0000</InfoRow>
-            <InfoRow label="เลขประจำตัว (ปกปิด)">1-****-*****-**-9</InfoRow>
-            <InfoRow label="ทะเบียนรถ">DEMO-0001</InfoRow>
-            <InfoRow label="ที่อยู่">ที่อยู่สาธิต (สมมติ)</InfoRow>
+            <InfoRow label="ข้อมูลคนขับ">ยังไม่มีข้อมูลอ้างอิง</InfoRow>
           </InfoGrid>
         ) : (
           <p className="text-muted-foreground">
@@ -480,26 +473,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
         )}
       </SectionCard>
       <SectionCard title={productionSections[9]}>
-        <Timeline
-          entries={[
-            ...events,
-            {
-              title: "ส่งสถานะกลับ Sales Hub (จำลอง)",
-              at: order.updated,
-              description: "ตัวอย่างผลสำเร็จ · ไม่มี network request",
-            },
-            {
-              title: "แก้ไขข้อมูล (จำลอง)",
-              at: order.received,
-              description: `Revision ${order.revision} · สำเร็จ`,
-            },
-            {
-              title: `รับข้อมูลจาก ${order.source} (จำลอง)`,
-              at: order.received,
-              description: "รับเอกสารสำเร็จ · mock data",
-            },
-          ]}
-        />
+        <Timeline entries={events} />
       </SectionCard>
       <SectionCard title={productionSections[10]}>
         <div className="grid gap-6 md:grid-cols-2">
@@ -508,11 +482,11 @@ export function ProductionOrderDetail({ id }: { id: string }) {
           </dl>
           <div className="rounded-lg border border-dashed p-5">
             <p className="text-xs text-muted-foreground">
-              ผู้อนุมัติ / ลายเซ็นตัวอย่าง
+              ผู้อนุมัติ / ลายเซ็น
             </p>
             <p className="mt-3 font-semibold">
               {order.approval === "โรงงานอนุมัติ"
-                ? "ผู้อนุมัติสาธิต"
+                ? "บันทึกสถานะ Local — ยังไม่มี verified approver"
                 : "ยังไม่มีผู้อนุมัติ"}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">

@@ -103,7 +103,7 @@ export function BulkProductionWorkspace() {
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
-        title="ใบสั่งผลิต"
+        title="ใบสั่งผลิตสินค้า"
         description="จัดทำแผนการผลิตปุ๋ย ติดตามยอดผลิตจริงและยอดค้างตามรายการ"
         actions={
           <>

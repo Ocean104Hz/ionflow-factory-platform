@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import ts from "typescript";
 
 const read = (path) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -51,7 +52,7 @@ const expectedGroups = {
   SYSTEM: ["ระบบ", ["ตั้งค่าระบบ"]],
 };
 const routes = {
-  ใบสั่งผลิต: "/bulk-production-orders",
+  ใบสั่งผลิตสินค้า: "/bulk-production-orders",
   "เบิกวัสดุ/วัตถุดิบ": "/material-requisitions",
   รับวัตถุดิบและวัสดุ: "/raw-material-receiving",
   แดชบอร์ด: "/dashboard",
@@ -194,4 +195,25 @@ test("sidebar keeps shared shadcn navigation and safe inline placeholders instea
   assert.match(shell, /item.href \? \(/);
   assert.match(shell, /key=\{item.title\}/);
   assert.doesNotMatch(shell, /href="#"|window\.location|https:\/\//);
+});
+
+test("purchasing orders and Bulk product documents have separate routes, components and active states", async () => {
+  const { items } = catalog();
+  const incoming = items.find((r) => r.title === "คำสั่งการผลิต");
+  const bulk = items.find((r) => r.title === "ใบสั่งผลิตสินค้า");
+  assert.equal(incoming.group, "PURCHASING");
+  assert.equal(incoming.href, "/production-orders");
+  assert.equal(bulk.group, "PRODUCTION");
+  assert.equal(bulk.href, "/bulk-production-orders");
+  assert.equal(items.find((r) => r.title === "ใบสั่งผลิต").href, undefined);
+  assert.match(read("app/(factory)/production-orders/page.tsx"), /<ProductionOrderList\s*\/>/);
+  assert.match(read("app/(factory)/bulk-production-orders/page.tsx"), /<BulkProductionWorkspace\s*\/>/);
+  const nav = read("src/lib/constants/navigation.ts");
+  const functionSource = nav.slice(nav.indexOf("export function isNavigationActive"), nav.indexOf("// Business navigation"));
+  const code = ts.transpileModule(functionSource, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
+  const { isNavigationActive } = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
+  for (const [pathname, expected] of [[incoming.href, incoming], [`${incoming.href}/existing-id`, incoming], [bulk.href, bulk]]) {
+    assert.deepEqual(items.filter((r) => r.href && !r.alias && isNavigationActive(pathname,r.href)).map((r) => r.title), [expected.title]);
+  }
+  assert.equal(isNavigationActive("/production-orders-extra", incoming.href), false);
 });
