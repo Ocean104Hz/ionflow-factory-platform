@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
-  ChevronRight,
   Inbox,
   AlertCircle,
   RefreshCw,
@@ -425,18 +424,20 @@ export function SelectField({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
     <div className="grid min-w-0 gap-2">
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} className="w-full bg-surface">
+        <SelectTrigger id={id} className="w-full bg-surface" disabled={disabled}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

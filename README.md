@@ -85,7 +85,7 @@ Workspace surface hierarchy uses a cool neutral canvas with white cards/controls
 
 ### Combined factory navigation
 
-`src/lib/constants/navigation.ts` inventories the sidebar labels from iCON, iTech and iFoam (read-only reference). It contains 39 distinct menu labels grouped by operation, plus the existing Settings footer. Different legacy names remain visible; identical labels are listed once. Implemented links stay within the template. Unimplemented modules show **เร็วๆนี้** and an inline explanation rather than a fabricated route or a link to production. Legacy aliases that share a template route do not receive a second active highlight. This adds menu names only: no new workflows, integrations or access enforcement. iCON's configured-but-hidden goods-issue label and iFoam's legacy Kanchan 3 report label are retained for completeness, not as implemented features.
+`src/lib/constants/navigation.ts` consolidates the verified iCON, iTech and iFoam sidebar inventory into 30 canonical menu items grouped by operation. Legacy labels for the same intake, material requisition, internal production order and production-report workflows are represented once; factory/site variants belong inside the canonical workspace rather than separate menus. Implemented links stay within the template. Unimplemented modules show **เร็วๆนี้** and an inline explanation rather than a fabricated route or a link to production. This consolidation changes navigation only: it does not merge distinct business documents, integrations or access rules.
 
 ### Visual polish pass
 
@@ -183,6 +183,12 @@ Focused check: `node --test scripts/audit-log.unit.test.mjs scripts/sidebar-menu
 ## BOM formula UI demo
 
 Open `/bom` from **สูตรผสมวัตถุดิบ**. The isolated `BOMProvider` owns masters, versioned formulas, ingredients, packaging, defaults, timestamps and per-formula demo history. Shared shadcn dialogs keep the header/close control visible while the body scrolls. Search, metadata filters, pagination and normal/loading/empty demo modes use existing Factory patterns.
+
+## Production execution demo
+
+The Production menu has four canonical destinations: `/bulk-production-orders`, `/bom`, `/production-reports` and `/production-receipts`. **ใบสูตรผลิต** is issued and printed inside a saved production order, where it snapshots the active BOM version and calculated material quantities; it is not a second formula master. **คลัง BOM** was removed as a duplicate destination—future hierarchy/where-used needs belong inside `/bom`.
+
+`ProductionFlowProvider` keeps the mock order → formula snapshot → actual report → output receipt chain consistent across client navigation. Reports own actual output/material usage and do not post stock. Only confirmation in `/production-receipts` commits a WIP/FG `RECEIPT` to the shared in-memory Stock Ledger, rejects over-receipt, uses an idempotent operation ID, and locks confirmed receipts. All production-flow data still resets on full reload and is not a backend workflow.
 
 - Normalized master codes and per-master versions are unique. Existing version identities are locked; new versions are separate records. RAW_MATERIAL/SUB_MATERIAL masters are components, not formula parents, matching iCON.
 - Defaults must belong to the master and be ACTIVE. Changing defaults never changes other formula statuses. Confirmed deletion rejects formula/default/component references; there is no cascade.

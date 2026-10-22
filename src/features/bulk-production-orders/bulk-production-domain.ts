@@ -9,6 +9,8 @@ export interface BulkHeader {
 }
 export interface BulkRow {
   id: string;
+  formulaId: string;
+  inventoryItemId: string;
   itemName: string;
   product: string;
   productCode: string;
@@ -49,6 +51,8 @@ export interface BulkOrder {
 export type BulkErrors = Record<string, string>;
 export interface BulkProduct {
   id: string;
+  formulaId: string;
+  inventoryItemId: string;
   code: string;
   name: string;
   size: number;
@@ -63,6 +67,8 @@ export const signerLabels = {
 export function newBulkRow(id: string): BulkRow {
   return {
     id,
+    formulaId: "",
+    inventoryItemId: "",
     itemName: "",
     product: "",
     productCode: "",
@@ -122,6 +128,8 @@ export function selectBulkProduct(
   product: BulkProduct,
 ): BulkOrder {
   return updateBulkRow(doc, id, {
+    formulaId: product.formulaId,
+    inventoryItemId: product.inventoryItemId,
     product: product.name,
     productCode: product.code,
     size: product.size,

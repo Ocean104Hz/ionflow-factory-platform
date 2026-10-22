@@ -24,24 +24,17 @@ const expectedGroups = {
     "คลังสินค้า",
     [
       "รับวัตถุดิบและวัสดุ",
-      "รับวัตถุดิบ (PO/QC/รับตรง)",
       "เบิกวัสดุ/วัตถุดิบ",
-      "เบิกวัตถุดิบการผลิต",
       "สินค้าคงคลัง",
     ],
   ],
   PRODUCTION: [
     "การผลิต",
     [
-      "ใบสั่งผลิต",
-      "ใบสูตรผลิต",
       "ใบสั่งผลิตสินค้า",
-      "รายงานการผลิต",
-      "รายงานการผลิตปุ๋ยเม็ด",
-      "รับยอดผลิต",
-      "ใบรายงานการผลิต",
-      "คลัง BOM",
       "สูตรผสมวัตถุดิบ",
+      "รายงานการผลิต",
+      "รับยอดผลิต",
     ],
   ],
   PACKING: ["บรรจุสินค้า", ["รายงานการบรรจุ", "ใบแจ้งสั่งแพ็คสินค้า"]],
@@ -53,6 +46,8 @@ const expectedGroups = {
 };
 const routes = {
   ใบสั่งผลิตสินค้า: "/bulk-production-orders",
+  รายงานการผลิต: "/production-reports",
+  รับยอดผลิต: "/production-receipts",
   "เบิกวัสดุ/วัตถุดิบ": "/material-requisitions",
   รับวัตถุดิบและวัสดุ: "/raw-material-receiving",
   แดชบอร์ด: "/dashboard",
@@ -98,10 +93,10 @@ function catalog() {
   ].map(([, key, title]) => ({ key, title }));
   return { items, groups };
 }
-test("sidebar has 35 canonical items in the approved business groups", () => {
+test("sidebar has 28 canonical items in the approved business groups", () => {
   const { items, groups } = catalog();
   const titles = items.map((item) => item.title);
-  assert.equal(items.length, 35);
+  assert.equal(items.length, 28);
   assert.equal(titles.length, new Set(titles).size);
   assert.deepEqual(
     groups,
@@ -123,25 +118,31 @@ test("sidebar has 35 canonical items in the approved business groups", () => {
     "ตั้งราคาสินค้า",
     "ใบตรวจสอบวัตถุดิบ",
     "ใบตรวจวัตถุดิบ",
+    "รับวัตถุดิบ (PO/QC/รับตรง)",
+    "เบิกวัตถุดิบการผลิต",
+    "ใบสั่งผลิต",
     "รายงานการผลิตปุ๋ยเม็ด (กาญ 1)",
     "รายงานการผลิตปุ๋ยเม็ด (กาญ 3)",
+    "รายงานการผลิตปุ๋ยเม็ด",
+    "ใบรายงานการผลิต",
   ])
     assert.ok(!titles.includes(removed), removed);
 });
 
-test("pellet production report appears once as a production placeholder with the Factory icon", () => {
-  const reports = catalog().items.filter(
-    (item) => item.title === "รายงานการผลิตปุ๋ยเม็ด",
-  );
+test("production report variants collapse into one implemented production page", () => {
+  const { items } = catalog();
+  const reports = items.filter((item) => item.title === "รายงานการผลิต");
   assert.equal(reports.length, 1);
   assert.equal(reports[0].group, "PRODUCTION");
   assert.equal(reports[0].icon, "Factory");
-  assert.equal(reports[0].href, undefined);
+  assert.equal(reports[0].href, "/production-reports");
+  assert.ok(!items.some((item) => item.title === "รายงานการผลิตปุ๋ยเม็ด"));
+  assert.ok(!items.some((item) => item.title === "ใบรายงานการผลิต"));
 });
-test("all twenty-one implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all twenty-three implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 21);
+  assert.equal(linked.length, 23);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);
@@ -156,14 +157,14 @@ test("all twenty-one implemented routes remain accessible once, with no fabricat
     assert.equal(item.href, undefined, item.title);
 });
 
-test("receiving activates the existing warehouse entry without duplicating the intake-mode placeholder", () => {
+test("receiving uses one warehouse entry for every intake mode", () => {
   const { items } = catalog();
   const receiving = items.filter((item) => item.title === "รับวัตถุดิบและวัสดุ");
   assert.equal(receiving.length, 1);
   assert.equal(receiving[0].href, "/raw-material-receiving");
   assert.equal(receiving[0].group, "WAREHOUSE");
   assert.equal(receiving[0].icon, "Package");
-  assert.equal(items.find((item) => item.title === "รับวัตถุดิบ (PO/QC/รับตรง)")?.href, undefined);
+  assert.ok(!items.some((item) => item.title === "รับวัตถุดิบ (PO/QC/รับตรง)"));
 });
 
 test("inventory replaces the warehouse stock placeholder once without changing its icon or group", () => {
@@ -205,7 +206,7 @@ test("purchasing orders and Bulk product documents have separate routes, compone
   assert.equal(incoming.href, "/production-orders");
   assert.equal(bulk.group, "PRODUCTION");
   assert.equal(bulk.href, "/bulk-production-orders");
-  assert.equal(items.find((r) => r.title === "ใบสั่งผลิต").href, undefined);
+  assert.ok(!items.some((r) => r.title === "ใบสั่งผลิต"));
   assert.match(read("app/(factory)/production-orders/page.tsx"), /<ProductionOrderList\s*\/>/);
   assert.match(read("app/(factory)/bulk-production-orders/page.tsx"), /<BulkProductionWorkspace\s*\/>/);
   const nav = read("src/lib/constants/navigation.ts");

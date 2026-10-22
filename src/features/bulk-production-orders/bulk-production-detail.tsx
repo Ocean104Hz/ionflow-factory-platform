@@ -12,7 +12,6 @@ import {
 import {
   bulkPrintPages,
   bulkSummary,
-  remainingQty,
   signerLabels,
   type BulkOrder,
 } from "./bulk-production-domain";
@@ -69,22 +68,11 @@ export function BulkProductionDocument({ doc }: { doc: BulkOrder }) {
                   ["จำนวนที่สั่งผลิต", `${r.qty ?? 0} ${r.qtyUnit}`],
                   ["ขนาด", `${r.size ?? 0} กิโลกรัม`],
                   ["หมายเหตุขนาด / รายการ", r.sizeNote],
-                  ["วันที่ผลิต", r.prodDate],
-                  ["รายละเอียดวันที่ผลิต", r.prodDateNote],
-                  ["เวลาที่เริ่มผลิต", r.startTime],
-                  ["รายละเอียดเวลาเริ่มผลิต", r.startTimeNote],
-                  ["เวลาสิ้นสุด", r.endTime],
-                  ["รายละเอียดเวลาสิ้นสุด", r.endTimeNote],
-                  ["จำนวนที่ผลิตจริง", `${r.producedQty ?? 0} ${r.qtyUnit}`],
-                  ["จำนวนคงเหลือ (คำนวณ)", `${remainingQty(r)} ${r.qtyUnit}`],
                   [
                     "ยอดค้างการผลิตที่บันทึกเอง",
                     `${r.carryQty ?? 0} ${r.qtyUnit}`,
                   ],
                   ["รายละเอียดยอดค้างการผลิต", r.carryNote],
-                  ["หมายเหตุจำนวนผลิต", r.rowTotalNote],
-                  ["ลงชื่อ/ผลิต", r.signer],
-                  ["รายละเอียดผู้ผลิต", r.signerNote],
                 ].map(([label, value]) => (
                   <div className="min-w-0" key={label}>
                     <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -100,8 +88,7 @@ export function BulkProductionDocument({ doc }: { doc: BulkOrder }) {
             <h3 className="font-semibold">จำนวนสรุป (ทั้งเอกสาร)</h3>
             <p>
               รวมจากรายการ {summary.totalBags.toLocaleString("th-TH")} กระสอบ ·
-              เป้าหมาย {summary.targetBags.toLocaleString("th-TH")} กระสอบ ·
-              คงเหลือ {summary.remainingBags.toLocaleString("th-TH")} กระสอบ
+              เป้าหมาย {summary.targetBags.toLocaleString("th-TH")} กระสอบ
             </p>
             <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
               หมายเหตุเอกสาร: {doc.note || "—"}

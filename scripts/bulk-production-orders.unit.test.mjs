@@ -110,16 +110,6 @@ const rowFields = [
   ["carryQty", "number"],
   ["carryNote", "text"],
   ["sizeNote", "text"],
-  ["prodDate", "date"],
-  ["prodDateNote", "text"],
-  ["producedQty", "number"],
-  ["startTime", "time"],
-  ["startTimeNote", "text"],
-  ["endTime", "time"],
-  ["endTimeNote", "text"],
-  ["signer", "text"],
-  ["signerNote", "text"],
-  ["rowTotalNote", "text"],
 ];
 const signers = ["issuer", "qc", "production", "manager"];
 // No source inputs: row.itemName (legacy fallback name), qtyUnit/countUnit (implicit units), header.producedTons (planned-ton alias at save).
@@ -336,7 +326,7 @@ test("history search/date filters find exact mock documents", () => {
     0,
   );
 });
-test("actual rendered controls match independent source manifest: 6 header, 18 per row, 4 signers and document note", () => {
+test("actual rendered order controls match independent source manifest: 6 header, 8 planned fields per row, 4 signers and document note", () => {
   const doc = draft();
   const html = renderToStaticMarkup(
     React.createElement(Form, {
@@ -365,6 +355,10 @@ test("actual rendered controls match independent source manifest: 6 header, 18 p
     `rows.${doc.rows[0].id}.itemName`,
     `rows.${doc.rows[0].id}.qtyUnit`,
     `rows.${doc.rows[0].id}.countUnit`,
+    `rows.${doc.rows[0].id}.producedQty`,
+    `rows.${doc.rows[0].id}.prodDate`,
+    `rows.${doc.rows[0].id}.startTime`,
+    `rows.${doc.rows[0].id}.endTime`,
   ])
     assert.ok(!inputs.some((t) => t.includes(`name="${hidden}"`)), hidden);
   assert.ok(html.includes(doc.rows[0].productCode));
@@ -401,7 +395,7 @@ test("print groups seven rows, retains every row/notes/signers, escapes user tex
   assert.doesNotMatch(source, /dangerouslySetInnerHTML|innerHTML/);
   assert.match(source, /contentWindow.print\(\)/);
 });
-test("only the internal Bulk sidebar destination is activated, not Sales Hub or other production documents", () => {
+test("internal production destinations are activated without a duplicate formula or BOM menu", () => {
   const source = readFileSync(
     path.join(root, "src/lib/constants/navigation.ts"),
     "utf8",
@@ -411,7 +405,9 @@ test("only the internal Bulk sidebar destination is activated, not Sales Hub or 
     1,
   );
   assert.match(source, /title: "ใบสั่งผลิตสินค้า", href: "\/bulk-production-orders", icon: Factory/);
-  assert.match(source, /title: "ใบสูตรผลิต", icon: FileText/);
+  assert.doesNotMatch(source, /title: "ใบสูตรผลิต"|title: "คลัง BOM"/);
+  assert.match(source, /title: "รายงานการผลิต", href: "\/production-reports"/);
+  assert.match(source, /title: "รับยอดผลิต", href: "\/production-receipts"/);
   assert.ok(
     existsSync(
       path.join(root, "app/(factory)/bulk-production-orders/page.tsx"),

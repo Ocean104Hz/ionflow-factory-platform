@@ -22,7 +22,7 @@ export function ProductionStatusOverview({
   ];
   const count = (status: string) =>
     orders.filter((order) =>
-      [order.material, order.approval, order.production].includes(status),
+      ([order.material, order.approval, order.production] as string[]).includes(status),
     ).length;
   const attention = [
     {

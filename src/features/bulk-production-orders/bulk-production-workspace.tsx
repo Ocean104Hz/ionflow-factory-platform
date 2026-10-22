@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Eye, Pencil, Printer, Plus, Trash2 } from "lucide-react";
+import { Beaker, Eye, Pencil, Printer, Plus, Trash2 } from "lucide-react";
 import {
   PageHeader,
   SectionCard,
@@ -29,23 +29,23 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/src/components/ui/alert-dialog";
-import { bulkOrders } from "@/src/lib/mock-data/bulk-production-orders";
 import {
   blankBulkOrder,
-  bulkProgress,
-  deleteBulkOrder,
   filterBulkOrders,
-  saveBulkOrder,
   type BulkOrder,
   type BulkErrors,
   type BulkFilters,
 } from "./bulk-production-domain";
 import { BulkProductionForm } from "./bulk-production-form";
 import { BulkProductionDetail } from "./bulk-production-detail";
+import { useProductionFlow } from "@/src/features/production-flow/production-flow-provider";
+import { ProductionFormulaSheetDialog } from "@/src/features/production-flow/production-formula-sheet";
+import type { ProductionFormulaSheet } from "@/src/features/production-flow/production-flow-domain";
 
 const emptyFilters: BulkFilters = { search: "", from: "", to: "" };
 export function BulkProductionWorkspace() {
-  const [records, setRecords] = useState(() => structuredClone(bulkOrders));
+  const flow = useProductionFlow();
+  const records = flow.orders;
   const [doc, setDoc] = useState(blankBulkOrder);
   const [baseline, setBaseline] = useState(() =>
     JSON.stringify(blankBulkOrder()),
@@ -55,6 +55,7 @@ export function BulkProductionWorkspace() {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<BulkOrder | null>(null);
   const [view, setView] = useState<{ id: string; print: boolean } | null>(null);
+  const [formulaSheet, setFormulaSheet] = useState<ProductionFormulaSheet | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
@@ -75,26 +76,33 @@ export function BulkProductionWorkspace() {
     else open(next);
   }
   function save() {
-    const result = saveBulkOrder(
-      records,
-      doc,
-      crypto.randomUUID(),
-      new Date().toISOString(),
-    );
+    const result = flow.saveOrder(doc);
     setErrors(result.errors);
     if (!result.saved) {
       setMessage("ยังบันทึกไม่ได้ กรุณาตรวจสอบข้อมูลที่ระบุ");
       return;
     }
-    setRecords(result.records);
     open(result.saved);
     setMessage("บันทึกข้อมูลตัวอย่างแล้ว · ไม่สั่งผลิตจริง ไม่เปลี่ยนสต็อก");
   }
   function remove(id: string) {
-    setRecords((previous) => deleteBulkOrder(previous, id));
-    if (doc.id === id) open(blankBulkOrder());
-    if (view?.id === id) setView(null);
-    setMessage("ลบเอกสารตัวอย่างแล้ว · ไม่เปลี่ยนข้อมูลโมดูลอื่น");
+    try {
+      flow.removeOrder(id);
+      if (doc.id === id) open(blankBulkOrder());
+      if (view?.id === id) setView(null);
+      setMessage("ลบเอกสารตัวอย่างแล้ว · ไม่เปลี่ยนข้อมูลโมดูลอื่น");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่ได้");
+    }
+  }
+  function issueFormula(orderId: string) {
+    try {
+      const sheet = flow.issueFormula(orderId);
+      setFormulaSheet(sheet);
+      setMessage("ออกใบสูตรผลิตแบบ snapshot แล้ว · ไม่เปลี่ยนสต็อก");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "ออกใบสูตรผลิตไม่ได้");
+    }
   }
   function filter(patch: Partial<BulkFilters>) {
     setFilters({ ...filters, ...patch });
@@ -104,7 +112,7 @@ export function BulkProductionWorkspace() {
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="ใบสั่งผลิตสินค้า"
-        description="จัดทำแผนการผลิตปุ๋ย ติดตามยอดผลิตจริงและยอดค้างตามรายการ"
+        description="จัดทำแผนการผลิตและออกใบสูตร ก่อนบันทึกผลจริงในรายงานการผลิต"
         actions={
           <>
             <StatusBadge tone="info">UI MOCK · Bulk ภายใน</StatusBadge>
@@ -249,7 +257,7 @@ export function BulkProductionWorkspace() {
                   key: "progress",
                   label: "สถานะการผลิต",
                   render: (r) => {
-                    const status = bulkProgress(r);
+                    const status = flow.orderProgress(r);
                     return (
                       <StatusBadge
                         tone={
@@ -273,6 +281,15 @@ export function BulkProductionWorkspace() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="ออกหรือดูใบสูตรผลิต"
+                        aria-label={`ออกหรือดูใบสูตรผลิต ${r.header.docNo}`}
+                        onClick={() => issueFormula(r.id)}
+                      >
+                        <Beaker />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         title="ดูรายละเอียด"
                         aria-label={`ดูรายละเอียด ${r.header.docNo}`}
                         onClick={() => setView({ id: r.id, print: false })}
@@ -282,8 +299,15 @@ export function BulkProductionWorkspace() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="แก้ไข"
+                        title={
+                          flow.formulaSheets.some((sheet) => sheet.orderId === r.id)
+                            ? "ออกใบสูตรแล้ว จึงล็อกการแก้ไข"
+                            : "แก้ไข"
+                        }
                         aria-label={`แก้ไข ${r.header.docNo}`}
+                        disabled={flow.formulaSheets.some(
+                          (sheet) => sheet.orderId === r.id,
+                        )}
                         onClick={() => request(r)}
                       >
                         <Pencil />
@@ -326,23 +350,23 @@ export function BulkProductionWorkspace() {
               }
             />
             <p className="mt-3 text-xs text-muted-foreground">
-              ตามกติกา history ต้นฉบับ หากยังไม่ระบุยอดผลิตจริงแต่กรอกวันที่ผลิต
-              เวลาเริ่ม/จบ และชื่อผู้ผลิตครบ
-              จะถือว่ารายการนั้นผลิตครบสำหรับป้ายความคืบหน้าเท่านั้น
-              ไม่เขียนยอดจริงทับ
+              สถานะการผลิตคำนวณจากรายงานการผลิต ไม่ใช้ช่องผลผลิตเดิมในใบสั่งผลิต
             </p>
           </SectionCard>
         </TabsContent>
       </Tabs>
       <p className="text-xs text-muted-foreground">
-        ข้อมูลในหน้านี้รีเซ็ตเมื่อรีโหลด · ไม่เชื่อมคำสั่งการผลิต Sales Hub, BOM
-        หรือ Inventory
+        ข้อมูลในหน้านี้รีเซ็ตเมื่อรีโหลด · ใบสูตรอ่าน BOM แบบ snapshot และไม่เปลี่ยน Inventory
       </p>
       <BulkProductionDetail
         doc={records.find((r) => r.id === view?.id) ?? null}
         print={view?.print ?? false}
         onClose={() => setView(null)}
         onEdit={request}
+      />
+      <ProductionFormulaSheetDialog
+        sheet={formulaSheet}
+        onClose={() => setFormulaSheet(null)}
       />
       <AlertDialog
         open={!!pending}

@@ -9,17 +9,21 @@ import {
 export const bulkProducts: BulkProduct[] = [
   {
     id: "demo-ag",
-    code: "BULK-DEMO-AG",
+    formulaId: "formula-a2",
+    inventoryItemId: "fg-a",
+    code: "DEMO-FG001",
     name: "ปุ๋ยเบล้าท์ AG ตัวอย่าง ขนาด 50 กก.",
     size: 50,
-    formulaVersion: "DEMO-AG-V1",
+    formulaVersion: "V2",
   },
   {
     id: "demo-np",
-    code: "BULK-DEMO-NP",
+    formulaId: "formula-a2",
+    inventoryItemId: "fg-a",
+    code: "DEMO-FG001-NP",
     name: "ปุ๋ยเบล้าท์ NP ตัวอย่าง ขนาด 25 กก.",
     size: 25,
-    formulaVersion: "DEMO-NP-V2",
+    formulaVersion: "V2",
   },
 ];
 export const bulkOrders: BulkOrder[] = [0, 1, 2, 3, 4, 5].map((i) => {
@@ -39,6 +43,8 @@ export const bulkOrders: BulkOrder[] = [0, 1, 2, 3, 4, 5].map((i) => {
     },
     rows: [0, 1].map((n) => ({
       ...newBulkRow(`bulk-${i}-${n}`),
+      formulaId: bulkProducts[n].formulaId,
+      inventoryItemId: bulkProducts[n].inventoryItemId,
       product: bulkProducts[n].name,
       productCode: bulkProducts[n].code,
       qty: 50,

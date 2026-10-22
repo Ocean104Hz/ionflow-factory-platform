@@ -340,13 +340,13 @@ test("detail and print use the same safely rendered document with every saved va
   assert.match(source, /contentWindow.print\(\)/);
   assert.doesNotMatch(source, /dangerouslySetInnerHTML|innerHTML/);
 });
-test("route activates one existing menu and leaves the separate production requisition placeholder unchanged", () => {
+test("route is the sole material and production requisition menu", () => {
   const nav = readFileSync(
     path.join(root, "src/lib/constants/navigation.ts"),
     "utf8",
   );
   assert.equal((nav.match(/href: "\/material-requisitions"/g) || []).length, 1);
-  assert.match(nav, /title: "เบิกวัตถุดิบการผลิต", icon: FileText/);
+  assert.doesNotMatch(nav, /title: "เบิกวัตถุดิบการผลิต"/);
   assert.ok(
     existsSync(path.join(root, "app/(factory)/material-requisitions/page.tsx")),
   );

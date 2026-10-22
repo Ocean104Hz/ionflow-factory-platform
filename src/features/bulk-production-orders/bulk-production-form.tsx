@@ -10,7 +10,6 @@ import { bulkProducts } from "@/src/lib/mock-data/bulk-production-orders";
 import {
   bulkSummary,
   newBulkRow,
-  remainingQty,
   removeBulkRow,
   selectBulkProduct,
   signerLabels,
@@ -164,7 +163,7 @@ export function BulkProductionForm({
       </SectionCard>
       <SectionCard
         title="รายการสั่งผลิต"
-        subtitle="เพิ่มรายการได้หลายแถว · ข้อมูลกำหนดการและผู้ผลิตกรอกภายหลังได้"
+        subtitle="เพิ่มรายการได้หลายแถว · ผลผลิตจริงบันทึกในหน้ารายงานการผลิต"
         action={
           <Button
             type="button"
@@ -269,42 +268,6 @@ export function BulkProductionForm({
                       <option key={p.id} value={p.formulaVersion} />
                     ))}
                 </datalist>
-                <div className="mt-5 border-t pt-5">
-                  <h4 className="mb-4 text-sm font-medium">
-                    กำหนดการและผลผลิต
-                  </h4>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {f("prodDate", "วันที่ผลิต", "date")}
-                    {f("prodDateNote", "รายละเอียดวันที่ผลิต")}
-                    {f(
-                      "producedQty",
-                      `จำนวนที่ผลิตจริง (${row.qtyUnit})`,
-                      "number",
-                    )}
-                    {f("startTime", "เวลาที่เริ่มผลิต", "time")}
-                    {f("startTimeNote", "รายละเอียดเวลาเริ่มผลิต")}
-                    {f("endTime", "เวลาสิ้นสุด", "time")}
-                    {f("endTimeNote", "รายละเอียดเวลาสิ้นสุด")}
-                    {f("signer", "ลงชื่อ/ผลิต")}
-                    {f("signerNote", "รายละเอียดผู้ผลิต")}
-                    {f("rowTotalNote", "หมายเหตุจำนวนผลิต")}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-5 rounded-lg bg-muted p-3 text-sm">
-                    <span>
-                      จำนวนผลิต:{" "}
-                      {(row.producedQty ?? 0).toLocaleString("th-TH")}{" "}
-                      {row.qtyUnit}
-                    </span>
-                    <span>
-                      จำนวนคงเหลือ (คำนวณ):{" "}
-                      {remainingQty(row).toLocaleString("th-TH")} {row.qtyUnit}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    เวลาเริ่ม/สิ้นสุด และผู้ผลิตต้องกรอกคู่กับรายละเอียด ·
-                    ยอดค้างที่กรอกเองไม่ถูกคำนวณทับ
-                  </p>
-                </div>
               </section>
             );
           })}
@@ -317,13 +280,12 @@ export function BulkProductionForm({
       </SectionCard>
       <SectionCard
         title="จำนวนสรุป"
-        subtitle="คงเหลือ = ผลรวม max(จำนวนสั่ง − ผลิตจริง, 0) ไม่ใช่เป้าหมายลบยอดสั่ง"
+        subtitle="สรุปเฉพาะแผนในใบสั่งผลิต ยอดจริงอยู่ในรายงานการผลิต"
       >
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {[
             ["จำนวนกระสอบรวมจากรายการผลิต", summary.totalBags],
             ["จำนวนกระสอบเป้าหมาย", summary.targetBags],
-            ["จำนวนที่แตกต่าง / คงเหลือ", summary.remainingBags],
           ].map(([label, value]) => (
             <div className="rounded-lg border bg-muted/20 p-4" key={label}>
               <p className="text-sm text-muted-foreground">{label}</p>

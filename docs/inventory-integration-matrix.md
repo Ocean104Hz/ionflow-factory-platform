@@ -2,7 +2,7 @@
 
 ตรวจจาก LOCAL working tree วันที่ 19 ต.ค. 2026 รวมงาน uncommitted Steps 1–3 ไม่ใช้ remote main เป็นหลักฐาน
 
-**PROPOSED / NOT IMPLEMENTED:** จุด posting และ integration ทั้งหมดในเอกสารนี้เป็นข้อเสนอ ยังไม่มีการต่อ save handler ของโมดูลใดเข้ากับ Inventory
+**MIXED STATUS:** Production Receipt เชื่อม Stock Ledger แบบ in-memory demo แล้ว โมดูลอื่นในตารางที่ยังระบุ DECISION_PENDING เป็นข้อเสนอและยังไม่ต่อ posting จริง
 
 ## สถานะและแหล่งหลักฐาน
 
@@ -15,7 +15,7 @@
 | เบิกวัตถุดิบ/เบิกการผลิต | navigation placeholder ไม่มี href/feature | ไม่ implemented | แนะนำเป็นเจ้าของการตัดวัตถุดิบเมื่อยืนยันจ่ายจริง; ต้องตกลง workflow/line allocation/Lot/หน่วย/stock key |
 | Mixing | `src/features/fertilizer-powder-mixing/mixing-domain.ts`, `mixing-provider.tsx` | MixingReport.id/doc_no; material.id, material_code/name, lot_no, order_qty, unit, stock_balance; report_date, shift, location, loader_no; rounds.is_pass boolean/null; ไม่มี document approval/posting lifecycle | order_qty เป็นแผนผสม ไม่ใช่ actual consumption; stock_balance เป็นข้อมูลแค็ตตาล็อกสาธิต ไม่ใช่ Ledger อีกชุด; site/warehouse/item mapping และ issue reference ยังไม่มี |
 | คำสั่งผลิต | `src/lib/mock-data/index.ts` (`ProductionOrder`, `OrderItem`), `src/features/production-orders/production-order-detail.tsx`, `src/components/factory/demo-provider.tsx` | id/number/revision/source Sales Hub หรือ Datalink; OrderItem.sku ไม่มี stable line ID; document/material/approval/production แยกสถานะ | warehouse เป็นข้อความ; items quantity/unit เป็น Sales SKU ไม่ใช่ Inventory Item; ไม่มี output Lot/location/confirmed receipt; ไม่แก้ inbound/outbound Sales Hub |
-| รับยอดผลิต | navigation placeholder ไม่มี href/feature | ไม่ implemented | ต้องกำหนด output receipt document/line; สถานะ “ผลิตเสร็จแล้ว”, “พร้อมรับสินค้า”, “รับสินค้าแล้ว” ของคำสั่งผลิตไม่ใช่หลักฐานลง stock receipt |
+| รับยอดผลิต | `src/features/production-flow/*`, `/production-receipts` | draft → confirmed; อ้าง report/order line, item, Lot, site/warehouse/location, exact quantity และ idempotent operation ID | confirmed เท่านั้นที่ลง `RECEIPT` ใน in-memory Ledger; กันรับเกินและรับซ้ำ แต่ยังไม่มี persistence/backend transaction |
 | QC วัตถุดิบ | `src/features/raw-material-inspections/inspection-domain.ts`, `raw-material-inspections.tsx` | Inspection.id/number/date/location/lot/material/reference; finalized และ checks pending/pass/fail/na; inspectionStatus derives รอตรวจสอบ/ผ่าน/ไม่ผ่าน; มี inspector/approver ชื่อและวันที่; records เป็น local page state | ไม่มี Inventory item/warehouse IDs, affected qty หรือ allocation line; finalized/ผลผ่านไม่ใช่ stock authorization; ต้องแยก final QC disposition และ scope ของ Lot/ตำแหน่ง |
 | QC การผลิต/ปุ๋ยอินทรีย์เคมี | navigation placeholder ไม่มี href/feature | ไม่ implemented | ห้ามอ้างการอนุมัติจริงหรือ reuse ผลตรวจคนละแบบโดยไม่ออกแบบ |
 | Packing/ใบแจ้งแพ็ค | navigation placeholder ไม่มี href/feature | ไม่ implemented | conversion อาจใช้ WIP และ packaging แล้วได้ FG ต่างหน่วย ต้องกำหนด input/output/yield/scrap และ authoritative completion |
@@ -38,7 +38,7 @@
 | Physical material issue confirmed | ISSUE | แนะนำ Material Issue เป็นเจ้าของหลักฐานเพียงหนึ่งราย | **DECISION_PENDING**: ต้องมีโมดูลและ milestone; กันตัดซ้ำกับ Mixing โดย shared physicalMovementId |
 | Mixing saved / rounds passed | NONE | ไม่มี | เก็บหลักฐานผสมและ production Lot traceability; อ้าง Material Issue ในอนาคต แต่ไม่สร้าง issue ซ้ำ |
 | Production Order created/status update | NONE | ไม่มี | ไม่เชื่อม source Sales Hub หรือ deduct planned BOM |
-| Production output receipt confirmed | RECEIPT ของ WIP/FG | แนะนำ Production Receipt เพียงหนึ่งราย | **DECISION_PENDING**: output item, exact base qty/unit, Lot, destination key, source production/line และหลักฐานรับ; ห้ามรับซ้ำจากรายงานผลิต/Packing |
+| Production output receipt confirmed | RECEIPT ของ WIP/FG | Production Receipt เพียงหนึ่งราย | **IMPLEMENTED IN-MEMORY DEMO:** ตรวจ output item, exact base qty/unit, Lot, destination, source report/line, over-receipt และ idempotency; รายงานผลิต/Packing ไม่ลง stock |
 | Packing completion | MANUFACTURING_CONVERSION | specialized conversion contract | **DECISION_PENDING**: ไม่ใช่ transfer และห้ามบวก/เทียบยอดต่าง item/ต่างหน่วย; ยังไม่รองรับการ execute |
 | Delivery draft/created/edited/printed/ready | NONE | ไม่มี | ไม่ยก “พร้อมส่ง” หรือ “ส่งข้อมูลแล้ว” ให้เป็น stock posting trigger |
 | Physical dispatch confirmed | ISSUE ของ FG | เลือก Goods Issue **หรือ** confirmed dispatch ไม่ใช่ทั้งคู่ | **DECISION_PENDING**: final owner, immutable allocations, confirmation evidence; preview เป็น hypothetical contract เท่านั้น |

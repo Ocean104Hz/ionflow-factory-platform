@@ -9,6 +9,7 @@ import { MasterDataProvider } from "@/src/features/master-data/master-provider";
 import { InventoryOperationsProvider } from "@/src/features/inventory/inventory-operations-provider";
 import { ProductionQualityProvider } from "@/src/features/production-quality/production-quality-provider";
 import { PackagingProvider } from "@/src/features/packaging-reports/packaging-provider";
+import { ProductionFlowProvider } from "@/src/features/production-flow/production-flow-provider";
 
 export default function FactoryLayout({
   children,
@@ -22,13 +23,15 @@ export default function FactoryLayout({
           <PRProvider>
             <BOMProvider>
               <InventoryOperationsProvider>
-                <ProductionQualityProvider>
-                  <PackagingProvider>
-                    <Suspense fallback={<LoadingState />}>
-                      <AppShell>{children}</AppShell>
-                    </Suspense>
-                  </PackagingProvider>
-                </ProductionQualityProvider>
+                <ProductionFlowProvider>
+                  <ProductionQualityProvider>
+                    <PackagingProvider>
+                      <Suspense fallback={<LoadingState />}>
+                        <AppShell>{children}</AppShell>
+                      </Suspense>
+                    </PackagingProvider>
+                  </ProductionQualityProvider>
+                </ProductionFlowProvider>
               </InventoryOperationsProvider>
             </BOMProvider>
           </PRProvider>

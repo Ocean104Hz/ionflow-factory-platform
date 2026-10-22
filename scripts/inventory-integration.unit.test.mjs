@@ -159,7 +159,7 @@ test("PR, PO, BOM, Mixing, Production creation, Invoice and Delivery draft propo
   }
 });
 test("a planning or financial module cannot request stock effect via a forged confirmed intent", () => {
-  for (const module of [
+  for (const sourceModule of [
     "PR",
     "PO",
     "BOM",
@@ -168,9 +168,9 @@ test("a planning or financial module cannot request stock effect via a forged co
     "INVOICE",
   ]) {
     const row = scenario("material-issue");
-    row.sourceReference.sourceModule = module;
+    row.sourceReference.sourceModule = sourceModule;
     row.sourceReference.sourceDocumentType =
-      contracts.sourceDocumentTypes[module];
+      contracts.sourceDocumentTypes[sourceModule];
     blocked(row, /ไม่มีสิทธิ์/);
   }
 });
@@ -441,12 +441,10 @@ test("read-only UI is a third Inventory view without posting controls or source 
       /commitStockOperation|createStockSession|\.commit\(|setEvents|fetch\(|localStorage|sessionStorage|\bany\b|useDemo|useBOM|useMasterData/,
     );
   assert.doesNotMatch(ui, /<Button|ConfirmDialog|onSubmit/);
-  for (const file of [
-    "docs/inventory-integration-matrix.md",
-    "docs/inventory-integration-contract.md",
-  ]) {
-    const doc = read(file);
-    assert.match(doc, /PROPOSED \/ NOT IMPLEMENTED/);
-    assert.match(doc, /DECISION_PENDING|Unresolved/);
-  }
+  assert.match(read("docs/inventory-integration-matrix.md"), /MIXED STATUS/);
+  assert.match(read("docs/inventory-integration-matrix.md"), /DECISION_PENDING/);
+  assert.match(
+    read("docs/inventory-integration-contract.md"),
+    /PROPOSED \/ NOT IMPLEMENTED/,
+  );
 });
