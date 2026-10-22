@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Eye,
-  Pencil,
-  Plus,
-  Search,
-} from "lucide-react";
+import { Eye, Pencil, Plus, Search } from "lucide-react";
 import {
   FactoryDataTable,
   PageHeader,
@@ -220,6 +215,70 @@ export function ProductionReceiptsWorkspace() {
               <p className="mt-2 text-sm text-danger">{errors.source}</p>
             )}
           </SectionCard>
+
+          {/* แสดงโครงเอกสารเมื่อยังไม่ได้เลือกรายงาน */}
+          {!receipt && (
+            <div className="space-y-5">
+              <SectionCard
+                title="ส่วนหัวเอกสาร"
+                subtitle="กรุณาเลือกรายงานการผลิตก่อนกรอกข้อมูล"
+              >
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>สถานที่</Label>
+                    <Input placeholder="รอข้อมูลสถานที่" disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>วันที่เอกสาร</Label>
+                    <Input placeholder="วันที่เอกสาร" disabled />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>เอกสารเลขที่</Label>
+                    <Input placeholder="สร้างเมื่อเลือกรายงาน" disabled />
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="รายละเอียดสินค้า">
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full min-w-[700px] text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        {[
+                          "No.",
+                          "รายการ",
+                          "รหัสสินค้า",
+                          "จำนวนรับ",
+                          "หน่วยนับ",
+                          "Lot",
+                        ].map((column) => (
+                          <th
+                            key={column}
+                            className="border-b px-4 py-3 text-left"
+                          >
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-4 py-10 text-center text-muted-foreground"
+                        >
+                          กรุณาเลือกรายงานการผลิตก่อน
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </SectionCard>
+            </div>
+          )}
 
           {receipt && report && (
             <form
