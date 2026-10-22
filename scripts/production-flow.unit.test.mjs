@@ -215,3 +215,81 @@ test("production forms cover the approved visible fields and routes", () => {
   assert.ok(existsSync(path.join(root, "app/(factory)/production-reports/page.tsx")));
   assert.ok(existsSync(path.join(root, "app/(factory)/production-receipts/page.tsx")));
 });
+
+test("production receipt UI keeps the iTECH document structure and Factory behavior", () => {
+  const workspace = readFileSync(
+    path.join(root, "src/features/production-flow/production-receipts-workspace.tsx"),
+    "utf8",
+  );
+  const document = readFileSync(
+    path.join(root, "src/features/production-flow/production-receipt-document.tsx"),
+    "utf8",
+  );
+
+  for (const text of [
+    'title="ใบรับยอดผลิต"',
+    "สร้างใบรับยอดผลิต",
+    "ประวัติใบรับยอดผลิต",
+    "ส่วนหัวเอกสาร",
+    "สถานที่ *",
+    "วันที่เอกสาร",
+    "เอกสารเลขที่",
+    "รายการรับยอดการผลิต",
+    "รหัสสินค้า",
+    "จำนวนรับ",
+    "หน่วยนับ",
+    "ข้อมูลปลายทางคลัง",
+    "หมายเหตุ",
+  ]) {
+    assert.ok(workspace.includes(text), text);
+  }
+
+  assert.ok(workspace.includes("flow.saveReceipt(receipt)"));
+  assert.ok(workspace.includes("flow.confirmReceipt(receipt)"));
+  assert.ok(workspace.includes('receipt.status === "CONFIRMED"'));
+  assert.ok(workspace.includes('row.status === "DRAFT"'));
+  assert.ok(workspace.includes('aria-label="ตารางรายละเอียดใบรับยอดผลิต เลื่อนแนวนอนเพื่อดูทุกคอลัมน์"'));
+  assert.ok(document.includes("receipt.quantity"));
+  assert.ok(document.includes("receipt.lotCode"));
+  assert.ok(document.includes("receipt.ledgerEventId"));
+});
+
+test("isolated production receipt V1 stays UI-only and keeps the iTECH form sections", () => {
+  const workspace = readFileSync(
+    path.join(
+      root,
+      "src/features/production-receipts-v1/production-receipt-v1-workspace.tsx",
+    ),
+    "utf8",
+  );
+  const types = readFileSync(
+    path.join(
+      root,
+      "src/features/production-receipts-v1/production-receipt-v1-types.ts",
+    ),
+    "utf8",
+  );
+
+  for (const text of [
+    "ใบรับยอดผลิต V1",
+    "UI DRAFT",
+    "เอกสารอ้างอิง",
+    "รายละเอียดวัสดุ / สินค้า",
+    "รายละเอียดการผลิต",
+    "รายชื่อผู้ลงนาม",
+    "ประวัติใบรับยอดผลิต V1",
+    "หน้านี้ยังไม่บันทึกข้อมูลจริง",
+  ])
+    assert.ok(workspace.includes(text), text);
+
+  assert.ok(workspace.includes("newReceiptItemV1()"));
+  assert.ok(workspace.includes("disabled"));
+  assert.ok(!workspace.includes("saveReceipt("));
+  assert.ok(!workspace.includes("confirmReceipt("));
+  assert.ok(types.includes("items: [newReceiptItemV1()]"));
+  assert.ok(
+    existsSync(
+      path.join(root, "app/(factory)/production-receipts-v1/page.tsx"),
+    ),
+  );
+});

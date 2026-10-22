@@ -111,7 +111,7 @@ export function BulkProductionWorkspace() {
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
-        title="ใบสั่งผลิตสินค้า"
+        title="ใบสั่งผลิตสินค้า V2"
         description="จัดทำแผนการผลิตและออกใบสูตร ก่อนบันทึกผลจริงในรายงานการผลิต"
         actions={
           <>
