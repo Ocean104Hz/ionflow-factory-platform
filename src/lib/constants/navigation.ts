@@ -111,7 +111,12 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/raw-material-receiving",
     icon: Package,
   },
-  { group: "WAREHOUSE", title: "เบิกวัสดุ/วัตถุดิบ", href: "/material-requisitions", icon: FileText },
+  {
+    group: "WAREHOUSE",
+    title: "เบิกวัสดุ/วัตถุดิบ",
+    href: "/material-requisitions",
+    icon: FileText,
+  },
   {
     group: "WAREHOUSE",
     title: "สินค้าคงคลัง",
@@ -131,7 +136,12 @@ export const navigation: FactoryNavigationItem[] = [
     icon: Factory,
   },
   { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", href: "/bom", icon: Beaker },
-  { group: "PRODUCTION", title: "รายงานการผลิต", href: "/production-reports", icon: Factory },
+  {
+    group: "PRODUCTION",
+    title: "รายงานการผลิต",
+    href: "/production-reports",
+    icon: Factory,
+  },
   {
     group: "PRODUCTION",
     title: "ใบรับยอดผลิต V1",
@@ -144,7 +154,12 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/production-receipts",
     icon: ClipboardList,
   },
-  { group: "PACKING", title: "ใบแจ้งสั่งแพ็คสินค้า", icon: Archive },
+  {
+    group: "PACKING",
+    title: "ใบแจ้งสั่งแพ็คสินค้า",
+    href: "/packing-summary",
+    icon: Archive,
+  },
   {
     group: "LOGISTICS",
     title: "ใบส่งสินค้า",

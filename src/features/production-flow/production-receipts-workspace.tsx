@@ -39,6 +39,7 @@ import {
 } from "./production-flow-domain";
 import { useProductionFlow } from "./production-flow-provider";
 import { ProductionReceiptDialog } from "./production-receipt-document";
+import { IconReceiptForm } from "@/src/features/production-receipts-v2/icon-receipt-form";
 
 function formatDocumentDate(value: string) {
   if (!value) return "";
@@ -185,100 +186,40 @@ export function ProductionReceiptsWorkspace() {
         </TabsList>
 
         <TabsContent value="form" className="space-y-5">
-          <SectionCard
-            title="รายงานการผลิตต้นทาง"
-            subtitle="เลือกได้เฉพาะรายงานที่บันทึกแล้วและยังมียอดเหลือรับ"
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link href="/production-reports">
-                  <Plus aria-hidden="true" />
-                  ไปรายงานการผลิต
-                </Link>
-              </Button>
-            }
-          >
-            <SelectField
-              label="รายงานการผลิต"
-              value={receipt?.reportId ?? "NONE"}
-              onChange={(value) => value !== "NONE" && chooseReport(value)}
-              options={[
-                {
-                  value: "NONE",
-                  label: sourceOptions.length
-                    ? "เลือกรายงาน"
-                    : "ยังไม่มีรายงานที่พร้อมรับ",
-                },
-                ...sourceOptions,
-              ]}
-            />
-            {errors.source && (
-              <p className="mt-2 text-sm text-danger">{errors.source}</p>
-            )}
-          </SectionCard>
-
-          {/* แสดงโครงเอกสารเมื่อยังไม่ได้เลือกรายงาน */}
-          {!receipt && (
-            <div className="space-y-5">
-              <SectionCard
-                title="ส่วนหัวเอกสาร"
-                subtitle="กรุณาเลือกรายงานการผลิตก่อนกรอกข้อมูล"
-              >
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>สถานที่</Label>
-                    <Input placeholder="รอข้อมูลสถานที่" disabled />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>วันที่เอกสาร</Label>
-                    <Input placeholder="วันที่เอกสาร" disabled />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>เอกสารเลขที่</Label>
-                    <Input placeholder="สร้างเมื่อเลือกรายงาน" disabled />
-                  </div>
-                </div>
-              </SectionCard>
-
-              <SectionCard title="รายละเอียดสินค้า">
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full min-w-[700px] text-sm">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        {[
-                          "No.",
-                          "รายการ",
-                          "รหัสสินค้า",
-                          "จำนวนรับ",
-                          "หน่วยนับ",
-                          "Lot",
-                        ].map((column) => (
-                          <th
-                            key={column}
-                            className="border-b px-4 py-3 text-left"
-                          >
-                            {column}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-10 text-center text-muted-foreground"
-                        >
-                          กรุณาเลือกรายงานการผลิตก่อน
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </SectionCard>
-            </div>
+          {receipt && (
+            <SectionCard
+              title="รายงานการผลิตต้นทาง"
+              subtitle="เลือกได้เฉพาะรายงานที่บันทึกแล้วและยังมียอดเหลือรับ"
+              action={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/production-reports">
+                    <Plus aria-hidden="true" />
+                    ไปรายงานการผลิต
+                  </Link>
+                </Button>
+              }
+            >
+              <SelectField
+                label="รายงานการผลิต"
+                value={receipt?.reportId ?? "NONE"}
+                onChange={(value) => value !== "NONE" && chooseReport(value)}
+                options={[
+                  {
+                    value: "NONE",
+                    label: sourceOptions.length
+                      ? "เลือกรายงาน"
+                      : "ยังไม่มีรายงานที่พร้อมรับ",
+                  },
+                  ...sourceOptions,
+                ]}
+              />
+              {errors.source && (
+                <p className="mt-2 text-sm text-danger">{errors.source}</p>
+              )}
+            </SectionCard>
           )}
+
+          {!receipt && <IconReceiptForm />}
 
           {receipt && report && (
             <form
