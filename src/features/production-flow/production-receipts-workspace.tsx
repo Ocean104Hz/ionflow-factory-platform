@@ -2,19 +2,46 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, Pencil, Plus } from "lucide-react";
-import { FactoryDataTable, PageHeader, SectionCard, SelectField, StatusBadge } from "@/src/components/factory/patterns";
+import {
+  Eye,
+  Pencil,
+  Plus,
+  Search,
+} from "lucide-react";
+import {
+  FactoryDataTable,
+  PageHeader,
+  SectionCard,
+  SelectField,
+  StatusBadge,
+} from "@/src/components/factory/patterns";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/src/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
 import { inventoryStatuses } from "@/src/features/inventory/inventory-domain";
 import { ledgerContext } from "@/src/features/inventory/inventory-ledger-data";
 import { operationLocations } from "@/src/features/inventory/inventory-operations-domain";
-import { receivedQuantity, type ProductionFlowErrors, type ProductionReceipt } from "./production-flow-domain";
+import {
+  receivedQuantity,
+  type ProductionFlowErrors,
+  type ProductionReceipt,
+} from "./production-flow-domain";
 import { useProductionFlow } from "./production-flow-provider";
 import { ProductionReceiptDialog } from "./production-receipt-document";
 
@@ -34,8 +61,12 @@ function siteLabel(siteId: string) {
 }
 
 function warehouseLabel(warehouseId: string) {
-  const warehouse = ledgerContext.warehouses.find((row) => row.id === warehouseId);
-  return warehouse ? `${warehouse.code} · ${warehouse.name}` : warehouseId || "—";
+  const warehouse = ledgerContext.warehouses.find(
+    (row) => row.id === warehouseId,
+  );
+  return warehouse
+    ? `${warehouse.code} · ${warehouse.name}`
+    : warehouseId || "—";
 }
 
 export function ProductionReceiptsWorkspace() {
@@ -45,11 +76,20 @@ export function ProductionReceiptsWorkspace() {
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState("form");
   const [view, setView] = useState<ProductionReceipt | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+
+  const [historyStatus, setHistoryStatus] = useState<
+    "ALL" | "DRAFT" | "CONFIRMED"
+  >("ALL");
   const report = flow.reports.find((row) => row.id === receipt?.reportId);
   const received = report ? receivedQuantity(report.id, flow.receipts) : 0;
   const remaining = Math.max(0, (report?.goodQuantity ?? 0) - received);
-  const warehouses = ledgerContext.warehouses.filter((row) => row.siteId === receipt?.siteId);
-  const locations = receipt ? operationLocations(ledgerContext, receipt.warehouseId) : [];
+  const warehouses = ledgerContext.warehouses.filter(
+    (row) => row.siteId === receipt?.siteId,
+  );
+  const locations = receipt
+    ? operationLocations(ledgerContext, receipt.warehouseId)
+    : [];
   const sourceOptions = flow.reports
     .filter(
       (row) =>
@@ -61,6 +101,26 @@ export function ProductionReceiptsWorkspace() {
       value: row.id,
       label: `${row.documentNumber} · คงเหลือ ${(row.goodQuantity ?? 0) - receivedQuantity(row.id, flow.receipts)} ${row.unit}`,
     }));
+
+  const filteredReceipts = flow.receipts.filter((row) => {
+    const keyword = historySearch.trim().toLocaleLowerCase("th-TH");
+
+    const matchesSearch =
+      !keyword ||
+      [
+        row.documentNumber,
+        row.itemCode,
+        row.itemName,
+        row.lotCode,
+        siteLabel(row.siteId),
+        warehouseLabel(row.warehouseId),
+      ].some((value) => value.toLocaleLowerCase("th-TH").includes(keyword));
+
+    const matchesStatus =
+      historyStatus === "ALL" || row.status === historyStatus;
+
+    return matchesSearch && matchesStatus;
+  });
 
   function chooseReport(reportId: string) {
     try {
@@ -103,17 +163,30 @@ export function ProductionReceiptsWorkspace() {
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
-        title="ใบรับยอดผลิต"
-        description="จัดทำเอกสารรับ WIP/สินค้าสำเร็จรูปจากรายงานการผลิตเข้าคลัง"
-        actions={<StatusBadge tone="warning">ยืนยันแล้วลง Stock Ledger</StatusBadge>}
+        title="ใบรับยอดผลิต V2"
+        description="Production Receipt · จัดทำใบรับยอดผลิตตามกระบวนการ iCON"
+        actions={
+          <StatusBadge tone="warning">ยืนยันแล้วลง Stock Ledger</StatusBadge>
+        }
       />
 
-      {message && <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">{message}</p>}
+      {message && (
+        <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">
+          {message}
+        </p>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList aria-label="มุมมองใบรับยอดผลิต" className="mx-auto grid h-11 w-full max-w-lg grid-cols-2 rounded-full p-1">
-          <TabsTrigger value="form" className="h-9 rounded-full px-4">สร้างใบรับยอดผลิต</TabsTrigger>
-          <TabsTrigger value="history" className="h-9 rounded-full px-4">ประวัติใบรับยอดผลิต</TabsTrigger>
+        <TabsList
+          aria-label="มุมมองใบรับยอดผลิต"
+          className="mx-auto grid h-11 w-full max-w-lg grid-cols-2 rounded-full p-1"
+        >
+          <TabsTrigger value="form" className="h-9 rounded-full px-4">
+            สร้างใบรับยอดผลิต
+          </TabsTrigger>
+          <TabsTrigger value="history" className="h-9 rounded-full px-4">
+            ประวัติใบรับยอดผลิต
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="form" className="space-y-5">
@@ -122,7 +195,10 @@ export function ProductionReceiptsWorkspace() {
             subtitle="เลือกได้เฉพาะรายงานที่บันทึกแล้วและยังมียอดเหลือรับ"
             action={
               <Button asChild variant="outline" size="sm">
-                <Link href="/production-reports"><Plus aria-hidden="true" />ไปรายงานการผลิต</Link>
+                <Link href="/production-reports">
+                  <Plus aria-hidden="true" />
+                  ไปรายงานการผลิต
+                </Link>
               </Button>
             }
           >
@@ -131,11 +207,18 @@ export function ProductionReceiptsWorkspace() {
               value={receipt?.reportId ?? "NONE"}
               onChange={(value) => value !== "NONE" && chooseReport(value)}
               options={[
-                { value: "NONE", label: sourceOptions.length ? "เลือกรายงาน" : "ยังไม่มีรายงานที่พร้อมรับ" },
+                {
+                  value: "NONE",
+                  label: sourceOptions.length
+                    ? "เลือกรายงาน"
+                    : "ยังไม่มีรายงานที่พร้อมรับ",
+                },
                 ...sourceOptions,
               ]}
             />
-            {errors.source && <p className="mt-2 text-sm text-danger">{errors.source}</p>}
+            {errors.source && (
+              <p className="mt-2 text-sm text-danger">{errors.source}</p>
+            )}
           </SectionCard>
 
           {receipt && report && (
@@ -148,7 +231,10 @@ export function ProductionReceiptsWorkspace() {
               }}
             >
               {!!Object.keys(errors).length && (
-                <p role="alert" className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
+                <p
+                  role="alert"
+                  className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
+                >
                   กรุณาตรวจสอบข้อมูลก่อนบันทึกหรือยืนยัน
                 </p>
               )}
@@ -163,31 +249,52 @@ export function ProductionReceiptsWorkspace() {
                     value={receipt.siteId}
                     disabled={receipt.status === "CONFIRMED"}
                     onChange={(siteId) => {
-                      const warehouse = ledgerContext.warehouses.find((row) => row.siteId === siteId);
-                      const location = warehouse ? operationLocations(ledgerContext, warehouse.id)[0] ?? "" : "";
+                      const warehouse = ledgerContext.warehouses.find(
+                        (row) => row.siteId === siteId,
+                      );
+                      const location = warehouse
+                        ? (operationLocations(ledgerContext, warehouse.id)[0] ??
+                          "")
+                        : "";
                       setReceipt((current) =>
                         current
-                          ? { ...current, siteId, warehouseId: warehouse?.id ?? "", locationLabel: location }
+                          ? {
+                              ...current,
+                              siteId,
+                              warehouseId: warehouse?.id ?? "",
+                              locationLabel: location,
+                            }
                           : current,
                       );
                     }}
-                    options={ledgerContext.sites.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))}
+                    options={ledgerContext.sites.map((row) => ({
+                      value: row.id,
+                      label: `${row.code} · ${row.name}`,
+                    }))}
                   />
 
                   <div className="grid min-w-0 gap-2">
-                    <Label htmlFor="production-receipt-date">วันที่เอกสาร</Label>
+                    <Label htmlFor="production-receipt-date">
+                      วันที่เอกสาร
+                    </Label>
                     <Input
                       id="production-receipt-date"
-                      value={formatDocumentDate(receipt.createdAt || receipt.confirmedAt)}
+                      value={formatDocumentDate(
+                        receipt.createdAt || receipt.confirmedAt,
+                      )}
                       placeholder="บันทึกอัตโนมัติเมื่อบันทึกแบบร่าง"
                       readOnly
                       className="bg-muted/35"
                     />
-                    <p className="text-xs text-muted-foreground">ใช้วันเวลาที่ระบบบันทึกเอกสาร ไม่เพิ่มข้อมูลวันที่ใหม่</p>
+                    <p className="text-xs text-muted-foreground">
+                      ใช้วันเวลาที่ระบบบันทึกเอกสาร ไม่เพิ่มข้อมูลวันที่ใหม่
+                    </p>
                   </div>
 
                   <div className="grid min-w-0 gap-2">
-                    <Label htmlFor="production-receipt-number">เอกสารเลขที่</Label>
+                    <Label htmlFor="production-receipt-number">
+                      เอกสารเลขที่
+                    </Label>
                     <Input
                       id="production-receipt-number"
                       name="documentNumber"
@@ -195,7 +302,9 @@ export function ProductionReceiptsWorkspace() {
                       readOnly
                       className="bg-muted/35 font-medium"
                     />
-                    <p className="text-xs text-muted-foreground">สร้างตามกติกาเลขเอกสารของ Factory</p>
+                    <p className="text-xs text-muted-foreground">
+                      สร้างตามกติกาเลขเอกสารของ Factory
+                    </p>
                   </div>
                 </div>
               </SectionCard>
@@ -212,18 +321,36 @@ export function ProductionReceiptsWorkspace() {
                     onChange={(warehouseId) =>
                       setReceipt((current) =>
                         current
-                          ? { ...current, warehouseId, locationLabel: operationLocations(ledgerContext, warehouseId)[0] ?? "" }
+                          ? {
+                              ...current,
+                              warehouseId,
+                              locationLabel:
+                                operationLocations(
+                                  ledgerContext,
+                                  warehouseId,
+                                )[0] ?? "",
+                            }
                           : current,
                       )
                     }
-                    options={warehouses.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }))}
+                    options={warehouses.map((row) => ({
+                      value: row.id,
+                      label: `${row.code} · ${row.name}`,
+                    }))}
                   />
                   <SelectField
                     label="ตำแหน่งจัดเก็บ *"
                     value={receipt.locationLabel}
                     disabled={receipt.status === "CONFIRMED"}
-                    onChange={(locationLabel) => setReceipt((current) => current ? { ...current, locationLabel } : current)}
-                    options={locations.map((value) => ({ value, label: value }))}
+                    onChange={(locationLabel) =>
+                      setReceipt((current) =>
+                        current ? { ...current, locationLabel } : current,
+                      )
+                    }
+                    options={locations.map((value) => ({
+                      value,
+                      label: value,
+                    }))}
                   />
                   <SelectField
                     label="สถานะสินค้า *"
@@ -232,11 +359,17 @@ export function ProductionReceiptsWorkspace() {
                     onChange={(inventoryStatus) =>
                       setReceipt((current) =>
                         current
-                          ? { ...current, inventoryStatus: inventoryStatus as ProductionReceipt["inventoryStatus"] }
+                          ? {
+                              ...current,
+                              inventoryStatus:
+                                inventoryStatus as ProductionReceipt["inventoryStatus"],
+                            }
                           : current,
                       )
                     }
-                    options={(["AVAILABLE", "QC_HOLD"] as const).map((value) => ({ value, label: inventoryStatuses[value] }))}
+                    options={(["AVAILABLE", "QC_HOLD"] as const).map(
+                      (value) => ({ value, label: inventoryStatuses[value] }),
+                    )}
                   />
                 </div>
               </SectionCard>
@@ -255,7 +388,9 @@ export function ProductionReceiptsWorkspace() {
                   <Table className="min-w-[860px]">
                     <TableHeader className="bg-surface-muted">
                       <TableRow>
-                        <TableHead className="w-16 px-5 text-center">No.</TableHead>
+                        <TableHead className="w-16 px-5 text-center">
+                          No.
+                        </TableHead>
                         <TableHead className="min-w-56">รายการ</TableHead>
                         <TableHead className="min-w-40">รหัสสินค้า</TableHead>
                         <TableHead className="min-w-44">จำนวนรับ</TableHead>
@@ -265,43 +400,83 @@ export function ProductionReceiptsWorkspace() {
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="px-5 text-center text-muted-foreground">1</TableCell>
-                        <TableCell className="font-medium">{receipt.itemName}</TableCell>
+                        <TableCell className="px-5 text-center text-muted-foreground">
+                          1
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {receipt.itemName}
+                        </TableCell>
                         <TableCell>{receipt.itemCode}</TableCell>
                         <TableCell className="align-top">
-                          <Label htmlFor="production-receipt-quantity" className="sr-only">จำนวนรับ ({receipt.unit})</Label>
+                          <Label
+                            htmlFor="production-receipt-quantity"
+                            className="sr-only"
+                          >
+                            จำนวนรับ ({receipt.unit})
+                          </Label>
                           <Input
                             id="production-receipt-quantity"
                             name="quantity"
                             inputMode="decimal"
                             value={receipt.quantity}
-                            onChange={(event) => setReceipt((current) => current ? { ...current, quantity: event.target.value } : current)}
+                            onChange={(event) =>
+                              setReceipt((current) =>
+                                current
+                                  ? { ...current, quantity: event.target.value }
+                                  : current,
+                              )
+                            }
                             readOnly={receipt.status === "CONFIRMED"}
                             aria-invalid={!!errors.quantity}
-                            aria-describedby={errors.quantity ? "production-receipt-quantity-error" : undefined}
+                            aria-describedby={
+                              errors.quantity
+                                ? "production-receipt-quantity-error"
+                                : undefined
+                            }
                             className="min-w-36"
                           />
                           {errors.quantity && (
-                            <p id="production-receipt-quantity-error" className="mt-1.5 whitespace-normal text-xs text-danger">
+                            <p
+                              id="production-receipt-quantity-error"
+                              className="mt-1.5 whitespace-normal text-xs text-danger"
+                            >
                               {errors.quantity}
                             </p>
                           )}
                         </TableCell>
                         <TableCell>{receipt.unit}</TableCell>
                         <TableCell className="align-top pr-5">
-                          <Label htmlFor="production-receipt-lot" className="sr-only">Lot</Label>
+                          <Label
+                            htmlFor="production-receipt-lot"
+                            className="sr-only"
+                          >
+                            Lot
+                          </Label>
                           <Input
                             id="production-receipt-lot"
                             name="lotCode"
                             value={receipt.lotCode}
-                            onChange={(event) => setReceipt((current) => current ? { ...current, lotCode: event.target.value } : current)}
+                            onChange={(event) =>
+                              setReceipt((current) =>
+                                current
+                                  ? { ...current, lotCode: event.target.value }
+                                  : current,
+                              )
+                            }
                             readOnly={receipt.status === "CONFIRMED"}
                             aria-invalid={!!errors.lotCode}
-                            aria-describedby={errors.lotCode ? "production-receipt-lot-error" : undefined}
+                            aria-describedby={
+                              errors.lotCode
+                                ? "production-receipt-lot-error"
+                                : undefined
+                            }
                             className="min-w-36"
                           />
                           {errors.lotCode && (
-                            <p id="production-receipt-lot-error" className="mt-1.5 whitespace-normal text-xs text-danger">
+                            <p
+                              id="production-receipt-lot-error"
+                              className="mt-1.5 whitespace-normal text-xs text-danger"
+                            >
                               {errors.lotCode}
                             </p>
                           )}
@@ -313,25 +488,42 @@ export function ProductionReceiptsWorkspace() {
               </SectionCard>
 
               <SectionCard title="หมายเหตุ">
-                <Label htmlFor="production-receipt-note" className="sr-only">หมายเหตุ</Label>
+                <Label htmlFor="production-receipt-note" className="sr-only">
+                  หมายเหตุ
+                </Label>
                 <Textarea
                   id="production-receipt-note"
                   name="note"
                   value={receipt.note}
-                  onChange={(event) => setReceipt((current) => current ? { ...current, note: event.target.value } : current)}
+                  onChange={(event) =>
+                    setReceipt((current) =>
+                      current
+                        ? { ...current, note: event.target.value }
+                        : current,
+                    )
+                  }
                   readOnly={receipt.status === "CONFIRMED"}
                   placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)"
                   className="min-h-28 resize-y bg-surface"
                 />
               </SectionCard>
 
-              <section aria-label="การดำเนินการเอกสาร" className="rounded-xl border bg-surface px-5 py-4">
+              <section
+                aria-label="การดำเนินการเอกสาร"
+                className="rounded-xl border bg-surface px-5 py-4"
+              >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">สถานะเอกสาร</p>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <StatusBadge tone={receipt.status === "CONFIRMED" ? "success" : "neutral"}>
-                        {receipt.status === "CONFIRMED" ? "ยืนยันรับแล้ว" : "แบบร่าง"}
+                      <StatusBadge
+                        tone={
+                          receipt.status === "CONFIRMED" ? "success" : "neutral"
+                        }
+                      >
+                        {receipt.status === "CONFIRMED"
+                          ? "ยืนยันรับแล้ว"
+                          : "แบบร่าง"}
                       </StatusBadge>
                       <span>
                         {receipt.status === "CONFIRMED"
@@ -343,7 +535,9 @@ export function ProductionReceiptsWorkspace() {
 
                   {receipt.status === "DRAFT" && (
                     <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                      <Button type="submit" variant="outline">บันทึกแบบร่าง</Button>
+                      <Button type="submit" variant="outline">
+                        บันทึกแบบร่าง
+                      </Button>
                       <ConfirmDialog
                         title="ยืนยันรับยอดและลง Stock Ledger?"
                         description={`${receipt.documentNumber} · ${receipt.quantity || 0} ${receipt.unit} · เมื่อยืนยันแล้วแก้ไขไม่ได้`}
@@ -366,22 +560,72 @@ export function ProductionReceiptsWorkspace() {
           >
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/25 px-4 py-3 text-sm">
               <span className="font-medium">ข้อมูลที่บันทึก</span>
-              <span className="text-muted-foreground">ทั้งหมด {flow.receipts.length.toLocaleString("th-TH")} รายการ</span>
+              <span className="text-muted-foreground">
+                ทั้งหมด {flow.receipts.length.toLocaleString("th-TH")} รายการ
+              </span>
             </div>
+            <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="space-y-2">
+                <Label htmlFor="receipt-v2-history-search">ค้นหาเอกสาร</Label>
+
+                <div className="relative">
+                  <Search
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+
+                  <Input
+                    id="receipt-v2-history-search"
+                    value={historySearch}
+                    onChange={(event) => setHistorySearch(event.target.value)}
+                    placeholder="เลขเอกสาร, สินค้า, Lot, สถานที่..."
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="receipt-v2-history-status">สถานะเอกสาร</Label>
+
+                <select
+                  id="receipt-v2-history-status"
+                  value={historyStatus}
+                  onChange={(event) =>
+                    setHistoryStatus(
+                      event.target.value as "ALL" | "DRAFT" | "CONFIRMED",
+                    )
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="ALL">ทุกสถานะ</option>
+                  <option value="DRAFT">แบบร่าง</option>
+                  <option value="CONFIRMED">ยืนยันรับแล้ว</option>
+                </select>
+              </div>
+            </div>
+
+            <p role="status" className="text-xs text-muted-foreground">
+              พบ {filteredReceipts.length.toLocaleString("th-TH")} รายการ
+            </p>
             <FactoryDataTable
-              rows={flow.receipts}
+              rows={filteredReceipts}
               rowKey={(row) => row.id}
               minWidth={1120}
               columns={[
                 {
                   key: "number",
                   label: "เลขที่เอกสาร",
-                  render: (row) => <span className="font-medium">{row.documentNumber}</span>,
+                  render: (row) => (
+                    <span className="font-medium">{row.documentNumber}</span>
+                  ),
                 },
                 {
                   key: "date",
                   label: "วันที่",
-                  render: (row) => formatDocumentDate(row.createdAt || row.confirmedAt || row.updatedAt) || "—",
+                  render: (row) =>
+                    formatDocumentDate(
+                      row.createdAt || row.confirmedAt || row.updatedAt,
+                    ) || "—",
                 },
                 {
                   key: "destination",
@@ -389,7 +633,10 @@ export function ProductionReceiptsWorkspace() {
                   render: (row) => (
                     <div className="min-w-56 whitespace-normal">
                       <p>{siteLabel(row.siteId)}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{warehouseLabel(row.warehouseId)} · {row.locationLabel || "—"}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {warehouseLabel(row.warehouseId)} ·{" "}
+                        {row.locationLabel || "—"}
+                      </p>
                     </div>
                   ),
                 },
@@ -399,17 +646,26 @@ export function ProductionReceiptsWorkspace() {
                   render: (row) => (
                     <div className="min-w-52 whitespace-normal">
                       <p>{row.itemName}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{row.itemCode}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {row.itemCode}
+                      </p>
                     </div>
                   ),
                 },
                 { key: "lot", label: "Lot", render: (row) => row.lotCode },
-                { key: "quantity", label: "จำนวนรับ", numeric: true, render: (row) => `${row.quantity} ${row.unit}` },
+                {
+                  key: "quantity",
+                  label: "จำนวนรับ",
+                  numeric: true,
+                  render: (row) => `${row.quantity} ${row.unit}`,
+                },
                 {
                   key: "status",
                   label: "สถานะ",
                   render: (row) => (
-                    <StatusBadge tone={row.status === "CONFIRMED" ? "success" : "neutral"}>
+                    <StatusBadge
+                      tone={row.status === "CONFIRMED" ? "success" : "neutral"}
+                    >
                       {row.status === "CONFIRMED" ? "ยืนยันรับแล้ว" : "แบบร่าง"}
                     </StatusBadge>
                   ),
@@ -419,7 +675,12 @@ export function ProductionReceiptsWorkspace() {
                   label: "จัดการ",
                   render: (row) => (
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" aria-label={`ดู ${row.documentNumber}`} onClick={() => setView(row)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`ดู ${row.documentNumber}`}
+                        onClick={() => setView(row)}
+                      >
                         <Eye aria-hidden="true" />
                       </Button>
                       {row.status === "DRAFT" && (

@@ -6,21 +6,12 @@ import {
   ClipboardList,
   FileText,
   History,
-  Plus,
-  Trash2,
 } from "lucide-react";
 import { SectionCard } from "@/src/components/factory/patterns";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/src/components/ui/table";
+import { useSettingsPostgres } from "@/src/components/factory/use-settings-postgres";
 import {
   Tabs,
   TabsContent,
@@ -33,7 +24,9 @@ import {
   newReceiptItemV1,
   type ReceiptDocumentV1,
   type ReceiptItemV1,
+  type ReceiptGroupV1,
 } from "./production-receipt-v1-types";
+import { ProductionReceiptV1Table } from "./production-receipt-v1-table";
 
 function Field({
   label,
@@ -76,29 +69,59 @@ export function ProductionReceiptV1Workspace() {
     setDoc((current) => ({ ...current, ...patch }));
   }
 
-  function updateItem(id: string, patch: Partial<ReceiptItemV1>) {
+  const {
+    state: settings,
+    loading: unitsLoading,
+    loadError: unitsError,
+    retry: retryUnits,
+  } = useSettingsPostgres();
+
+  const unitOptions = settings.rows
+    .filter((row) => row.kind === "units" && row.active)
+    .map((row) => ({
+      value: row.name,
+      label: `${row.code} · ${row.name}`,
+    }));
+
+  const groupKeys = {
+    P1: "p1Items",
+    P2: "p2Items",
+    MOLDING: "moldingItems",
+  } as const;
+
+  function updateItem(
+    group: ReceiptGroupV1,
+    id: string,
+    patch: Partial<ReceiptItemV1>,
+  ) {
+    const key = groupKeys[group];
+
     setDoc((current) => ({
       ...current,
-      items: current.items.map((item) =>
+      [key]: current[key].map((item) =>
         item.id === id ? { ...item, ...patch } : item,
       ),
     }));
   }
 
-  function addItem() {
+  function addItem(group: ReceiptGroupV1) {
+    const key = groupKeys[group];
+
     setDoc((current) => ({
       ...current,
-      items: [...current.items, newReceiptItemV1()],
+      [key]: [...current[key], newReceiptItemV1()],
     }));
   }
 
-  function removeItem(id: string) {
+  function removeItem(group: ReceiptGroupV1, id: string) {
+    const key = groupKeys[group];
+
     setDoc((current) => ({
       ...current,
-      items:
-        current.items.length > 1
-          ? current.items.filter((item) => item.id !== id)
-          : current.items,
+      [key]:
+        current[key].length > 1
+          ? current[key].filter((item) => item.id !== id)
+          : current[key],
     }));
   }
 
@@ -178,161 +201,112 @@ export function ProductionReceiptV1Workspace() {
             />
           </SectionCard>
 
-          <SectionCard
-            title="รายละเอียดวัสดุ / สินค้า"
-            subtitle="โครงตารางตามใบรับยอดผลิต iTECH"
-          >
+          {unitsLoading && (
             <div
-              role="region"
-              tabIndex={0}
-              aria-label="ตารางรายละเอียดใบรับยอดผลิต V1 เลื่อนแนวนอนเพื่อดูทุกคอลัมน์"
-              className="rounded-lg border border-border"
+              role="status"
+              className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
             >
-              <Table className="min-w-[1100px] border-collapse">
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead
-                      rowSpan={2}
-                      className="h-auto w-14 border-r p-3 text-center"
-                    >
-                      No.
-                    </TableHead>
-                    <TableHead
-                      colSpan={2}
-                      className="h-auto border-r p-3 text-center"
-                    >
-                      รายละเอียดวัสดุ
-                    </TableHead>
-                    <TableHead rowSpan={2} className="h-auto border-r p-3">
-                      จำนวน
-                    </TableHead>
-                    <TableHead rowSpan={2} className="h-auto border-r p-3">
-                      หน่วยนับ
-                    </TableHead>
-                    <TableHead rowSpan={2} className="h-auto border-r p-3">
-                      Lot
-                    </TableHead>
-                    <TableHead rowSpan={2} className="h-auto border-r p-3">
-                      หมายเหตุ
-                    </TableHead>
-                    <TableHead rowSpan={2} className="h-auto w-14 p-3">
-                      <span className="sr-only">จัดการ</span>
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="h-auto border-r p-3 text-left">
-                      รายการ
-                    </TableHead>
-                    <TableHead className="h-auto border-r p-3 text-left">
-                      ขนาด (kg)
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {doc.items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="border-r p-2 text-center">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell className="min-w-56 border-r p-2">
-                        <Input
-                          aria-label={`รายการ ${index + 1}`}
-                          value={item.name}
-                          onChange={(event) =>
-                            updateItem(item.id, { name: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="min-w-32 border-r p-2">
-                        <Input
-                          aria-label={`ขนาด ${index + 1}`}
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.sizeKg}
-                          onChange={(event) =>
-                            updateItem(item.id, { sizeKg: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="min-w-32 border-r p-2">
-                        <Input
-                          aria-label={`จำนวน ${index + 1}`}
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={item.quantity}
-                          onChange={(event) =>
-                            updateItem(item.id, { quantity: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="min-w-32 border-r p-2">
-                        <Input
-                          aria-label={`หน่วย ${index + 1}`}
-                          value={item.unit}
-                          onChange={(event) =>
-                            updateItem(item.id, { unit: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="min-w-36 border-r p-2">
-                        <Input
-                          aria-label={`Lot ${index + 1}`}
-                          value={item.lot}
-                          onChange={(event) =>
-                            updateItem(item.id, { lot: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="min-w-40 border-r p-2">
-                        <Input
-                          aria-label={`หมายเหตุ ${index + 1}`}
-                          value={item.note}
-                          onChange={(event) =>
-                            updateItem(item.id, { note: event.target.value })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="p-2 text-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`ลบรายการ ${index + 1}`}
-                          disabled={doc.items.length === 1}
-                          onClick={() => removeItem(item.id)}
-                          className="size-11"
-                        >
-                          <Trash2 aria-hidden="true" className="size-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              กำลังโหลดหน่วยนับจากตั้งค่าระบบ...
             </div>
+          )}
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground" aria-live="polite">
-                จำนวนรายการ: {doc.items.length}
+          {unitsError && (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3"
+            >
+              <p className="text-sm text-destructive">
+                โหลดหน่วยนับไม่สำเร็จ: {unitsError}
               </p>
-              <Button type="button" variant="outline" onClick={addItem}>
-                <Plus aria-hidden="true" className="size-4" />
-                เพิ่มรายการ
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={retryUnits}
+              >
+                ลองใหม่
               </Button>
             </div>
-          </SectionCard>
+          )}
 
-          <SectionCard
-            title="รายละเอียดการผลิต"
-            subtitle="รอข้อมูลจริงจากใบสั่งผลิตและรายงานการผลิต iTECH"
-          >
+          {!unitsLoading && !unitsError && unitOptions.length === 0 && (
+            <p
+              role="status"
+              className="rounded-lg border p-3 text-sm text-muted-foreground"
+            >
+              ยังไม่มีหน่วยนับที่เปิดใช้งาน กรุณาเพิ่มข้อมูลในตั้งค่าระบบ
+            </p>
+          )}
+
+          <ProductionReceiptV1Table
+            title="กระสอบปุ๋ยอินทรีย์ / สารปรับสภาพดิน (P1)"
+            items={doc.p1Items}
+            unitOptions={unitOptions}
+            onAdd={() => addItem("P1")}
+            onRemove={(id) => removeItem("P1", id)}
+            onUpdate={(id, patch) => updateItem("P1", id, patch)}
+          />
+
+          <ProductionReceiptV1Table
+            title="กระสอบปุ๋ยอินทรีย์ / สารปรับสภาพดิน (P2)"
+            items={doc.p2Items}
+            unitOptions={unitOptions}
+            onAdd={() => addItem("P2")}
+            onRemove={(id) => removeItem("P2", id)}
+            onUpdate={(id, patch) => updateItem("P2", id, patch)}
+          />
+
+          <ProductionReceiptV1Table
+            title="ยอดผลิตปั้น"
+            items={doc.moldingItems}
+            unitOptions={unitOptions}
+            onAdd={() => addItem("MOLDING")}
+            onRemove={(id) => removeItem("MOLDING", id)}
+            onUpdate={(id, patch) => updateItem("MOLDING", id, patch)}
+          />
+
+          <SectionCard title="สรุปรายการรับยอดผลิต">
             <div className="grid gap-4 md:grid-cols-3">
-              <Field label="P1 รวม" value={doc.p1Total} readOnly placeholder="รอข้อมูลต้นทาง" />
-              <Field label="P2 รวม" value={doc.p2Total} readOnly placeholder="รอข้อมูลต้นทาง" />
-              <Field label="ยอดผลิตปั้น รวม" value={doc.moldingTotal} readOnly placeholder="รอข้อมูลต้นทาง" />
+              {(
+                [
+                  {
+                    label: "P1 รวม",
+                    items: doc.p1Items,
+                  },
+                  {
+                    label: "P2 รวม",
+                    items: doc.p2Items,
+                  },
+                  {
+                    label: "ยอดผลิตปั้น รวม",
+                    items: doc.moldingItems,
+                  },
+                ] as const
+              ).map(({ label, items }) => {
+                const total = items.reduce((sum, item) => {
+                  const qty = Number(item.quantity);
+
+                  return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+                }, 0);
+
+                return (
+                  <div
+                    key={label}
+                    className="rounded-xl border border-border bg-muted/20 p-5"
+                  >
+                    <p className="text-sm text-muted-foreground">{label}</p>
+
+                    <p className="mt-3 text-2xl font-semibold tabular-nums">
+                      {total.toLocaleString("th-TH")}
+                    </p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      รวมจำนวนตามรายการที่กรอก
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </SectionCard>
 
@@ -383,7 +357,10 @@ export function ProductionReceiptV1Workspace() {
         <TabsContent value="history">
           <SectionCard title="ประวัติใบรับยอดผลิต V1">
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-              <History aria-hidden="true" className="size-8 text-muted-foreground" />
+              <History
+                aria-hidden="true"
+                className="size-8 text-muted-foreground"
+              />
               <p className="font-medium">ยังไม่มีประวัติใบรับยอดผลิต V1</p>
               <p className="text-sm text-muted-foreground">
                 ตารางประวัติจะเปิดใช้งานเมื่อมีระบบบันทึกข้อมูล V1

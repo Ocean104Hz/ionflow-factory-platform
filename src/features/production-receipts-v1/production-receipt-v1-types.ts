@@ -1,3 +1,6 @@
+
+export type ReceiptGroupV1 = "P1" | "P2" | "MOLDING";
+
 export type ReceiptItemV1 = {
   id: string;
   name: string;
@@ -13,10 +16,11 @@ export type ReceiptDocumentV1 = {
   documentDate: string;
   documentNumber: string;
   productionOrderNumber: string;
-  items: ReceiptItemV1[];
-  p1Total: string;
-  p2Total: string;
-  moldingTotal: string;
+
+  p1Items: ReceiptItemV1[];
+  p2Items: ReceiptItemV1[];
+  moldingItems: ReceiptItemV1[];
+
   warehouseOfficer: string;
   inspector: string;
   note: string;
@@ -40,10 +44,11 @@ export function newReceiptDocumentV1(): ReceiptDocumentV1 {
     documentDate: new Date().toLocaleDateString("en-CA"),
     documentNumber: "",
     productionOrderNumber: "",
-    items: [newReceiptItemV1()],
-    p1Total: "",
-    p2Total: "",
-    moldingTotal: "",
+
+    p1Items: [newReceiptItemV1()],
+    p2Items: [newReceiptItemV1()],
+    moldingItems: [newReceiptItemV1()],
+
     warehouseOfficer: "",
     inspector: "",
     note: "",
