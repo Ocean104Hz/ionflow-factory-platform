@@ -42,11 +42,15 @@ const expectedGroups = {
   PACKING: ["บรรจุสินค้า", ["รายงานการบรรจุ", "ใบแจ้งสั่งแพ็คสินค้า"]],
   LOGISTICS: ["จ่ายและขนส่ง", ["ใบส่งสินค้า", "ใบจ่ายสินค้า"]],
   "SALES DOCUMENTS": ["เอกสารขาย", ["ใบแจ้งหนี้"]],
-  MAINTENANCE: ["ซ่อมบำรุง", ["ใบแจ้งซ่อม", "รายการอุปกรณ์"]],
+  MAINTENANCE: ["ซ่อมบำรุง", ["ใบแจ้งซ่อม", "รายการอุปกรณ์", "รายงานซ่อมบำรุง"]],
   "MASTER DATA": ["ข้อมูลหลัก", ["สินค้าและราคากลาง"]],
   SYSTEM: ["ระบบ", ["ตั้งค่าระบบ"]],
 };
 const routes = {
+  ใบแจ้งซ่อม: "/repair-requests",
+  รายการอุปกรณ์: "/equipment",
+  รายงานซ่อมบำรุง: "/maintenance-reports",
+  PO: "/purchase-orders",
   "ใบสั่งผลิตสินค้า V1": "/product-production-orders-v1",
   "ใบสั่งผลิตสินค้า V2": "/bulk-production-orders",
   รายงานการผลิต: "/production-reports",
@@ -64,6 +68,7 @@ const routes = {
   ตรวจสอบคุณภาพการผลิต: "/production-quality",
   ตรวจคุณภาพปุ๋ยอินทรีย์เคมี: "/qc-organic-fertilizer",
   รายงานการบรรจุ: "/packaging-report",
+  ใบแจ้งสั่งแพ็คสินค้า: "/packing-summary",
   "ใบ NC": "/nc-reports",
   ใบส่งตัวอย่าง: "/sample-submissions",
   แบบบันทึกการส่งตัวอย่าง: "/sample-submission-log",
@@ -97,10 +102,10 @@ function catalog() {
   ].map(([, key, title]) => ({ key, title }));
   return { items, groups };
 }
-test("sidebar has 30 canonical items in the approved business groups", () => {
+test("sidebar has 31 canonical items in the approved business groups", () => {
   const { items, groups } = catalog();
   const titles = items.map((item) => item.title);
-  assert.equal(items.length, 30);
+  assert.equal(items.length, 31);
   assert.equal(titles.length, new Set(titles).size);
   assert.deepEqual(
     groups,
@@ -143,10 +148,10 @@ test("production report variants collapse into one implemented production page",
   assert.ok(!items.some((item) => item.title === "รายงานการผลิตปุ๋ยเม็ด"));
   assert.ok(!items.some((item) => item.title === "ใบรายงานการผลิต"));
 });
-test("all twenty-five implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all thirty implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 25);
+  assert.equal(linked.length, 30);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);

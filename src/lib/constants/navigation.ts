@@ -55,7 +55,7 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/pr",
     icon: FileText,
   },
-  { group: "PURCHASING", title: "PO", icon: ShoppingCart },
+  { group: "PURCHASING", title: "PO", href: "/purchase-orders", icon: ShoppingCart },
   {
     group: "PURCHASING",
     title: "คำสั่งการผลิต",
@@ -173,8 +173,9 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/invoices",
     icon: ReceiptText,
   },
-  { group: "MAINTENANCE", title: "ใบแจ้งซ่อม", icon: Wrench },
-  { group: "MAINTENANCE", title: "รายการอุปกรณ์", icon: Wrench },
+  { group: "MAINTENANCE", title: "ใบแจ้งซ่อม", href: "/repair-requests", icon: Wrench },
+  { group: "MAINTENANCE", title: "รายการอุปกรณ์", href: "/equipment", icon: Wrench },
+  { group: "MAINTENANCE", title: "รายงานซ่อมบำรุง", href: "/maintenance-reports", icon: Wrench },
   {
     group: "MASTER DATA",
     title: "สินค้าและราคากลาง",
