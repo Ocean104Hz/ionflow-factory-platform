@@ -336,12 +336,13 @@ test("status palette, horizontal table overflow, and dialog safety are shared", 
   assert.match(dialog, /setOpen\(false\)/);
 });
 
-test("Login is a mock entry outside the factory shell and never stores credentials", () => {
+test("Login submits only to the local auth API and never stores credentials", () => {
   const login = read("src/features/login/login.tsx");
-  assert.match(login, /MOCK LOGIN/);
-  assert.match(login, /router\.push\("\/dashboard"\)/);
-  assert.match(login, /e\.currentTarget\.reset\(\)/);
-  assert.doesNotMatch(login, /localStorage|sessionStorage|fetch\(/);
+  assert.match(login, /fetch\("\/api\/auth\/login"/);
+  assert.match(login, /credentials: "same-origin"/);
+  assert.match(login, /router\.replace\("\/dashboard"\)/);
+  assert.match(login, /form\.reset\(\)/);
+  assert.doesNotMatch(login, /localStorage|sessionStorage/);
   assert.match(read("app/layout.tsx"), /<BrandingProvider>/);
   assert.match(read("app/page.tsx"), /redirect\("\/login"\)/);
   assert.match(read("app/login/page.tsx"), /<Login \/>/);

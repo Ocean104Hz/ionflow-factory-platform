@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
 import {
   Breadcrumb,
@@ -50,7 +50,19 @@ import {
 } from "@/src/lib/constants/navigation";
 import { Alert, AlertDescription } from "../ui/alert";
 
-export function AppShell({ children }: { children: ReactNode }) {
+type CurrentUser = Readonly<{
+  displayName: string;
+  email: string;
+  roles: readonly string[];
+}>;
+
+export function AppShell({
+  children,
+  currentUser,
+}: {
+  children: ReactNode;
+  currentUser: CurrentUser;
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   useEffect(() => {
     try {
@@ -70,12 +82,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       }}
       style={{ "--sidebar-width-icon": "4rem" } as CSSProperties}
     >
-      <FactoryShell>{children}</FactoryShell>
+      <FactoryShell currentUser={currentUser}>{children}</FactoryShell>
     </SidebarProvider>
   );
 }
 
-function FactoryShell({ children }: { children: ReactNode }) {
+function FactoryShell({
+  children,
+  currentUser,
+}: {
+  children: ReactNode;
+  currentUser: CurrentUser;
+}) {
   const pathname = usePathname();
   const { branding } = useBranding();
   const current = navigation.find(
@@ -91,9 +109,10 @@ function FactoryShell({ children }: { children: ReactNode }) {
       >
         ข้ามไปเนื้อหา
       </a>
-      <AppSidebar onPreview={setPreviewMenu} />
+      <AppSidebar currentUser={currentUser} onPreview={setPreviewMenu} />
       <SidebarInset className="min-w-0 bg-background">
         <SiteHeader
+          currentUser={currentUser}
           title={
             pathname.startsWith("/settings")
               ? "ตั้งค่า"
@@ -132,7 +151,13 @@ function FactoryShell({ children }: { children: ReactNode }) {
     </>
   );
 }
-function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
+function AppSidebar({
+  currentUser,
+  onPreview,
+}: {
+  currentUser: CurrentUser;
+  onPreview: (title: string) => void;
+}) {
   const pathname = usePathname();
   const { branding } = useBranding();
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -253,10 +278,10 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
           {!compact && (
             <div className="min-w-0">
               <p className="truncate text-xs font-medium">
-                {branding.factoryName}
+                {currentUser.displayName}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                ผู้ใช้งานสาธิต
+                {currentUser.email}
               </p>
             </div>
           )}
@@ -265,8 +290,16 @@ function AppSidebar({ onPreview }: { onPreview: (title: string) => void }) {
     </Sidebar>
   );
 }
-function SiteHeader({ title }: { title: string }) {
+function SiteHeader({
+  title,
+  currentUser,
+}: {
+  title: string;
+  currentUser: CurrentUser;
+}) {
   const { branding } = useBranding();
+  const router = useRouter();
+  const [logoutPending, setLogoutPending] = useState(false);
   const { state, isMobile, openMobile } = useSidebar();
   const compact = !isMobile && state === "collapsed";
   return (
@@ -333,7 +366,7 @@ function SiteHeader({ title }: { title: string }) {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              aria-label="เมนูผู้ใช้งานสาธิต"
+              aria-label="เมนูผู้ใช้งาน"
               className="h-auto gap-2 p-1"
             >
               <Avatar className="size-9">
@@ -343,22 +376,44 @@ function SiteHeader({ title }: { title: string }) {
               </Avatar>
               <span className="hidden text-left sm:block">
                 <span className="block text-xs font-semibold">
-                  ผู้ใช้งานสาธิต
+                  {currentUser.displayName}
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  Factory administrator
+                  {currentUser.roles.join(", ") || currentUser.email}
                 </span>
               </span>
               <ChevronDown className="size-3" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              บัญชีสมมติ · ไม่มี authentication
-            </DropdownMenuLabel>
+            <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/login">กลับหน้า Login (demo)</Link>
+            <DropdownMenuItem
+              disabled={logoutPending}
+              onSelect={async (event) => {
+                event.preventDefault();
+                setLogoutPending(true);
+                try {
+                  const csrfToken = document.cookie
+                    .split("; ")
+                    .find((part) => part.startsWith("ionflow_factory_csrf="))
+                    ?.slice("ionflow_factory_csrf=".length);
+                  if (!csrfToken) return;
+                  const response = await fetch("/api/auth/logout", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "x-csrf-token": decodeURIComponent(csrfToken) },
+                  });
+                  if (response.ok) {
+                    router.replace("/login");
+                    router.refresh();
+                  }
+                } finally {
+                  setLogoutPending(false);
+                }
+              }}
+            >
+              {logoutPending ? "กำลังออกจากระบบ…" : "ออกจากระบบ"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

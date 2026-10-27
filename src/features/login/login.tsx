@@ -3,17 +3,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card } from "@/src/components/ui/card";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
-import { useId, useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Eye,
   EyeOff,
-  LockKeyhole,
   Palette,
   Factory,
-  ShieldCheck,
-  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -34,7 +31,8 @@ export function Login() {
   const id = useId();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
       <section className="login-showcase relative hidden flex-col justify-between p-10 lg:flex">
@@ -96,41 +94,72 @@ export function Login() {
             </div>
             <Alert role="note" className="mb-6 border-info/20 bg-info/5">
               <AlertDescription className="text-xs text-info">
-                MOCK LOGIN · ใช้ข้อมูลตัวอย่างเท่านั้น ห้ามกรอกรหัสผ่านจริง
-                ไม่มีการส่งหรือเก็บข้อมูลบัญชี
+                LOCAL LOGIN · ตรวจสอบบัญชีและ Session ผ่าน PostgreSQL Local
               </AlertDescription>
             </Alert>
             <form
               className="space-y-5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.currentTarget.reset();
-                setShowPassword(false);
-                startTransition(() => router.push("/dashboard"));
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const values = new FormData(form);
+                setPending(true);
+                setError("");
+                try {
+                  const response = await fetch("/api/auth/login", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      email: values.get("email"),
+                      password: values.get("password"),
+                    }),
+                  });
+                  const result = await response.json().catch(() => null);
+                  if (!response.ok)
+                    throw new Error(
+                      result?.message ?? "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่",
+                    );
+                  form.reset();
+                  setShowPassword(false);
+                  router.replace("/dashboard");
+                  router.refresh();
+                } catch (reason) {
+                  setError(
+                    reason instanceof Error
+                      ? reason.message
+                      : "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่",
+                  );
+                  const password = form.elements.namedItem("password");
+                  if (password instanceof HTMLInputElement) {
+                    password.value = "";
+                    password.focus();
+                  }
+                } finally {
+                  setPending(false);
+                }
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor={`${id}-email`}>อีเมลตัวอย่าง</Label>
+                <Label htmlFor={`${id}-email`}>อีเมล</Label>
                 <Input
                   id={`${id}-email`}
-                  name="demo-email"
+                  name="email"
                   type="email"
                   required
-                  defaultValue="demo@example.test"
-                  autoComplete="off"
+                  autoComplete="email"
                   className="h-11"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor={`${id}-password`}>รหัสผ่านตัวอย่าง</Label>
+                <Label htmlFor={`${id}-password`}>รหัสผ่าน</Label>
                 <div className="relative">
                   <Input
                     id={`${id}-password`}
-                    name="demo-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     required
-                    defaultValue="demo-only"
-                    autoComplete="off"
+                    autoComplete="current-password"
                     className="h-11 pr-12"
                   />
                   <Button
@@ -155,23 +184,27 @@ export function Login() {
                   </DialogTrigger>
                   <DialogContent className="bg-surface">
                     <DialogHeader>
-                      <DialogTitle>การกู้คืนรหัสผ่าน · UI demo</DialogTitle>
+                      <DialogTitle>การกู้คืนรหัสผ่าน</DialogTitle>
                       <DialogDescription>
-                        ไม่มีระบบบัญชีจริงใน phase นี้
-                        จึงไม่ส่งอีเมลหรือสร้างลิงก์กู้คืน
-                        ใช้ข้อมูลตัวอย่างที่ให้ไว้แล้วกดเข้าใช้งาน demo ได้ทันที
+                        Local Login V1 ยังไม่มีระบบกู้คืนรหัสผ่าน
+                        กรุณาติดต่อผู้ดูแล Factory เพื่อดำเนินการอย่างปลอดภัย
                       </DialogDescription>
                     </DialogHeader>
                   </DialogContent>
                 </Dialog>
               </div>
+              {error && (
+                <p role="alert" className="text-sm text-danger">
+                  {error}
+                </p>
+              )}
               <Button type="submit" disabled={pending} className="h-11 w-full">
-                {pending ? "กำลังเปิด workspace…" : "เข้าใช้งาน Demo"}
+                {pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
                 <ArrowRight />
               </Button>
             </form>
             <p className="mt-5 text-center text-xs text-muted-foreground">
-              หน้า workspace เปิดได้โดยตรง ไม่มี route guard หรือ authentication
+              Session มีอายุจำกัดและตรวจสอบสิทธิ์จาก Server ทุกครั้ง
             </p>
           </Card>
         </div>

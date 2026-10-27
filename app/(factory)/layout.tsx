@@ -10,12 +10,22 @@ import { InventoryOperationsProvider } from "@/src/features/inventory/inventory-
 import { ProductionQualityProvider } from "@/src/features/production-quality/production-quality-provider";
 import { PackagingProvider } from "@/src/features/packaging-reports/packaging-provider";
 import { ProductionFlowProvider } from "@/src/features/production-flow/production-flow-provider";
+import { requireAuthenticatedFactoryUser } from "@/src/server/auth/server-auth";
 
 export default function FactoryLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AuthenticatedFactory>{children}</AuthenticatedFactory>
+    </Suspense>
+  );
+}
+
+async function AuthenticatedFactory({ children }: { children: React.ReactNode }) {
+  const user = await requireAuthenticatedFactoryUser();
   return (
     <MasterDataProvider>
       <MixingProvider>
@@ -26,9 +36,15 @@ export default function FactoryLayout({
                 <ProductionFlowProvider>
                   <ProductionQualityProvider>
                     <PackagingProvider>
-                      <Suspense fallback={<LoadingState />}>
-                        <AppShell>{children}</AppShell>
-                      </Suspense>
+                      <AppShell
+                        currentUser={{
+                          displayName: user.displayName,
+                          email: user.email,
+                          roles: user.roles,
+                        }}
+                      >
+                        {children}
+                      </AppShell>
                     </PackagingProvider>
                   </ProductionQualityProvider>
                 </ProductionFlowProvider>
