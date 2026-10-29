@@ -7,6 +7,7 @@ export type PoStatus = keyof typeof poStatuses;
 export type PoAction = "submit" | "approve" | "reject" | "return_draft" | "cancel" | "close" | "delete";
 export type PoItem = {
   id: string; raw_material_id: string; material_code_snapshot: string; material_name_snapshot: string;
+  request_ref_item_id?: string;
   specification: string; ordered_qty: string; received_qty: string; unit: string;
   unit_price: string; discount_amount: string; tax_amount: string;
   expected_delivery_date: string; remarks: string;
@@ -34,7 +35,7 @@ export const demoMaterials: MasterOption[] = [
   { id: "demo-rm-b", code: "DEMO-RM-02", name: "กระสอบตัวอย่าง B", unit: "ใบ", price: "8.00", specification: "ขนาดตัวอย่าง 50 กก." },
 ];
 export function blankItem(id: string): PoItem {
-  return { id, raw_material_id: "", material_code_snapshot: "", material_name_snapshot: "", specification: "", ordered_qty: "", received_qty: "0", unit: "", unit_price: "", discount_amount: "", tax_amount: "", expected_delivery_date: "", remarks: "" };
+  return { id, raw_material_id: "", request_ref_item_id: "", material_code_snapshot: "", material_name_snapshot: "", specification: "", ordered_qty: "", received_qty: "0", unit: "", unit_price: "", discount_amount: "", tax_amount: "", expected_delivery_date: "", remarks: "" };
 }
 export function blankPo(date = ""): PurchaseOrder {
   return { id: "", po_no: "", po_date: date, supplier_id: "", supplier_code_snapshot: "", supplier_name_snapshot: "", warehouse_code: "", warehouse_name: "", currency_code: "THB", vat_type: "NON_VAT", payment_term: "", credit_days: "", expected_delivery_date: "", request_ref_id: "", request_ref_no: "", remarks: "", status: "draft", items: [], created_at: "", updated_at: "" };
