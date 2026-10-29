@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Printer } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -16,7 +16,17 @@ import { useBranding } from "@/src/components/factory/branding-provider";
 import { buildPRPrintHtml } from "./pr-print";
 import type { PR } from "./pr-domain";
 
-export function PRPrintPreview({ records }: { records: PR[] }) {
+export function PRPrintPreview({
+  records,
+  open,
+  onOpenChange,
+  trigger,
+}: {
+  records: PR[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: ReactNode | null;
+}) {
   const { branding } = useBranding();
   const frame = useRef<HTMLIFrameElement>(null);
   const [loadedHtml, setLoadedHtml] = useState("");
@@ -27,19 +37,25 @@ export function PRPrintPreview({ records }: { records: PR[] }) {
   );
   return (
     <Dialog
+      open={open}
       onOpenChange={(open) => {
         if (open) {
           setLoadedHtml("");
           setError("");
         }
+        onOpenChange?.(open);
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline" disabled={!records.length}>
-          <Printer aria-hidden="true" />
-          พิมพ์ใบขอซื้อ
-        </Button>
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button variant="outline" disabled={!records.length}>
+              <Printer aria-hidden="true" />
+              พิมพ์ใบขอซื้อ
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="flex max-h-[94dvh] flex-col sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>ตัวอย่างใบขอซื้อก่อนพิมพ์</DialogTitle>

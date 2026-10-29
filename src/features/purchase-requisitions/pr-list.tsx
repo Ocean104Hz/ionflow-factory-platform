@@ -1,6 +1,21 @@
 "use client";
-import { useState } from "react";
-import { FilePlus2, SlidersHorizontal } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Copy,
+  FilePlus2,
+  SlidersHorizontal,
+  MoreHorizontal,
+  Eye,
+  Pencil,
+  Printer,
+  Trash2,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
 import {
   Card,
   CardHeader,
@@ -43,28 +58,43 @@ import {
 } from "@/src/components/factory/patterns";
 import { usePR } from "./pr-provider";
 import {
+  actionLabel,
+  actionRules,
   filterPRs,
   importExamplePR,
   quantitySummary,
   statusLabel,
   statusTone,
   type PR,
+  type PRAction,
   type PRStatus,
 } from "./pr-domain";
-import { PRCommand, PRPreview, prDate } from "./pr-components";
+import {
+  PRCommand,
+  PRCreatePO,
+  PRPreview,
+  prDate,
+} from "./pr-components";
+import { PRPrintPreview } from "./pr-print-preview";
 
 const emptyFilters = { search: "", status: "all", from: "", to: "" };
+type RowOverlay =
+  | { type: "workflow"; id: string; action: PRAction }
+  | { type: "delete" | "create-po" | "print"; id: string };
 export function PRList() {
-  const { records, create, batch } = usePR();
+  const { records, create, batch, act, copy, remove } = usePR();
   const [draft, setDraft] = useState(emptyFilters);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState("10");
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [rowOverlay, setRowOverlay] = useState<RowOverlay | null>(null);
   const [document, setDocument] = useState<
     { mode: "new" } | { mode: "view" | "edit"; id: string } | null
   >(null);
+  const actionButtons = useRef(new Map<string, HTMLButtonElement>());
+  const returnFocusId = useRef<string | null>(null);
   const filtered = filterPRs(records, filters);
   const pages = Math.max(1, Math.ceil(filtered.length / Number(pageSize)));
   const currentPage = Math.min(page, pages);
@@ -94,6 +124,23 @@ export function PRList() {
     );
     setSelected([]);
     setMessage(`ดำเนินการ ${selectedRows.length} ใบสำเร็จ (สาธิต)`);
+  }
+  function afterMenu(id: string, action: () => void) {
+    returnFocusId.current = id;
+    // Let Radix close the menu before opening another modal and moving focus.
+    window.setTimeout(action, 0);
+  }
+  function restoreMenuFocus() {
+    const id = returnFocusId.current;
+    returnFocusId.current = null;
+    if (id)
+      window.requestAnimationFrame(() => actionButtons.current.get(id)?.focus());
+  }
+  function closeRowOverlay(open: boolean) {
+    if (!open) {
+      setRowOverlay(null);
+      restoreMenuFocus();
+    }
   }
   const columns: Column<PR>[] = [
     {
@@ -175,28 +222,116 @@ export function PRList() {
       ),
     },
     { key: "needed", label: "กำหนดใช้", render: (pr) => prDate(pr.neededDate) },
+
     {
       key: "action",
       label: "จัดการ",
       render: (pr) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDocument({ mode: "view", id: pr.id })}
-          >
-            ดูรายละเอียด
-          </Button>
-          {["draft", "rejected"].includes(pr.status) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDocument({ mode: "edit", id: pr.id })}
+              ref={(button) => {
+                if (button) actionButtons.current.set(pr.id, button);
+                else actionButtons.current.delete(pr.id);
+              }}
+              variant="ghost"
+              size="icon"
+              aria-label={`จัดการ ${pr.number}`}
             >
-              แก้ไข
+              <MoreHorizontal aria-hidden="true" />
             </Button>
-          )}
-        </div>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() =>
+                afterMenu(pr.id, () =>
+                  setDocument({ mode: "view", id: pr.id }),
+                )
+              }
+            >
+              <Eye aria-hidden="true" />
+              ดูรายละเอียด
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                afterMenu(pr.id, () => {
+                  try {
+                    setDocument({ mode: "edit", id: copy(pr.id) });
+                  } catch (issue) {
+                    setMessage(
+                      issue instanceof Error ? issue.message : "คัดลอกไม่ได้",
+                    );
+                    restoreMenuFocus();
+                  }
+                })
+              }
+            >
+              <Copy aria-hidden="true" />
+              คัดลอกเป็นฉบับร่าง
+            </DropdownMenuItem>
+            {["draft", "rejected"].includes(pr.status) && (
+              <DropdownMenuItem
+                onSelect={() =>
+                  afterMenu(pr.id, () =>
+                    setDocument({ mode: "edit", id: pr.id }),
+                  )
+                }
+              >
+                <Pencil aria-hidden="true" />
+                แก้ไข
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onSelect={() =>
+                afterMenu(pr.id, () =>
+                  setRowOverlay({ type: "print", id: pr.id }),
+                )
+              }
+            >
+              <Printer aria-hidden="true" />
+              พรีวิว / พิมพ์
+            </DropdownMenuItem>
+            {(Object.keys(actionRules) as PRAction[])
+              .filter((action) => actionRules[action].from.includes(pr.status))
+              .map((action) => (
+                <DropdownMenuItem
+                  key={action}
+                  onSelect={() =>
+                    afterMenu(pr.id, () =>
+                      setRowOverlay({ type: "workflow", id: pr.id, action }),
+                    )
+                  }
+                >
+                  {actionLabel[action]}
+                </DropdownMenuItem>
+              ))}
+            {pr.status === "draft" && (
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() =>
+                  afterMenu(pr.id, () =>
+                    setRowOverlay({ type: "delete", id: pr.id }),
+                  )
+                }
+              >
+                <Trash2 aria-hidden="true" />
+                ลบฉบับร่าง
+              </DropdownMenuItem>
+            )}
+            {["approved", "partial_po_created"].includes(pr.status) && (
+              <DropdownMenuItem
+                onSelect={() =>
+                  afterMenu(pr.id, () =>
+                    setRowOverlay({ type: "create-po", id: pr.id }),
+                  )
+                }
+              >
+                สร้าง PO สาธิต
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
@@ -433,10 +568,71 @@ export function PRList() {
           </div>
         }
       />
+      {rowOverlay?.type === "workflow" &&
+        (() => {
+          const pr = records.find((row) => row.id === rowOverlay.id);
+          const action = rowOverlay.action;
+          return pr ? (
+            <PRCommand
+              key={`workflow-${pr.id}-${action}`}
+              open
+              onOpenChange={closeRowOverlay}
+              title={`${actionLabel[action]} PR`}
+              description={
+                action === "cancel" && pr.purchaseOrders.length
+                  ? "ยกเลิกยอดค้างซื้อของ PR เท่านั้น PO สาธิตที่ออกแล้วคงอยู่ ไม่ได้ยกเลิกตาม"
+                  : action === "approve" || action === "reject"
+                    ? `ผู้อนุมัติที่กำหนด: ${pr.approver} · ผู้ใช้ปัจจุบันในต้นแบบเป็นผู้ดูแลสาธิต`
+                    : "ตรวจสอบข้อมูลก่อนยืนยัน"
+              }
+              requiresReason={action === "reject" || action === "cancel"}
+              onConfirm={(reason) => act(pr.id, action, reason)}
+            />
+          ) : null;
+        })()}
+      {rowOverlay?.type === "delete" && (
+        <PRCommand
+          key={`delete-${rowOverlay.id}`}
+          open
+          onOpenChange={closeRowOverlay}
+          title="ลบฉบับร่าง PR"
+          description="ลบออกจากรายการสาธิต ประวัติการลบยังอยู่จนโหลดแอปใหม่"
+          onConfirm={() => remove(rowOverlay.id)}
+        />
+      )}
+      {rowOverlay?.type === "create-po" &&
+        (() => {
+          const pr = records.find((row) => row.id === rowOverlay.id);
+          return pr ? (
+            <PRCreatePO
+              key={`create-po-${pr.id}-${pr.revision}`}
+              pr={pr}
+              open
+              onOpenChange={closeRowOverlay}
+              trigger={null}
+            />
+          ) : null;
+        })()}
+      {rowOverlay?.type === "print" &&
+        (() => {
+          const pr = records.find((row) => row.id === rowOverlay.id);
+          return pr ? (
+            <PRPrintPreview
+              key={`print-${pr.id}-${pr.revision}`}
+              records={[pr]}
+              open
+              onOpenChange={closeRowOverlay}
+              trigger={null}
+            />
+          ) : null;
+        })()}
       <Dialog
         open={document !== null}
         onOpenChange={(open) => {
-          if (!open) setDocument(null);
+          if (!open) {
+            setDocument(null);
+            restoreMenuFocus();
+          }
         }}
       >
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-6xl">

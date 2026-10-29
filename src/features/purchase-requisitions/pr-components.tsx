@@ -50,28 +50,32 @@ export function PRCommand({
   onConfirm,
   requiresReason = false,
   children,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   title: string;
   description: string;
-  trigger: ReactNode;
+  trigger?: ReactNode;
   onConfirm: (reason: string) => void;
   requiresReason?: boolean;
   children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const id = useId();
+  const open = controlledOpen ?? internalOpen;
+  const changeOpen = (value: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(value);
+    onOpenChange?.(value);
+    setError("");
+    if (value) setReason("");
+  };
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(value) => {
-        setOpen(value);
-        setError("");
-        if (value) setReason("");
-      }}
-    >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+    <Dialog open={open} onOpenChange={changeOpen}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -87,7 +91,7 @@ export function PRCommand({
               if (requiresReason && !reason.trim())
                 throw new Error("กรุณาระบุเหตุผล");
               onConfirm(reason.trim());
-              setOpen(false);
+              changeOpen(false);
             } catch (issue) {
               setError(
                 issue instanceof Error ? issue.message : "ดำเนินการไม่สำเร็จ",
@@ -222,14 +226,28 @@ export function PRTotals({ pr }: { pr: PR }) {
     </div>
   );
 }
-export function PRCreatePO({ pr }: { pr: PR }) {
+export function PRCreatePO({
+  pr,
+  open,
+  onOpenChange,
+  trigger,
+}: {
+  pr: PR;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: ReactNode | null;
+}) {
   const { order } = usePR();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   return (
     <PRCommand
       title="สร้าง PO สาธิตจาก PR"
       description="เลือกจำนวนซื้อครั้งนี้ ไม่เกินยอดค้างซื้อ ไม่มีการสร้างใบสั่งซื้อจริงหรือส่งผู้ขาย"
-      trigger={<Button>สร้าง PO สาธิต</Button>}
+      trigger={
+        trigger === undefined ? <Button>สร้าง PO สาธิต</Button> : trigger
+      }
+      open={open}
+      onOpenChange={onOpenChange}
       onConfirm={() =>
         order(
           pr.id,
