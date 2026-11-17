@@ -107,6 +107,10 @@ export function PRList() {
     selected.includes(pr.id),
   ).length;
   const invalidRange = Boolean(draft.from && draft.to && draft.from > draft.to);
+  const dialogPR =
+    document && document.mode !== "new"
+      ? records.find((row) => row.id === document.id)
+      : undefined;
   const update = (key: keyof typeof draft, value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
   const toggle = (id: string) =>
@@ -635,18 +639,29 @@ export function PRList() {
           }
         }}
       >
-        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-6xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[94dvh] min-h-0 w-[min(96vw,1500px)] max-w-none flex-col overflow-hidden sm:max-w-none">
+          <DialogHeader className="shrink-0 pr-8">
             <DialogTitle>
               {document?.mode === "new"
                 ? "สร้างใบขอซื้อ"
                 : document?.mode === "edit"
-                  ? "แก้ไขใบขอซื้อ"
+                  ? `แก้ไข ${dialogPR?.number ?? "ใบขอซื้อ"}`
                   : "รายละเอียดใบขอซื้อ"}
             </DialogTitle>
             <DialogDescription>
-              จัดการ PR ในหน้าต่างนี้ · ข้อมูลสาธิต
+              {document?.mode === "new"
+                ? "กรอกข้อมูลใบขอซื้อใหม่ · ข้อมูลสาธิต"
+                : document?.mode === "edit"
+                  ? `แก้ไขข้อมูลเอกสาร · Rev. ${dialogPR?.revision ?? "—"}`
+                  : "ดูข้อมูลและประวัติเอกสาร · ข้อมูลสาธิต"}
             </DialogDescription>
+            {document?.mode === "edit" && dialogPR && (
+              <div className="pt-1">
+                <StatusBadge tone={statusTone[dialogPR.status]}>
+                  {statusLabel[dialogPR.status]}
+                </StatusBadge>
+              </div>
+            )}
           </DialogHeader>
           {document?.mode === "new" ? (
             <PREditor
@@ -669,12 +684,15 @@ export function PRList() {
               );
             })()
           ) : document?.mode === "view" ? (
-            <PRDetail
-              key={`view-${document.id}`}
-              id={document.id}
-              onEdit={(id) => setDocument({ mode: "edit", id })}
-              onClose={() => setDocument(null)}
-            />
+            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto pr-1">
+              <PRDetail
+                key={`view-${document.id}`}
+                id={document.id}
+                variant="dialog"
+                onEdit={(id) => setDocument({ mode: "edit", id })}
+                onClose={() => setDocument(null)}
+              />
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>

@@ -56,8 +56,8 @@ export function PRPrintPreview({
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="flex max-h-[94dvh] flex-col sm:max-w-5xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[94dvh] min-h-0 w-[min(96vw,1200px)] max-w-none flex-col overflow-hidden sm:max-w-none">
+        <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>ตัวอย่างใบขอซื้อก่อนพิมพ์</DialogTitle>
           <DialogDescription>
             กระดาษ A4 · {records.length} เอกสารที่เลือกหรือผลกรอง ·
@@ -68,7 +68,7 @@ export function PRPrintPreview({
         <iframe
           ref={frame}
           title="พรีวิวใบขอซื้อสำหรับพิมพ์"
-          className="h-[65dvh] min-h-64 w-full rounded-md border bg-white"
+          className="h-[65dvh] min-h-64 w-full flex-1 rounded-md border bg-white"
           sandbox="allow-same-origin allow-modals"
           srcDoc={html}
           onLoad={() => setLoadedHtml(html)}
@@ -78,7 +78,7 @@ export function PRPrintPreview({
             {error}
           </p>
         )}
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t pt-4">
           <DialogClose asChild>
             <Button variant="outline">ปิดพรีวิว</Button>
           </DialogClose>

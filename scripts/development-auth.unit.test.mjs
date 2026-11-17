@@ -128,6 +128,7 @@ test("route integration keeps HttpOnly expiry, CSRF logout and Cache Components 
   const login = read("app/api/auth/login/route.ts");
   const logout = read("app/api/auth/logout/route.ts");
   const layout = read("app/(factory)/layout.tsx");
+  const serverAuth = read("src/server/auth/server-auth.ts");
   const http = read("src/server/auth/auth-http.ts");
   assert.match(login, /loginWithDevelopmentPassword/);
   assert.match(login, /expires/);
@@ -135,5 +136,10 @@ test("route integration keeps HttpOnly expiry, CSRF logout and Cache Components 
   assert.match(logout, /assertCsrf\(request\)/);
   assert.match(logout, /maxAge: 0/);
   assert.match(layout, /<Suspense[\s\S]*<AuthenticatedFactory>/);
-  assert.match(read("src/server/auth/server-auth.ts"), /await headers\(\)/);
+  assert.match(serverAuth, /await headers\(\)/);
+  assert.match(
+    serverAuth,
+    /if \(developmentAuthEnabled\(\)\)[\s\S]*loginWithDevelopmentPassword/,
+  );
+  assert.match(read("app/page.tsx"), /redirect\("\/dashboard"\)/);
 });
