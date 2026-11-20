@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import {
   FactoryAuthError,
   getCurrentFactoryUser,
@@ -17,12 +18,16 @@ import {
 } from "./development-auth.ts";
 
 export async function readCurrentFactoryUser(): Promise<AuthenticatedFactoryUser | null> {
+  await connection();
+
   const secret = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!secret) return null;
+
   if (developmentAuthEnabled()) {
     assertDevelopmentRequestHost(await headers());
     return readDevelopmentSession(secret);
   }
+
   return getCurrentFactoryUser(
     getFactoryAuthRepository(),
     secret,
@@ -37,6 +42,7 @@ export async function requireAuthenticatedFactoryUser(): Promise<AuthenticatedFa
   } catch (error) {
     if (!(error instanceof FactoryAuthError)) throw error;
   }
+
   redirect("/login");
 }
 

@@ -33,7 +33,6 @@ export function MasterSettings({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const id = useId();
-  const isDepartment = kind === "departments";
   const title = masterKinds[kind];
   const { state, save, remove, loading, loadError, busy, retry } = useSettingsPostgres();
   const rows = state.rows.filter((row) => row.kind === kind);

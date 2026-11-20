@@ -55,7 +55,12 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/pr",
     icon: FileText,
   },
-  { group: "PURCHASING", title: "PO", href: "/purchase-orders", icon: ShoppingCart },
+  {
+    group: "PURCHASING",
+    title: "PO",
+    href: "/purchase-orders",
+    icon: ShoppingCart,
+  },
   {
     group: "PURCHASING",
     title: "คำสั่งการผลิต",
@@ -101,9 +106,21 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "QC",
-    title: "แบบบันทึกการส่งตัวอย่าง",
+    title: "แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์",
     href: "/sample-submission-log",
     icon: FileText,
+  },
+  {
+    group: "QC",
+    title: "i-Lab แบบบันทึกรับตัวอย่าง",
+    href: "/lab_sample_receiving",
+    icon: FlaskConical,
+  },
+  {
+    group: "QC",
+    title: "QC ตรวจเช็คน้ำหนักผลิตภัณฑ์",
+    href: "/qc_product_weight_check",
+    icon: ClipboardList,
   },
   {
     group: "WAREHOUSE",
@@ -155,6 +172,30 @@ export const navigation: FactoryNavigationItem[] = [
     icon: ClipboardList,
   },
   {
+    group: "ORGANIC",
+    title: "บันทึกการรับ-จ่าย WIP",
+    href: "/wip-receiving-issuing",
+    icon: ClipboardList,
+  },
+  {
+    group: "ORGANIC",
+    title: "ใบตรวจรับวัตถุดิบ/รับเข้าวัตถุดิบ",
+    href: "/organic_raw_material_receiving",
+    icon: ClipboardList,
+  },
+  {
+    group: "ORGANIC",
+    title: "ใบบันทึกการใช้วัตถุสกัด/อุณหภูมิในการผลิต",
+    href: "/organic_extraction_temperature",
+    icon: ClipboardList,
+  },
+    {
+    group: "ORGANIC",
+    title: "บันทึกการรับ-จ่าย วัตถุดิบต้มสกัด",
+    href: "/organic_extraction_material_ledger",
+    icon: ClipboardList,
+  },
+  {
     group: "PACKING",
     title: "ใบแจ้งสั่งแพ็คสินค้า",
     href: "/packing-summary",
@@ -173,9 +214,24 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/invoices",
     icon: ReceiptText,
   },
-  { group: "MAINTENANCE", title: "ใบแจ้งซ่อม", href: "/repair-requests", icon: Wrench },
-  { group: "MAINTENANCE", title: "รายการอุปกรณ์", href: "/equipment", icon: Wrench },
-  { group: "MAINTENANCE", title: "รายงานซ่อมบำรุง", href: "/maintenance-reports", icon: Wrench },
+  {
+    group: "MAINTENANCE",
+    title: "ใบแจ้งซ่อม",
+    href: "/repair-requests",
+    icon: Wrench,
+  },
+  {
+    group: "MAINTENANCE",
+    title: "รายการอุปกรณ์",
+    href: "/equipment",
+    icon: Wrench,
+  },
+  {
+    group: "MAINTENANCE",
+    title: "รายงานซ่อมบำรุง",
+    href: "/maintenance-reports",
+    icon: Wrench,
+  },
   {
     group: "MASTER DATA",
     title: "สินค้าและราคากลาง",
@@ -190,6 +246,7 @@ export const navigationGroups = [
   { key: "QC", title: "ตรวจสอบคุณภาพ (QC)" },
   { key: "WAREHOUSE", title: "คลังสินค้า" },
   { key: "PRODUCTION", title: "การผลิต" },
+  { key: "ORGANIC", title: "ชุดอินทรีย์" },
   { key: "PACKING", title: "บรรจุสินค้า" },
   { key: "LOGISTICS", title: "จ่ายและขนส่ง" },
   { key: "SALES DOCUMENTS", title: "เอกสารขาย" },

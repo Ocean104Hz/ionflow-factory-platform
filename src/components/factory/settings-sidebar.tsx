@@ -97,11 +97,11 @@ export function SettingsSidebar({
                 <span className="flex-1 text-left">{group.title}</span>
                 <ChevronDown
                   aria-hidden="true"
-                  className={`size-3.5 text-muted-foreground transition-transform duration-[var(--motion-fast)] ease-out motion-reduce:transition-none ${open ? "rotate-0" : "-rotate-90"}`}
+                  className={`size-3.5 text-muted-foreground transition-transform duration-(--motion-fast) ease-out motion-reduce:transition-none ${open ? "rotate-0" : "-rotate-90"}`}
                 />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 duration-[var(--motion-fast)] ease-out motion-reduce:animate-none">
+            <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 duration-(--motion-fast) ease-out motion-reduce:animate-none">
               <ul className="my-1 ml-5 space-y-0.5 border-l pl-2">
                 {group.items.map((destination) => (
                   <li key={destination}>
@@ -112,7 +112,7 @@ export function SettingsSidebar({
                       aria-current={
                         selected === destination ? "page" : undefined
                       }
-                      className={`h-auto min-h-9 w-full justify-start whitespace-normal rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm font-normal transition-colors duration-[var(--motion-fast)] ease-out motion-reduce:transition-none ${selected === destination ? "border-l-primary bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary" : "text-muted-foreground"}`}
+                      className={`h-auto min-h-9 w-full justify-start whitespace-normal rounded-md border-l-2 border-transparent px-3 py-2 text-left text-sm font-normal transition-colors duration-(--motion-fast) ease-out motion-reduce:transition-none ${selected === destination ? "border-l-primary bg-primary/10 font-medium text-primary hover:bg-primary/15 hover:text-primary" : "text-muted-foreground"}`}
                     >
                       {settingsLabel(destination)}
                     </Button>

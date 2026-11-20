@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
   Collapsible,
@@ -49,6 +49,120 @@ const label = (value: string) =>
   }).format(
     new Date(`${value.length === 7 ? `${value}-01` : value}T00:00:00Z`),
   );
+
+const ProductionBars = memo(function ProductionBars({
+  rows,
+  onHover,
+  onSelect,
+}: {
+  rows: AnalyticsRow[];
+  onHover: (index: number | null) => void;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div
+      className="relative h-64 overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary sm:h-72"
+      tabIndex={0}
+      role="region"
+      aria-label="กราฟเปรียบเทียบ เลื่อนแนวนอนเพื่อดูทุกวันที่"
+    >
+      <ChartContainer
+        config={config}
+        resizeDebounce={100}
+        className="h-full w-full aspect-auto [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
+        style={{ minWidth: Math.max(360, rows.length * 64 + 80) }}
+      >
+        <BarChart
+          accessibilityLayer
+          data={rows}
+          margin={{ top: 16, right: 12, left: 4, bottom: 8 }}
+          onMouseMove={(state) => {
+            const index = Number(state.activeTooltipIndex);
+
+            if (
+              state.activeTooltipIndex != null &&
+              Number.isInteger(index) &&
+              rows[index]
+            ) {
+              onHover(index);
+            }
+          }}
+          onMouseLeave={() => onHover(null)}
+          onClick={(state) => {
+            const index = Number(state.activeTooltipIndex);
+
+            if (
+              state.activeTooltipIndex != null &&
+              Number.isInteger(index) &&
+              rows[index]
+            ) {
+              onSelect(index);
+            }
+          }}
+        >
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={(value) =>
+              label(String(value)).replace(/\s2569$/, "")
+            }
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+            tickMargin={10}
+          />
+          <YAxis
+            yAxisId="orders"
+            allowDecimals={false}
+            width={36}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            yAxisId="quantity"
+            orientation="right"
+            allowDecimals={false}
+            width={42}
+            tickLine={false}
+            axisLine={false}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                labelFormatter={(value) => label(String(value))}
+              />
+            }
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Bar
+            yAxisId="orders"
+            dataKey="productionOrderCount"
+            fill="var(--color-productionOrderCount)"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={32}
+            isAnimationActive={false}
+          />
+          <Bar
+            yAxisId="quantity"
+            dataKey="totalQuantity"
+            fill="var(--color-totalQuantity)"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={32}
+            isAnimationActive={false}
+          />
+          <Bar
+            yAxisId="orders"
+            dataKey="completedCount"
+            fill="var(--color-completedCount)"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={32}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ChartContainer>
+    </div>
+  );
+});
 export function FactoryDailyOverviewChart({
   rows,
   hasData,
@@ -125,102 +239,9 @@ export function FactoryDailyOverviewChart({
         แกนซ้าย: คำสั่ง / งาน (รายการ) · แกนขวา: จำนวนสินค้า (หน่วย) ·
         แตะกราฟเพื่อเลือก หรือใช้ตัวเลือกวันด้านบน
       </p>
-      <div
-        className="relative min-h-64 overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary xl:flex-1"
-        tabIndex={0}
-        role="region"
-        aria-label="กราฟเปรียบเทียบ เลื่อนแนวนอนเพื่อดูทุกวันที่"
-      >
-        <ChartContainer
-          config={config}
-          className="h-64 w-full aspect-auto xl:absolute xl:inset-0 xl:h-full [&_.recharts-surface]:focus-visible:outline-2 [&_.recharts-surface]:focus-visible:outline-primary"
-          style={{ minWidth: Math.max(360, rows.length * 64 + 80) }}
-        >
-          <BarChart
-            accessibilityLayer
-            data={rows}
-            margin={{ top: 16, right: 12, left: 4, bottom: 8 }}
-            onMouseMove={(state) => {
-              const index = Number(state.activeTooltipIndex);
-              if (
-                state.activeTooltipIndex != null &&
-                Number.isInteger(index) &&
-                rows[index]
-              )
-                setHovered(index);
-            }}
-            onMouseLeave={() => setHovered(null)}
-            onClick={(state) => {
-              const index = Number(state.activeTooltipIndex);
-              if (
-                state.activeTooltipIndex != null &&
-                Number.isInteger(index) &&
-                rows[index]
-              )
-                setSelected(index);
-            }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(value) =>
-                label(String(value)).replace(/\s2569$/, "")
-              }
-              tickLine={false}
-              axisLine={false}
-              interval={0}
-              tickMargin={10}
-            />
-            <YAxis
-              yAxisId="orders"
-              allowDecimals={false}
-              width={36}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              yAxisId="quantity"
-              orientation="right"
-              allowDecimals={false}
-              width={42}
-              tickLine={false}
-              axisLine={false}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(value) => label(String(value))}
-                />
-              }
-            />
-            <ChartLegend content={<ChartLegendContent />} />
-            <Bar
-              yAxisId="orders"
-              dataKey="productionOrderCount"
-              fill="var(--color-productionOrderCount)"
-              radius={[3, 3, 0, 0]}
-              maxBarSize={32}
-              isAnimationActive={false}
-            />
-            <Bar
-              yAxisId="quantity"
-              dataKey="totalQuantity"
-              fill="var(--color-totalQuantity)"
-              radius={[3, 3, 0, 0]}
-              maxBarSize={32}
-              isAnimationActive={false}
-            />
-            <Bar
-              yAxisId="orders"
-              dataKey="completedCount"
-              fill="var(--color-completedCount)"
-              radius={[3, 3, 0, 0]}
-              maxBarSize={32}
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ChartContainer>
-      </div>
+      
+      <ProductionBars rows={rows} onHover={setHovered} onSelect={setSelected} />
+
       <Collapsible className="mt-4 text-sm">
         <CollapsibleTrigger asChild>
           <Button variant="link" className="px-0">

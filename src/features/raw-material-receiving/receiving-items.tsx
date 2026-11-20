@@ -91,7 +91,7 @@ export function ReceivingItemsSection({
                     <Badge variant="outline" className="mt-1 font-normal text-muted-foreground">manual</Badge>
                   </TableCell>
                   <TableCell className="px-3 py-3 text-center tabular-nums">{index + 1}</TableCell>
-                  <TableCell className="w-[150px] min-w-[150px] px-2 py-3">
+                  <TableCell className="w-37.5 min-w-37.5 px-2 py-3">
                     <Input
                       type="number"
                       step="0.0001"
@@ -106,7 +106,7 @@ export function ReceivingItemsSection({
                     />
                     {error("quantity") && <p className="mt-1 text-xs text-destructive" role="alert">{error("quantity")}</p>}
                   </TableCell>
-                  <TableCell className="w-[140px] min-w-[140px] px-2 py-3">
+                  <TableCell className="w-35 min-w-35 px-2 py-3">
                     <Select value={item.unit} onValueChange={(unit) => changeItem(item.id, { unit })}>
                       <SelectTrigger aria-label={`หน่วยนับ ${rowLabel}`} className="w-full bg-surface">
                         <SelectValue placeholder="เลือกหน่วย" />
@@ -117,7 +117,7 @@ export function ReceivingItemsSection({
                     </Select>
                     {error("unit") && <p className="mt-1 text-xs text-destructive" role="alert">{error("unit")}</p>}
                   </TableCell>
-                  <TableCell className="w-[230px] min-w-[230px] px-2 py-3">
+                  <TableCell className="w-57.5 min-w-57.5 px-2 py-3">
                     <Input
                       className={tableInput}
                       placeholder="ชื่อวัตถุดิบ"
@@ -128,7 +128,7 @@ export function ReceivingItemsSection({
                     />
                     {error("description") && <p className="mt-1 text-xs text-destructive" role="alert">{error("description")}</p>}
                   </TableCell>
-                  <TableCell className="w-[188px] min-w-[188px] px-2 py-3">
+                  <TableCell className="w-47 min-w-47 px-2 py-3">
                     <Input
                       type="date"
                       lang="th-TH"
@@ -141,7 +141,7 @@ export function ReceivingItemsSection({
                     <p className="mt-1 text-[11px] text-muted-foreground">{formatThaiBuddhistDate(item.orderNoticeDate)}</p>
                     {error("orderNoticeDate") && <p className="mt-1 text-xs text-destructive" role="alert">{error("orderNoticeDate")}</p>}
                   </TableCell>
-                  <TableCell className="w-[150px] min-w-[150px] px-2 py-3">
+                  <TableCell className="w-37.5 min-w-37.5 px-2 py-3">
                     <Input
                       className={tableInput}
                       placeholder="เช่น RM-001"
@@ -152,7 +152,7 @@ export function ReceivingItemsSection({
                     />
                     {error("materialCode") && <p className="mt-1 text-xs text-destructive" role="alert">{error("materialCode")}</p>}
                   </TableCell>
-                  <TableCell className="w-[170px] min-w-[170px] px-2 py-3">
+                  <TableCell className="w-42.5 min-w-42.5 px-2 py-3">
                     <Input
                       type="number"
                       min="0"
@@ -167,7 +167,7 @@ export function ReceivingItemsSection({
                     />
                     {error("unitPrice") && <p className="mt-1 text-xs text-destructive" role="alert">{error("unitPrice")}</p>}
                   </TableCell>
-                  <TableCell className="w-[150px] min-w-[150px] px-2 py-3">
+                  <TableCell className="w-37.5 min-w-37.5 px-2 py-3">
                     <Input
                       readOnly
                       tabIndex={-1}

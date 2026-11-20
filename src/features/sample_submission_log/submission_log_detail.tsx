@@ -9,8 +9,8 @@ import {
   DialogClose,
 } from "@/src/components/ui/dialog";
 import { Button } from "@/src/components/ui/button";
-import { SubmissionLogSections } from "./submission-log-form";
-import type { SubmissionLog } from "./submission-log-domain";
+import { SubmissionLogSections } from "./submission_log_form";
+import type { SubmissionLog } from "./submission_log_domain";
 
 export function SubmissionLogDetail({
   row,
@@ -44,7 +44,7 @@ export function SubmissionLogDetail({
               data-log-paper={print ? "portrait" : undefined}
               className={
                 print
-                  ? "submission-log-paper mx-auto space-y-4 border bg-white p-[10mm] text-black [&_[data-slot=card]]:rounded-none [&_[data-slot=card]]:border-black [&_[data-slot=card]]:bg-white [&_[data-slot=card]]:text-black [&_p]:text-black [&_label]:text-black [&_[data-slot=checkbox]]:border-black [&_[data-slot=radio-group-item]]:border-black [&_[data-state=checked]]:text-black"
+                  ? "submission-log-paper mx-auto space-y-4 border bg-white p-[10mm] text-black **:data-[slot=card]:rounded-none **:data-[slot=card]:border-black **:data-[slot=card]:bg-white **:data-[slot=card]:text-black [&_p]:text-black [&_label]:text-black **:data-[slot=checkbox]:border-black **:data-[slot=radio-group-item]:border-black **:data-[state=checked]:text-black"
                   : "min-w-0 space-y-4"
               }
               style={print ? { width: "210mm", minHeight: "297mm" } : undefined}
@@ -54,7 +54,7 @@ export function SubmissionLogDetail({
               )}
               <header className="space-y-2 border-b pb-3">
                 <h2 className="text-lg font-semibold">
-                  แบบบันทึกการส่งตัวอย่าง
+                  แบบบันทึกการนำเข้าส่งตัวอย่าง
                 </h2>
                 <p className="break-all text-sm">
                   เลขที่คำขอ {row.doc_no} · รหัสตัวอย่าง {row.sample_code}
