@@ -3,7 +3,7 @@ import {
   setLogType,
   setLogForm,
   type SubmissionLog,
-} from "@/src/features/sample-submission-log/submission-log-domain";
+} from "@/src/features/sample_submission_log/submission_log_domain";
 export const demoSubmissionLogs: SubmissionLog[] = Array.from(
   { length: 6 },
   (_, i) => {

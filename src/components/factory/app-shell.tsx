@@ -1,7 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
+import {
+  useSyncExternalStore,
+  type ReactNode,
+  type CSSProperties,
+  useState,
+} from "react";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -56,6 +61,57 @@ type CurrentUser = Readonly<{
   roles: readonly string[];
 }>;
 
+const SIDEBAR_STORAGE_KEY = "ionflow.sidebar.open";
+const SIDEBAR_CHANGE_EVENT = "ionflow.sidebar.change";
+
+let sidebarMemoryValue: boolean | null = null;
+
+function getSidebarOpenSnapshot(): boolean {
+  if (sidebarMemoryValue !== null) return sidebarMemoryValue;
+
+  try {
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function getServerSidebarOpenSnapshot(): boolean {
+  return true;
+}
+
+function subscribeSidebarOpen(onChange: () => void): () => void {
+  const handleStorageChange = (event: StorageEvent): void => {
+    if (event.key !== SIDEBAR_STORAGE_KEY && event.key !== null) {
+      return;
+    }
+
+    sidebarMemoryValue = null;
+    onChange();
+  };
+
+  window.addEventListener("storage", handleStorageChange);
+  window.addEventListener(SIDEBAR_CHANGE_EVENT, onChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorageChange);
+    window.removeEventListener(SIDEBAR_CHANGE_EVENT, onChange);
+  };
+}
+
+function updateSidebarOpen(value: boolean): void {
+  sidebarMemoryValue = value;
+
+  try {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(value));
+    sidebarMemoryValue = null;
+  } catch {
+    sidebarMemoryValue = value;
+  }
+
+  window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
+}
+
 export function AppShell({
   children,
   currentUser,
@@ -63,23 +119,16 @@ export function AppShell({
   children: ReactNode;
   currentUser: CurrentUser;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  useEffect(() => {
-    try {
-      setSidebarOpen(
-        window.localStorage.getItem("ionflow.sidebar.open") !== "false",
-      );
-    } catch {}
-  }, []);
+  const sidebarOpen = useSyncExternalStore(
+    subscribeSidebarOpen,
+    getSidebarOpenSnapshot,
+    getServerSidebarOpenSnapshot,
+  );
+
   return (
     <SidebarProvider
       open={sidebarOpen}
-      onOpenChange={(value) => {
-        setSidebarOpen(value);
-        try {
-          window.localStorage.setItem("ionflow.sidebar.open", String(value));
-        } catch {}
-      }}
+      onOpenChange={updateSidebarOpen}
       style={{ "--sidebar-width-icon": "4rem" } as CSSProperties}
     >
       <FactoryShell currentUser={currentUser}>{children}</FactoryShell>
@@ -105,7 +154,7 @@ function FactoryShell({
     <>
       <a
         href="#main-content"
-        className="sr-only z-[100] rounded bg-surface p-3 focus:not-sr-only focus:fixed"
+        className="sr-only z-100 rounded bg-surface p-3 focus:not-sr-only focus:fixed"
       >
         ข้ามไปเนื้อหา
       </a>
@@ -121,7 +170,7 @@ function FactoryShell({
         />
         <div
           id="main-content"
-          className="factory-content @container/main mx-auto w-full max-w-[1680px] space-y-5 px-4 py-5 lg:px-6"
+          className="factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 lg:px-4"
         >
           {previewMenu && (
             <Alert role="status">

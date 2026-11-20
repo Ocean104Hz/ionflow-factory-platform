@@ -210,7 +210,7 @@ export function InfoRow({
   return (
     <div className="min-w-0 space-y-1.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="break-words font-medium leading-relaxed">{children}</dd>
+      <dd className="wrap-break-word font-medium leading-relaxed">{children}</dd>
     </div>
   );
 }

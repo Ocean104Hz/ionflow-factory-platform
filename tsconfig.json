@@ -30,6 +30,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "src/features/qc_product_weight_check/qc_product_weight_check_domain.tsx"  ],
   "exclude": ["node_modules"]
 }

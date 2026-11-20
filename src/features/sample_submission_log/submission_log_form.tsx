@@ -8,7 +8,7 @@ import { SectionCard, StatusBadge } from "@/src/components/factory/patterns";
 import {
   parseRequesterAddress,
   editRequesterAddress,
-} from "./submission-log-address";
+} from "./submission_log_address";
 import {
   analysisItems,
   typeOptions,
@@ -22,7 +22,7 @@ import {
   selectedAnalysis,
   type SubmissionLog,
   type LogErrors,
-} from "./submission-log-domain";
+} from "./submission_log_domain";
 
 export function SubmissionLogSections({
   row,
@@ -73,7 +73,7 @@ export function SubmissionLogSections({
           </Label>
         )}
         {readOnly ? (
-          <p className="whitespace-pre-wrap break-words text-sm">
+          <p className="whitespace-pre-wrap wrap-break-word text-sm">
             {type === "date" ? logDate(value) : value || "—"}
           </p>
         ) : multiline ? (
@@ -110,11 +110,11 @@ export function SubmissionLogSections({
     set: (v: string) => void,
     optional = false,
   ) {
-    const id = `${prefix}-${key}`,
-      items = optional ? [["unset", "ยังไม่ระบุ"], ...options] : options;
+    const id = `${prefix}-${key}`;
+    const items = options;
     return (
       <div className="min-w-0 space-y-3" key={key}>
-        <p id={`${id}-label`} className="text-sm font-medium">
+        <p id={`${id}-label`} className="min-h-5 text-sm font-medium">
           {label}
           {!optional && !readOnly && <span className="text-danger"> *</span>}
         </p>
@@ -148,10 +148,96 @@ export function SubmissionLogSections({
       </div>
     );
   }
+  function sampleChoice(
+    key: "sample_type" | "sample_form",
+    label: string,
+    value: string,
+    options: readonly (readonly [string, string])[],
+    set: (value: string) => void,
+    otherDetail: string | null,
+    setOtherDetail: (value: string) => void,
+  ) {
+    const id = `${prefix}-${key}`;
+    const otherKey = `${key}_other`;
+
+    return (
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[11rem_minmax(0,1fr)]">
+        <p id={`${id}-label`} className="pt-2 text-sm font-medium">
+          {label}
+          {!readOnly && <span className="text-danger"> *</span>}
+        </p>
+
+        <div className="min-w-0 space-y-2">
+          <RadioGroup
+            id={id}
+            aria-labelledby={`${id}-label`}
+            aria-required
+            aria-invalid={!!errors[key]}
+            aria-describedby={errors[key] ? `log-error-${key}` : undefined}
+            value={value}
+            onValueChange={set}
+            disabled={readOnly}
+            className="grid gap-2 sm:grid-cols-3"
+          >
+            {options.map(([option, text]) => (
+              <div
+                key={option}
+                className={
+                  option === "other"
+                    ? "flex min-w-0 flex-wrap items-center gap-2 sm:col-span-3"
+                    : "min-w-0"
+                }
+              >
+                <Label
+                  htmlFor={`${id}-${option}`}
+                  className={[
+                    "flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                    option === "other" ? "shrink-0" : "h-full w-full",
+                    value === option ? "border-primary/30 bg-primary/5" : "",
+                    !readOnly ? "cursor-pointer" : "",
+                  ].join(" ")}
+                >
+                  <RadioGroupItem
+                    id={`${id}-${option}`}
+                    value={option}
+                    className="disabled:opacity-100"
+                  />
+                  <span>{text}</span>
+                </Label>
+
+                {option === "other" &&
+                  value === "other" &&
+                  (readOnly ? (
+                    <span className="text-sm">{otherDetail || "-"}</span>
+                  ) : (
+                    <Input
+                      id={`${prefix}-${otherKey}`}
+                      value={otherDetail ?? ""}
+                      onChange={(event) => setOtherDetail(event.target.value)}
+                      placeholder="กรุณาระบุรายละเอียด"
+                      aria-label={`${label} อื่น ๆ`}
+                      aria-required
+                      aria-invalid={!!errors[otherKey]}
+                      aria-describedby={
+                        errors[otherKey] ? `log-error-${otherKey}` : undefined
+                      }
+                      className="min-w-48 flex-1"
+                    />
+                  ))}
+              </div>
+            ))}
+          </RadioGroup>
+
+          {fieldError(key)}
+          {value === "other" && fieldError(otherKey)}
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
+    <div className="min-w-0 space-y-4 wrap-anywhere">
       <SectionCard title="ข้อมูลเอกสาร">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           {field(
             "doc_no",
             "เลขที่คำขอ",
@@ -168,7 +254,7 @@ export function SubmissionLogSections({
           )}
         </div>
       </SectionCard>
-      <SectionCard title="ข้อมูลผู้ส่งตัวอย่าง">
+      <SectionCard title="รายละเอียดผู้นำส่งตัวอย่าง">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {field(
             "requester_name",
@@ -267,20 +353,22 @@ export function SubmissionLogSections({
           )}
         </div>
       </SectionCard>
-      <SectionCard title="ข้อมูลตัวอย่าง">
+      <SectionCard title="รายละเอียดตัวอย่าง">
         <div className="grid gap-4 sm:grid-cols-2">
-          {field(
+          {/* {field(
             "sample_code_info",
             "รหัสตัวอย่าง (ข้อมูลตัวอย่าง)",
             row.sample_code,
             (sample_code) => patch({ sample_code }),
             true,
-          )}
+          )} */}
           {field(
             "sample_name",
             "ชื่อตัวอย่าง",
             row.sample_name,
             (sample_name) => patch({ sample_name }),
+            true,
+            "text",
             true,
           )}
           {field(
@@ -293,43 +381,31 @@ export function SubmissionLogSections({
             true,
           )}
         </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <div className="space-y-3">
-            {choice(
-              "sample_type",
-              "ประเภทตัวอย่าง",
-              logTypeValue(row),
-              typeOptions,
-              (v) => onChange?.(setLogType(row, v)),
-            )}
-            {row.sample_type.other_detail !== null &&
-              field(
-                "sample_type_other",
-                "ประเภทตัวอย่างอื่น ๆ",
-                row.sample_type.other_detail,
-                (other_detail) =>
-                  patch({ sample_type: { ...row.sample_type, other_detail } }),
-                true,
-              )}
-          </div>
-          <div className="space-y-3">
-            {choice(
-              "sample_form",
-              "รูปแบบตัวอย่าง",
-              logFormValue(row),
-              formOptions,
-              (v) => onChange?.(setLogForm(row, v)),
-            )}
-            {row.sample_form.other_detail !== null &&
-              field(
-                "sample_form_other",
-                "รูปแบบตัวอย่างอื่น ๆ",
-                row.sample_form.other_detail,
-                (other_detail) =>
-                  patch({ sample_form: { ...row.sample_form, other_detail } }),
-                true,
-              )}
-          </div>
+        <div className="mt-5 space-y-5">
+          {sampleChoice(
+            "sample_type",
+            "ประเภทตัวอย่าง",
+            logTypeValue(row),
+            typeOptions,
+            (value) => onChange?.(setLogType(row, value)),
+            row.sample_type.other_detail,
+            (other_detail) =>
+              patch({
+                sample_type: { ...row.sample_type, other_detail },
+              }),
+          )}
+          {sampleChoice(
+            "sample_form",
+            "ชนิด",
+            logFormValue(row),
+            formOptions,
+            (value) => onChange?.(setLogForm(row, value)),
+            row.sample_form.other_detail,
+            (other_detail) =>
+              patch({
+                sample_form: { ...row.sample_form, other_detail },
+              }),
+          )}
         </div>
       </SectionCard>
       <SectionCard
@@ -347,7 +423,12 @@ export function SubmissionLogSections({
             errors.requested_items ? "log-error-requested_items" : undefined
           }
           tabIndex={-1}
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          className={[
+            "grid grid-flow-col grid-cols-1 gap-3",
+            "grid-rows-[repeat(32,auto)]",
+            "sm:grid-cols-2 sm:grid-rows-[repeat(16,auto)]",
+            "lg:grid-cols-3 lg:grid-rows-[repeat(11,auto)]",
+          ].join(" ")}
         >
           {analysisItems.map(([key, label], index) => (
             <Label
@@ -473,7 +554,7 @@ export function SubmissionLogSections({
           )}
           {field(
             "sender_date",
-            "วันที่ลงชื่อ",
+            "วันที่",
             row.sender_sign.signed_date,
             (signed_date) =>
               patch({ sender_sign: { ...row.sender_sign, signed_date } }),
@@ -537,7 +618,7 @@ export function SubmissionLogSections({
           <div className="space-y-3">
             {choice(
               "job_acceptance",
-              "ความพร้อมรับงาน (ตัวอย่าง)",
+              "",
               staff.job_acceptance.accepted
                 ? "accepted"
                 : staff.job_acceptance.rejected
@@ -584,14 +665,14 @@ export function SubmissionLogSections({
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {field(
             "received_by",
-            "ผู้รับตัวอย่าง",
+            "ลงชื่อผู้รับตัวอย่าง",
             staff.received_by,
             (received_by) =>
               patch({ staff_section: { ...staff, received_by } }),
           )}
           {field(
             "received_date",
-            "วันที่รับตัวอย่าง",
+            "วันที่",
             staff.received_date,
             (received_date) =>
               patch({ staff_section: { ...staff, received_date } }),
@@ -600,14 +681,14 @@ export function SubmissionLogSections({
           )}
           {field(
             "accepted_by",
-            "ผู้รับงาน / ผู้ทบทวน",
+            "ลงชื่อผู้ทบทวน",
             staff.accepted_by,
             (accepted_by) =>
               patch({ staff_section: { ...staff, accepted_by } }),
           )}
           {field(
             "accepted_date",
-            "วันที่รับงาน",
+            "วันที่",
             staff.accepted_date,
             (accepted_date) =>
               patch({ staff_section: { ...staff, accepted_date } }),
