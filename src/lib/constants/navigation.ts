@@ -141,6 +141,24 @@ export const navigation: FactoryNavigationItem[] = [
     icon: Boxes,
   },
   {
+    group: "WAREHOUSE",
+    title: "วัสดุคงเหลือ FF",
+    href: "/stock_remaining_materials_ff",
+    icon: Boxes,
+  },
+  {
+    group: "WAREHOUSE",
+    title: "Stock WIP FF",
+    href: "/stock_wip_ff",
+    icon: Boxes,
+  },
+  {
+    group: "WAREHOUSE",
+    title: "Stock RM FF",
+    href: "/stock_rm_ff",
+    icon: Boxes,
+  },
+  {
     group: "PRODUCTION",
     title: "ใบสั่งผลิตสินค้า V1",
     href: "/product-production-orders-v1",
@@ -189,10 +207,17 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/organic_extraction_temperature",
     icon: ClipboardList,
   },
-    {
+  {
     group: "ORGANIC",
     title: "บันทึกการรับ-จ่าย วัตถุดิบต้มสกัด",
     href: "/organic_extraction_material_ledger",
+    icon: ClipboardList,
+  },
+
+  {
+    group: "ORGANIC",
+    title: "บันทึกการรับ-จ่ายวัตถุดิบเม็ดฟู่",
+    href: "/effervescent_material_ledger",
     icon: ClipboardList,
   },
   {
