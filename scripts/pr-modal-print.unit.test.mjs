@@ -29,6 +29,7 @@ test("PR print renders A4 requisitions, totals and safe text without copying PO 
 test("PR list uses modal callbacks, accessible checkbox selection and bottom page-size control", () => {
   const list = read("src/features/purchase-requisitions/pr-list.tsx");
   const detail = read("src/features/purchase-requisitions/pr-detail.tsx");
+  const components = read("src/features/purchase-requisitions/pr-components.tsx");
   const editor = read("src/features/purchase-requisitions/pr-editor.tsx");
   const preview = read("src/features/purchase-requisitions/pr-print-preview.tsx");
   for (const token of ["<Dialog", "<PREditor", "<PRDetail", "onSaved=", "onEdit=", "<Checkbox", "indeterminate", "pagination={"]) assert.ok(list.includes(token), token);
@@ -39,4 +40,47 @@ test("PR list uses modal callbacks, accessible checkbox selection and bottom pag
   assert.ok(preview.includes("target.print()"));
   assert.ok(preview.includes('sandbox="allow-same-origin allow-modals"'));
   assert.ok(preview.includes("loadedHtml !== html"));
+  assert.ok(list.includes('document?.mode === "view"'));
+  assert.ok(list.includes('w-[min(96vw,1500px)]'));
+  assert.ok(list.includes('min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto'));
+  assert.ok(list.includes('variant="dialog"'));
+  assert.ok(list.includes('flex max-h-[94dvh] min-h-0 w-[min(96vw,1500px)]'));
+  assert.ok(detail.includes('variant?: "page" | "dialog"'));
+  assert.ok(detail.includes('variant={variant === "dialog" ? "detail" : "default"}'));
+  assert.ok(components.includes('variant?: "default" | "detail"'));
+  assert.ok(components.includes('minWidth={1120}'));
+  assert.ok(components.includes('minWidth={1450}'));
+  for (const label of ["ผู้ขาย:", "สเปก:", "หมายเหตุ:", "จำนวนขอซื้อ", "ออก PO แล้ว", "ค้างซื้อ", "ราคา/หน่วย", "ก่อนภาษี / ภาษี", "รวม"]) {
+    assert.ok(components.includes(label), label);
+  }
+});
+
+test("PR modals keep document forms responsive, action footers visible and standalone pages separate", () => {
+  const list = read("src/features/purchase-requisitions/pr-list.tsx");
+  const editor = read("src/features/purchase-requisitions/pr-editor.tsx");
+  const components = read("src/features/purchase-requisitions/pr-components.tsx");
+  const preview = read("src/features/purchase-requisitions/pr-print-preview.tsx");
+
+  assert.ok(list.includes('w-[min(96vw,1500px)]'));
+  assert.ok(list.includes('flex max-h-[94dvh] min-h-0'));
+  assert.ok(list.includes('DialogHeader className="shrink-0 pr-8"'));
+  assert.ok(editor.includes('const embedded = Boolean(onSaved)'));
+  assert.ok(editor.includes('{!embedded && ('));
+  assert.ok(editor.includes('min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto'));
+  assert.ok(editor.includes('grid gap-4 md:grid-cols-2 xl:grid-cols-3'));
+  assert.ok(editor.includes('space-y-3 rounded-lg border p-4'));
+  assert.ok(editor.includes('flex shrink-0 flex-col-reverse'));
+  assert.ok(editor.includes('form.items.length >= 100'));
+  assert.ok(editor.includes('newPRItem(crypto.randomUUID())'));
+  assert.ok(editor.includes('form.items.filter((row) => row.id !== item.id)'));
+  assert.ok(editor.includes('persist(false)'));
+  assert.ok(editor.includes('persist(true)'));
+  assert.ok(components.includes('size?: "compact" | "wide"'));
+  assert.ok(components.includes('w-[min(calc(100vw-2rem),640px)]'));
+  assert.ok(components.includes('w-[min(96vw,1100px)]'));
+  assert.ok(components.includes('size="wide"'));
+  assert.ok(components.includes('w-[min(96vw,1250px)]'));
+  assert.ok(components.includes('variant="detail"'));
+  assert.ok(preview.includes('w-[min(96vw,1200px)]'));
+  assert.ok(preview.includes('h-[65dvh] min-h-64 w-full flex-1'));
 });

@@ -33,10 +33,12 @@ export function PRDetail({
   id,
   onEdit,
   onClose,
+  variant = "page",
 }: {
   id: string;
   onEdit?: (id: string) => void;
   onClose?: () => void;
+  variant?: "page" | "dialog";
 }) {
   const { records, act, remove, copy } = usePR();
   const pr = records.find((row) => row.id === id);
@@ -53,18 +55,51 @@ export function PRDetail({
         </Button>
       </div>
     );
+  const headerFields = [
+    ["วันที่เอกสาร", prDate(pr.date)],
+    ["ผู้ขอซื้อ", pr.requester],
+    ["ฝ่าย/แผนก", pr.department],
+    ["คลัง / Site", `${pr.warehouseCode} ${pr.warehouseName}`],
+    ["ประเภท", pr.category],
+    ["ประเภทธุรกรรม", pr.transactionType],
+    ["เลขอ้างอิง", pr.referenceNo],
+    ["กำหนดใช้", prDate(pr.neededDate)],
+    ["ความเร่งด่วน", priorityLabel[pr.priority]],
+    ["ผู้อนุมัติที่กำหนด", pr.approver],
+    ["วัตถุประสงค์", pr.purpose],
+    ["หมายเหตุ", pr.remarks],
+  ];
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={pr.number}
-        description={`รายละเอียดใบขอซื้อสาธิต · Rev. ${pr.revision}`}
-        parent={onEdit ? undefined : { title: "รายการ PR", href: "/pr" }}
-        actions={
+    <div className={variant === "dialog" ? "min-w-0 space-y-6" : "space-y-5"}>
+      {variant === "dialog" ? (
+        <div className="flex min-w-0 flex-col gap-4 rounded-xl border bg-muted/20 p-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Purchase Requisition
+            </p>
+            <h2 className="mt-1 break-words text-2xl font-semibold tracking-tight">
+              {pr.number}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              รายละเอียดใบขอซื้อสาธิต · Rev. {pr.revision}
+            </p>
+          </div>
           <StatusBadge tone={statusTone[pr.status]}>
             {statusLabel[pr.status]}
           </StatusBadge>
-        }
-      />
+        </div>
+      ) : (
+        <PageHeader
+          title={pr.number}
+          description={`รายละเอียดใบขอซื้อสาธิต · Rev. ${pr.revision}`}
+          parent={onEdit ? undefined : { title: "รายการ PR", href: "/pr" }}
+          actions={
+            <StatusBadge tone={statusTone[pr.status]}>
+              {statusLabel[pr.status]}
+            </StatusBadge>
+          }
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         {["draft", "rejected"].includes(pr.status) &&
           (onEdit ? (
@@ -137,31 +172,24 @@ export function PRDetail({
           {error}
         </p>
       )}
-      <SectionCard title="ข้อมูลหัวเอกสาร">
+      <SectionCard
+        title={variant === "dialog" ? "ข้อมูลเอกสารและผู้ขอซื้อ" : "ข้อมูลหัวเอกสาร"}
+        contentClassName="min-w-0"
+      >
         <InfoGrid>
-          {[
-            ["วันที่เอกสาร", prDate(pr.date)],
-            ["ผู้ขอซื้อ", pr.requester],
-            ["ฝ่าย/แผนก", pr.department],
-            ["คลัง / Site", `${pr.warehouseCode} ${pr.warehouseName}`],
-            ["ประเภท", pr.category],
-            ["ประเภทธุรกรรม", pr.transactionType],
-            ["เลขอ้างอิง", pr.referenceNo],
-            ["กำหนดใช้", prDate(pr.neededDate)],
-            ["ความเร่งด่วน", priorityLabel[pr.priority]],
-            ["ผู้อนุมัติที่กำหนด", pr.approver],
-            ["วัตถุประสงค์", pr.purpose],
-            ["หมายเหตุ", pr.remarks],
-          ].map(([label, value]) => (
-            <InfoRow key={label} label={label}>
-              {value || "—"}
-            </InfoRow>
+          {headerFields.map(([label, value], index) => (
+            <div
+              key={label}
+              className={variant === "dialog" && index >= 10 ? "sm:col-span-2" : undefined}
+            >
+              <InfoRow label={label}>{value || "—"}</InfoRow>
+            </div>
           ))}
         </InfoGrid>
       </SectionCard>
       <SectionCard title="รายการขอซื้อ">
-        <PRItemsTable pr={pr} />
-        <PRTotals pr={pr} />
+        <PRItemsTable pr={pr} variant={variant === "dialog" ? "detail" : "default"} />
+        <PRTotals pr={pr} variant={variant === "dialog" ? "detail" : "default"} />
       </SectionCard>
       <SectionCard
         title="PO สาธิตที่เกี่ยวข้อง"
@@ -178,13 +206,16 @@ export function PRDetail({
             {
               key: "items",
               label: "รายการ / จำนวน",
-              render: (po) =>
-                po.lines
-                  .map((line) => {
-                    const item = pr.items.find((row) => row.id === line.itemId);
-                    return `${item?.name} ${line.quantity} ${item?.unit}`;
-                  })
-                  .join(" · "),
+              render: (po) => (
+                <span className={variant === "dialog" ? "block min-w-72 whitespace-normal break-words leading-relaxed" : undefined}>
+                  {po.lines
+                    .map((line) => {
+                      const item = pr.items.find((row) => row.id === line.itemId);
+                      return `${item?.name} ${line.quantity} ${item?.unit}`;
+                    })
+                    .join(" · ")}
+                </span>
+              ),
             },
           ]}
         />
@@ -220,7 +251,7 @@ export function PRDetail({
                     timeZone: "Asia/Bangkok",
                   }).format(new Date(event.at))}
                 </p>
-                <p className="text-sm">
+                <p className="break-words text-sm leading-relaxed">
                   {event.from ? statusLabel[event.from] : "เริ่มต้น"} →{" "}
                   {statusLabel[event.to]}
                   {event.note ? ` · ${event.note}` : ""}

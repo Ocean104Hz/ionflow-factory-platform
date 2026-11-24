@@ -14,6 +14,7 @@ import { getTrustedLocalScopeResolver } from "./local-scope-resolver.ts";
 import {
   assertDevelopmentRequestHost,
   developmentAuthEnabled,
+  loginWithDevelopmentPassword,
   readDevelopmentSession,
 } from "./development-auth.ts";
 
@@ -36,6 +37,12 @@ export async function readCurrentFactoryUser(): Promise<AuthenticatedFactoryUser
 }
 
 export async function requireAuthenticatedFactoryUser(): Promise<AuthenticatedFactoryUser> {
+  // shortcut: local development bypasses the login form, remove when PostgreSQL auth is ready.
+  if (developmentAuthEnabled())
+    return loginWithDevelopmentPassword({
+      email: process.env.FACTORY_DEV_AUTH_EMAIL,
+      password: process.env.FACTORY_DEV_AUTH_PASSWORD,
+    }).user;
   try {
     const user = await readCurrentFactoryUser();
     if (user) return user;

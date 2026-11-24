@@ -45,6 +45,7 @@ export function PREditor({
     original ? structuredClone(original) : newPR(),
   );
   const [error, setError] = useState("");
+  const embedded = Boolean(onSaved);
   const update = <K extends keyof PR>(key: K, value: PR[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
   const updateItem = (id: string, patch: Partial<PRItem>) =>
@@ -74,14 +75,41 @@ export function PREditor({
   if (original && !["draft", "rejected"].includes(original.status))
     return <p role="alert">เอกสารนี้ไม่อนุญาตให้แก้ไข</p>;
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={original ? `แก้ไข ${original.number}` : "สร้างใบขอซื้อ (PR)"}
-        description="ข้อมูลสาธิต · ฉบับร่างกรอกไม่ครบได้ แต่จำนวนและราคาต้องถูกต้อง"
-        parent={onSaved ? undefined : { title: "ใบขอซื้อ", href: "/pr" }}
-      />
-      <SectionCard title="ข้อมูลหัวเอกสาร">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      className={
+        embedded ? "flex min-h-0 min-w-0 flex-1 flex-col" : "space-y-5"
+      }
+    >
+      {!embedded && (
+        <PageHeader
+          title={original ? `แก้ไข ${original.number}` : "สร้างใบขอซื้อ (PR)"}
+          description="ข้อมูลสาธิต · ฉบับร่างกรอกไม่ครบได้ แต่จำนวนและราคาต้องถูกต้อง"
+          parent={{ title: "ใบขอซื้อ", href: "/pr" }}
+        />
+      )}
+      <div
+        className={
+          embedded
+            ? "min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto pr-1 pb-5"
+            : "space-y-5"
+        }
+      >
+      <SectionCard
+        title="ข้อมูลหัวเอกสาร"
+        subtitle={
+          embedded
+            ? "ฉบับร่างกรอกไม่ครบได้ แต่จำนวนและราคาต้องถูกต้อง"
+            : undefined
+        }
+        contentClassName={embedded ? "min-w-0" : undefined}
+      >
+        <div
+          className={
+            embedded
+              ? "grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          }
+        >
           <div className="grid gap-2">
             <Label htmlFor="pr-date">วันที่เอกสาร *</Label>
             <Input
@@ -205,7 +233,13 @@ export function PREditor({
               { value: "VAT", label: "VAT · สาธิต 7% เพิ่มจากราคาก่อนภาษี" },
             ]}
           />
-          <div className="grid gap-2 md:col-span-2">
+          <div
+            className={
+              embedded
+                ? "grid min-w-0 gap-2 sm:col-span-2"
+                : "grid gap-2 md:col-span-2"
+            }
+          >
             <Label htmlFor="pr-purpose">วัตถุประสงค์ *</Label>
             <Textarea
               id="pr-purpose"
@@ -213,7 +247,13 @@ export function PREditor({
               onChange={(event) => update("purpose", event.target.value)}
             />
           </div>
-          <div className="grid gap-2 md:col-span-2">
+          <div
+            className={
+              embedded
+                ? "grid min-w-0 gap-2 sm:col-span-2"
+                : "grid gap-2 md:col-span-2"
+            }
+          >
             <Label htmlFor="pr-remarks">หมายเหตุ</Label>
             <Textarea
               id="pr-remarks"
@@ -230,6 +270,7 @@ export function PREditor({
         title="รายการสินค้า/วัตถุดิบ"
         action={
           <Button
+            type="button"
             size="sm"
             variant="outline"
             disabled={form.items.length >= 100}
@@ -243,10 +284,25 @@ export function PREditor({
       >
         <div className="space-y-4">
           {form.items.map((item, index) => (
-            <section key={item.id} className="space-y-3 rounded-lg border p-4">
+            <section
+              key={item.id}
+              className={
+                embedded
+                  ? "min-w-0 space-y-4 rounded-xl border bg-muted/10 p-4 sm:p-5"
+                  : "space-y-3 rounded-lg border p-4"
+              }
+            >
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold">รายการ {index + 1}</h3>
+                {embedded ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground">รายการขอซื้อ</p>
+                    <h3 className="font-semibold">ลำดับที่ {index + 1}</h3>
+                  </div>
+                ) : (
+                  <h3 className="text-sm font-semibold">รายการ {index + 1}</h3>
+                )}
                 <Button
+                  type="button"
                   size="sm"
                   variant="outline"
                   aria-label={`ลบรายการ ${index + 1}`}
@@ -261,7 +317,13 @@ export function PREditor({
                   ลบ
                 </Button>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div
+                className={
+                  embedded
+                    ? "grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                    : "grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                }
+              >
                 <SelectField
                   label={`สินค้า รายการ ${index + 1} *`}
                   value={item.code || "none"}
@@ -348,6 +410,7 @@ export function PREditor({
                     type="number"
                     min="0.0001"
                     step="0.0001"
+                    className={embedded ? "text-right tabular-nums" : undefined}
                     value={Number.isFinite(item.quantity) ? item.quantity : ""}
                     onChange={(event) =>
                       updateItem(item.id, {
@@ -368,6 +431,7 @@ export function PREditor({
                     type="number"
                     min="0"
                     step="0.01"
+                    className={embedded ? "text-right tabular-nums" : undefined}
                     value={item.price ?? ""}
                     onChange={(event) =>
                       updateItem(item.id, {
@@ -404,24 +468,58 @@ export function PREditor({
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                ก่อนภาษี{" "}
-                {money(lineAmounts(item, form.transactionType)?.subtotal)} ·
-                ภาษี {money(lineAmounts(item, form.transactionType)?.tax)} · รวม{" "}
-                {money(lineAmounts(item, form.transactionType)?.total)} บาท
-              </p>
+              {embedded ? (
+                <dl className="grid gap-2 rounded-lg border bg-background p-3 text-sm sm:grid-cols-3">
+                <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
+                  <dt className="text-xs text-muted-foreground">ก่อนภาษี</dt>
+                  <dd className="font-medium tabular-nums">
+                    {money(lineAmounts(item, form.transactionType)?.subtotal)} บาท
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:block sm:text-right">
+                  <dt className="text-xs text-muted-foreground">ภาษี</dt>
+                  <dd className="font-medium tabular-nums">
+                    {money(lineAmounts(item, form.transactionType)?.tax)} บาท
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t pt-2 sm:block sm:border-t-0 sm:pt-0 sm:text-right">
+                  <dt className="text-xs text-muted-foreground">รวม</dt>
+                  <dd className="font-semibold tabular-nums">
+                    {money(lineAmounts(item, form.transactionType)?.total)} บาท
+                  </dd>
+                </div>
+                </dl>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  ก่อนภาษี{" "}
+                  {money(lineAmounts(item, form.transactionType)?.subtotal)} ·
+                  ภาษี {money(lineAmounts(item, form.transactionType)?.tax)} · รวม{" "}
+                  {money(lineAmounts(item, form.transactionType)?.total)} บาท
+                </p>
+              )}
             </section>
           ))}
         </div>
         <PRTotals pr={form} />
       </SectionCard>
+      </div>
       {error && (
-        <p role="alert" className="text-sm text-danger">
+        <p
+          role="alert"
+          className={embedded ? "shrink-0 py-2 text-sm text-danger" : "text-sm text-danger"}
+        >
           {error}
         </p>
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div
+        className={
+          embedded
+            ? "flex shrink-0 flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end"
+            : "flex flex-wrap justify-end gap-2"
+        }
+      >
         <Button
+          type="button"
           variant="outline"
           onClick={() =>
             onCancel
@@ -431,10 +529,12 @@ export function PREditor({
         >
           กลับโดยไม่บันทึก
         </Button>
-        <Button variant="outline" onClick={() => persist(false)}>
+        <Button type="button" variant="outline" onClick={() => persist(false)}>
           บันทึกฉบับร่าง
         </Button>
-        <Button onClick={() => persist(true)}>ส่งอนุมัติ</Button>
+        <Button type="button" onClick={() => persist(true)}>
+          ส่งอนุมัติ
+        </Button>
       </div>
     </div>
   );
