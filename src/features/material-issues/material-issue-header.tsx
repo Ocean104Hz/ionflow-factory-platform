@@ -62,7 +62,7 @@ export function MaterialIssueHeader({
 
     return (
         <SectionCard title="ข้อมูลใบเบิกจ่ายวัสดุ">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 
                 {/* สถานที่ */}
                 <div className="space-y-2">

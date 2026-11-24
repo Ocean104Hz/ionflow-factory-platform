@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+
 import { Search, X } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
@@ -86,7 +92,7 @@ export function MaterialIssueStockPickerModal({
         }
       }}
     >
-      <div className="flex max-h-[85vh] flex-col">
+      <div className="flex min-w-0 max-h-[85vh] flex-col">
 
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4">
@@ -125,6 +131,7 @@ export function MaterialIssueStockPickerModal({
             <Input
               ref={searchRef}
               type="search"
+              autoComplete="off"
               value={search}
               placeholder="ค้นหารหัส ชื่อวัสดุ หรือหน่วย"
               aria-label="ค้นหารายการวัสดุ"
@@ -136,17 +143,18 @@ export function MaterialIssueStockPickerModal({
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            ข้อมูลจำลอง (Mock Data)
+            ข้อมูลจากสต็อกวัสดุคงเหลือ FF เดือนตุลาคม 2569 (Mock Data)
           </p>
         </div>
 
         {/* Stock Table */}
-        <div className="min-h-0 flex-1 overflow-auto p-5">
-          <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-162.5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto p-5">
+          <div className="w-full min-w-0 overflow-x-auto rounded-md border">
+
+            <Table className="w-full min-w-150 table-fixed">
               <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="w-16 text-center">
+                  <TableHead className="w-12 text-center">
                     ลำดับ
                   </TableHead>
 
@@ -158,15 +166,15 @@ export function MaterialIssueStockPickerModal({
                     รายการวัสดุ
                   </TableHead>
 
-                  <TableHead className="w-28 text-right">
+                  <TableHead className="w-20 text-right">
                     คงเหลือ
                   </TableHead>
 
-                  <TableHead className="w-24 text-center">
+                  <TableHead className="w-16 text-center">
                     หน่วย
                   </TableHead>
 
-                  <TableHead className="w-24 text-center">
+                  <TableHead className="w-20 text-center">
                     จัดการ
                   </TableHead>
                 </TableRow>
@@ -177,44 +185,46 @@ export function MaterialIssueStockPickerModal({
                   filteredMaterials.map(
                     (material, index) => (
                       <TableRow
-                        key={material.materialCode}
+                        key={material.id}
                         className={
-                          selectedCode ===
-                          material.materialCode
+                          selectedCode === material.materialCode
                             ? "bg-primary/5"
                             : undefined
                         }
                       >
+                        {/* ลำดับ */}
                         <TableCell className="text-center">
                           {index + 1}
                         </TableCell>
 
-                        <TableCell className="font-medium">
-                          {material.materialCode}
+                        {/* รหัสวัสดุ */}
+                        <TableCell className="whitespace-normal wrap-break-word font-medium">
+                          {material.materialCode || "-"}
                         </TableCell>
 
-                        <TableCell>
+                        {/* รายการวัสดุ */}
+                        <TableCell className="whitespace-normal wrap-break-word">
                           {material.materialName}
                         </TableCell>
 
-                        <TableCell className="text-right">
-                          {material.remainingQuantity.toLocaleString(
-                            "th-TH",
-                          )}
+                        {/* คงเหลือ */}
+                        <TableCell className="whitespace-normal wrap-break-word text-right tabular-nums">
+                          {material.remainingQuantity.trim() || "-"}
                         </TableCell>
 
-                        <TableCell className="text-center">
-                          {material.unit}
+                        {/* หน่วย */}
+                        <TableCell className="whitespace-normal wrap-break-word text-center">
+                          {material.unit || "-"}
                         </TableCell>
 
+                        {/* ปุ่มเลือก */}
                         <TableCell className="text-center">
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() =>
-                              onSelect(material)
-                            }
+                            aria-label={`เลือก ${material.materialName}`}
+                            onClick={() => onSelect(material)}
                           >
                             เลือก
                           </Button>
@@ -240,7 +250,9 @@ export function MaterialIssueStockPickerModal({
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t px-5 py-4">
           <span className="text-sm text-muted-foreground">
-            ทั้งหมด {filteredMaterials.length} รายการ
+            ทั้งหมด{" "}
+            {filteredMaterials.length.toLocaleString("th-TH")}{" "}
+            รายการ
           </span>
 
           <Button
