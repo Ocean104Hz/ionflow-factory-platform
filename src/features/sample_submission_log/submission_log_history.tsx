@@ -19,7 +19,7 @@ import {
   logDate,
   selectedAnalysis,
   type SubmissionLog,
-} from "./submission-log-domain";
+} from "./submission_log_domain";
 
 export function SubmissionLogHistory({
   records,
@@ -160,7 +160,7 @@ export function SubmissionLogHistory({
             key: "sender",
             label: "ผู้ส่งตัวอย่าง",
             render: (r) => (
-              <div className="max-w-40 whitespace-normal break-words">
+              <div className="max-w-40 whitespace-normal wrap-break-word">
                 {r.sender_sign.signer_name}
                 <p className="text-xs text-muted-foreground">
                   ผู้ขอ: {r.requester_name}
@@ -181,7 +181,7 @@ export function SubmissionLogHistory({
             key: "name",
             label: "ชื่อตัวอย่าง",
             render: (r) => (
-              <span className="block max-w-44 whitespace-normal break-words">
+              <span className="block max-w-44 whitespace-normal wrap-break-word">
                 {r.sample_name}
               </span>
             ),
@@ -190,7 +190,7 @@ export function SubmissionLogHistory({
             key: "analysis",
             label: "รายการตรวจวิเคราะห์",
             render: (r) => (
-              <div className="max-w-52 whitespace-normal break-words">
+              <div className="max-w-52 whitespace-normal wrap-break-word">
                 <span className="font-medium">
                   {selectedAnalysis(r).length} รายการ
                 </span>

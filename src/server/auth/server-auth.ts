@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import {
   FactoryAuthError,
   getCurrentFactoryUser,
@@ -18,12 +19,16 @@ import {
 } from "./development-auth.ts";
 
 export async function readCurrentFactoryUser(): Promise<AuthenticatedFactoryUser | null> {
+  await connection();
+
   const secret = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!secret) return null;
+
   if (developmentAuthEnabled()) {
     assertDevelopmentRequestHost(await headers());
     return readDevelopmentSession(secret);
   }
+
   return getCurrentFactoryUser(
     getFactoryAuthRepository(),
     secret,
@@ -33,17 +38,20 @@ export async function readCurrentFactoryUser(): Promise<AuthenticatedFactoryUser
 
 export async function requireAuthenticatedFactoryUser(): Promise<AuthenticatedFactoryUser> {
   // shortcut: local development bypasses the login form, remove when PostgreSQL auth is ready.
-  if (developmentAuthEnabled())
+  if (developmentAuthEnabled()) {
+    await connection();
     return loginWithDevelopmentPassword({
       email: process.env.FACTORY_DEV_AUTH_EMAIL,
       password: process.env.FACTORY_DEV_AUTH_PASSWORD,
     }).user;
+  }
   try {
     const user = await readCurrentFactoryUser();
     if (user) return user;
   } catch (error) {
     if (!(error instanceof FactoryAuthError)) throw error;
   }
+
   redirect("/login");
 }
 

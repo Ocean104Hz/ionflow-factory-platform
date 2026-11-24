@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, ListFilter } from "lucide-react";
-import { PageHeader, SectionCard } from "./patterns";
+import { SectionCard } from "./patterns";
 import { BrandingEditor } from "./branding-editor";
 import { UserSettings } from "./user-settings";
 import { MasterSettings } from "./master-settings";

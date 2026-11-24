@@ -620,6 +620,18 @@ export function ReceivingHeaderWorkspace() {
         </div>
       </SectionCard>
 
+      {/* รูปภาพประกอบ */}
+      <SectionCard title="รูปภาพประกอบ" subtitle="แนบรูปภาพประกอบเอกสาร">
+        <div className="rounded-xl border border-dashed border-border bg-surface p-6">
+          <Input
+            type="file"
+            accept="image/*"
+            multiple
+            className="cursor-pointer"
+          />
+        </div>
+      </SectionCard>
+
       <ReceivingItemsSection
         items={items}
         onChange={updateItems}

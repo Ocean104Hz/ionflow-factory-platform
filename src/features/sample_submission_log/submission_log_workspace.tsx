@@ -26,10 +26,10 @@ import {
   deleteLog,
   type SubmissionLog,
   type LogErrors,
-} from "./submission-log-domain";
-import { SubmissionLogSections } from "./submission-log-form";
-import { SubmissionLogHistory } from "./submission-log-history";
-import { SubmissionLogDetail } from "./submission-log-detail";
+} from "./submission_log_domain";
+import { SubmissionLogSections } from "./submission_log_form";
+import { SubmissionLogHistory } from "./submission_log_history";
+import { SubmissionLogDetail } from "./submission_log_detail";
 
 export function SubmissionLogWorkspace() {
   const [records, setRecords] = useState(() =>
@@ -77,7 +77,7 @@ export function SubmissionLogWorkspace() {
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
-        title="แบบบันทึกการส่งตัวอย่าง"
+        title="แบบบันทึกการนำส่งตัวอย่างวิเคราะห์ (สำหรับลูกค้า)"
         description="บันทึกข้อมูลการนำส่งตัวอย่างเพื่อตรวจวิเคราะห์"
         actions={
           <StatusBadge tone="info">UI MOCK · ไม่เชื่อมระบบจริง</StatusBadge>
