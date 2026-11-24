@@ -142,19 +142,25 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "WAREHOUSE",
+    title: "สต็อกสินค้า",
+    href: "/stock_products",
+    icon: Boxes,
+  },
+  {
+    group: "WAREHOUSE",
     title: "วัสดุคงเหลือ FF",
     href: "/stock_remaining_materials_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "Stock WIP FF",
+    title: "สต็อก WIP FF",
     href: "/stock_wip_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "Stock RM FF",
+    title: "สต็อก RM FF",
     href: "/stock_rm_ff",
     icon: Boxes,
   },
