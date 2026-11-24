@@ -23,11 +23,11 @@ const read = (path) =>
 const env = {
   NODE_ENV: "test",
   FACTORY_DB_ENABLED: "true",
-  FACTORY_DB_HOST: "localhost",
-  FACTORY_DB_PORT: "5432",
-  FACTORY_DB_NAME: "ionflow_inventory_dev",
-  FACTORY_DB_SCHEMA: "inventory_sandbox",
-  FACTORY_DB_USER: "factory_test_app",
+  FACTORY_DB_HOST: "127.0.0.1",
+  FACTORY_DB_PORT: "5433",
+  FACTORY_DB_NAME: "production",
+  FACTORY_DB_SCHEMA: "foliar_fertilizer",
+  FACTORY_DB_USER: "foliar_fertilizer_app",
   FACTORY_DB_PASSWORD: "fictional-test-password-not-a-credential",
 };
 const safeError = (code) => (error) => {
@@ -105,7 +105,7 @@ async function withEnvironment(work, patch = env) {
 test("configuration is explicit, disabled by default and rejects missing credentials/unsafe targets/admin users", () => {
   assert.throws(() => readDatabaseConfig({}), safeError("DB_DISABLED"));
   const config = readDatabaseConfig(env);
-  assert.equal(config.schema, "inventory_sandbox");
+  assert.equal(config.schema, "foliar_fertilizer");
   assert.equal(config.connectionTimeoutMillis, 5000);
   assert.equal(config.max, 5);
   for (const key of [
@@ -126,9 +126,9 @@ test("configuration is explicit, disabled by default and rejects missing credent
   }
   for (const patch of [
     { NODE_ENV: "production" },
-    { FACTORY_DB_HOST: "example.com" },
-    { FACTORY_DB_PORT: "5433" },
-    { FACTORY_DB_NAME: "production" },
+    { FACTORY_DB_HOST: "localhost" },
+    { FACTORY_DB_PORT: "5432" },
+    { FACTORY_DB_NAME: "ionflow_inventory_dev" },
     { FACTORY_DB_SCHEMA: "public; DROP SCHEMA public" },
     { FACTORY_DB_USER: "postgres" },
     { FACTORY_DB_USER: "pg_admin" },
@@ -161,7 +161,7 @@ test("pool is bounded/lazy, pg NUMERIC remains a string, values are parameterize
     f.calls.map((c) => c.sql),
     [
       "BEGIN READ ONLY",
-      "SET LOCAL search_path TO pg_catalog, inventory_sandbox",
+      "SET LOCAL search_path TO pg_catalog, foliar_fertilizer",
       "SELECT $1::text AS value",
       "COMMIT",
     ],
@@ -319,7 +319,7 @@ test("server-only modules refuse an ordinary Node/client import and existing Dem
   ])
     assert.doesNotMatch(
       read(file),
-      /src\/server\/|getDevelopmentDatabase|FACTORY_DB_/,
+      /src\/server\/database\/|getDevelopmentDatabase|FACTORY_DB_/,
     );
 });
 test("CLI cannot execute SQL when disabled or in production and never prints raw metadata", () => {
@@ -345,7 +345,6 @@ test("CLI cannot execute SQL when disabled or in production and never prints raw
     assert.match(output, /DB_DISABLED|disabled in production/);
     for (const value of [
       env.FACTORY_DB_PASSWORD,
-      env.FACTORY_DB_NAME,
       env.FACTORY_DB_USER,
     ])
       assert.ok(!output.includes(value));

@@ -21,10 +21,10 @@ export class BackendError extends Error {
   }
 }
 export interface DatabaseConfig {
-  host: "localhost" | "127.0.0.1" | "::1";
-  port: 5432;
-  database: "ionflow_inventory_dev";
-  schema: "inventory_sandbox";
+  host: "127.0.0.1";
+  port: 5433;
+  database: "production";
+  schema: "foliar_fertilizer";
   user: string;
   password: string;
   max: number;
@@ -42,20 +42,18 @@ export function readDatabaseConfig(
     throw new BackendError("DB_CONFIG_INVALID");
   };
   const host = env.FACTORY_DB_HOST;
-  if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1")
-    return fail();
+  if (host !== "127.0.0.1") return fail();
   if (
-    env.FACTORY_DB_PORT !== "5432" ||
-    env.FACTORY_DB_NAME !== "ionflow_inventory_dev" ||
-    env.FACTORY_DB_SCHEMA !== "inventory_sandbox"
+    env.FACTORY_DB_PORT !== "5433" ||
+    env.FACTORY_DB_NAME !== "production" ||
+    env.FACTORY_DB_SCHEMA !== "foliar_fertilizer"
   )
     return fail();
   const user = env.FACTORY_DB_USER ?? "";
   const password = env.FACTORY_DB_PASSWORD ?? "";
   if (
     !/^[a-z_][a-z0-9_]{0,62}$/.test(user) ||
-    user === "postgres" ||
-    user.startsWith("pg_") ||
+    user !== "foliar_fertilizer_app" ||
     !password ||
     password.includes("\0")
   )
@@ -70,9 +68,9 @@ export function readDatabaseConfig(
   }
   return {
     host,
-    port: 5432,
-    database: "ionflow_inventory_dev",
-    schema: "inventory_sandbox",
+    port: 5433,
+    database: "production",
+    schema: "foliar_fertilizer",
     user,
     password,
     max: integer("FACTORY_DB_POOL_MAX", 5, 1, 10),

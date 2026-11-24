@@ -1,10 +1,12 @@
 # Maintenance UI V1
 
-Routes: `/repair-requests`, `/repair-requests/new`, `/repair-requests/[repairRequestId]`, `/equipment`, `/equipment/[equipmentId]`, `/maintenance-reports`.
+Routes: `/repair-requests`, `/repair-requests/new`, `/repair-requests/[repairRequestId]`, `/maintenance-work`, `/equipment`, `/equipment/[equipmentId]`, `/maintenance-reports`.
 
 `repair-store.ts` is the only maintenance state source: a module-scoped immutable store observed with React `useSyncExternalStore`. It survives client-side navigation without changing Factory layout/providers. Server rendering uses deterministic initial fixtures; browser reload resets the demo. No localStorage, APIs, database access, or production authorization. Drafts receive a local number on save so they remain uniquely identifiable; submitting a draft retains its ID and number. An unsaved request displays no assigned number.
 
 Equipment comes read-only from the existing `MasterDataProvider` and `MasterRow` contract. `equipmentAdapter` resolves `parentId` ancestry for site/line/location, and never makes up a missing type/location. This is the existing Demo Master, not PostgreSQL Settings. No new equipment catalog or CRUD. Six fictional requests reference the actual existing demo equipment ID.
+
+Technicians come from active personnel in the existing `MasterDataProvider` whose department is `ซ่อมบำรุง`. `/maintenance-work` provides the shared assignment queue and a selected-technician work view. It reuses the same repair store, transitions and activity history; it does not create a second work-order dataset.
 
 ## Form coverage
 

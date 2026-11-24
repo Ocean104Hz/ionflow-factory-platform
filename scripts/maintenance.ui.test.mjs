@@ -48,7 +48,7 @@ test("mock creation preserves all input, stable identity and unique monthly numb
   assert.equal(d.nextNumber(second,"2026-11-01"),"RR-202611-001");assert.throws(()=>d.createRepair(first,valid(),equipment,false,"a",now));
 });
 test("all stages, acceptance, parts wait, inspection rework reason and closed mutation denial",()=>{
-  let r=make();assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));r=d.transitionRepair(r,"PENDING_ASSIGNMENT",now);assert.throws(()=>d.transitionRepair(r,"ASSIGNED",now));r=d.transitionRepair(r,"ASSIGNED",now,"",d.technicians[0]);assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));r=d.acceptRepair(r,now);assert.throws(()=>d.acceptRepair(r,now));r=d.transitionRepair(r,"IN_PROGRESS",now);r=d.transitionRepair(r,"WAITING_PARTS",now);r=d.transitionRepair(r,"IN_PROGRESS",now);assert.throws(()=>d.transitionRepair(r,"PENDING_INSPECTION",now));
+  let r=make();assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));r=d.transitionRepair(r,"PENDING_ASSIGNMENT",now);assert.throws(()=>d.transitionRepair(r,"ASSIGNED",now));r=d.transitionRepair(r,"ASSIGNED",now,"",d.technicians[0],d.technicians);assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));r=d.acceptRepair(r,now);assert.throws(()=>d.acceptRepair(r,now));r=d.transitionRepair(r,"IN_PROGRESS",now);r=d.transitionRepair(r,"WAITING_PARTS",now);r=d.transitionRepair(r,"IN_PROGRESS",now);assert.throws(()=>d.transitionRepair(r,"PENDING_INSPECTION",now));
   r=d.saveWork(r,{diagnosis:"ชิ้นส่วนหลวม",method:"ปรับตั้ง",technicianNotes:"ทดสอบ",workStart:"2026-10-26T08:00",workEnd:"2026-10-26T09:00",parts:[],laborCost:"100"},now);
   r=d.transitionRepair(r,"PENDING_INSPECTION",now);assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));r=d.transitionRepair(r,"IN_PROGRESS",now,"ยังมีเสียง");assert.equal(r.workEnd,"");r=d.transitionRepair(r,"PENDING_INSPECTION",now);r=d.transitionRepair(r,"COMPLETED",now);r=d.transitionRepair(r,"CLOSED",now);
   assert.equal(r.activities.length,13);assert.equal(r.id,"test-1");assert.equal(r.activities[0].status,"SUBMITTED");assert.ok(r.activities.some(a=>a.text.includes("ยังมีเสียง")));assert.throws(()=>d.transitionRepair(r,"IN_PROGRESS",now));assert.throws(()=>d.saveWork(r,r,now));
@@ -69,6 +69,7 @@ const {RepairList}=await import(moduleURL(path.join(root,dir,"repair-list.tsx"))
 const {RepairDetail,WorkLogEditor}=await import(moduleURL(path.join(root,dir,"repair-detail.tsx")));
 const {EquipmentList,EquipmentDetail}=await import(moduleURL(path.join(root,dir,"equipment-workspace.tsx")));
 const {MaintenanceReports}=await import(moduleURL(path.join(root,dir,"maintenance-reports.tsx")));
+const {TechnicianWorkspace}=await import(moduleURL(path.join(root,dir,"technician-workspace.tsx")));
 const render=(component,props={})=>renderToStaticMarkup(React.createElement(MasterDataProvider,null,React.createElement(component,props)));
 // Independent manifest from the approved brief, not inferred from the TypeScript type.
 test("rendered full-page form contains all document, equipment, problem and note controls",()=>{
@@ -79,8 +80,9 @@ test("rendered full-page form contains all document, equipment, problem and note
   for(const name of ["equipmentName","equipmentLocation","equipmentType","number"]) {const tag=html.match(new RegExp(`<input[^>]*id="repair-${name}"[^>]*>`))?.[0];assert.match(tag,/readOnly/i);}
   assert.doesNotMatch(html,/<dialog/);assert.match(html,/<form/);
 });
-test("all six screens render, links preserve equipment and repair identity",()=>{
-  for(const component of [RepairList,EquipmentList,MaintenanceReports])assert.match(render(component),/<h1/);
+test("maintenance screens render, links preserve equipment and repair identity",()=>{
+  for(const component of [RepairList,EquipmentList,MaintenanceReports,TechnicianWorkspace])assert.match(render(component),/<h1/);
+  const technician=render(TechnicianWorkspace);for(const label of ["งานของช่าง","ผู้ซ่อมที่กำลังปฏิบัติงาน","คิวงานส่วนกลาง","รับงาน"])assert.ok(technician.includes(label),label);
   const detail=render(RepairDetail,{id:"repair-demo-1"});for(const label of ["ภาพรวม","การดำเนินงาน","อะไหล่และค่าใช้จ่าย","ประวัติกิจกรรม","มอเตอร์มีเสียงผิดปกติ","ผู้แจ้งสาธิต"])assert.ok(detail.includes(label),label);
   assert.match(render(EquipmentDetail,{id:"machine-1"}),/repair-demo-1/);assert.match(render(EquipmentDetail,{id:"unknown"}),/ไม่พบอุปกรณ์/);assert.match(render(RepairDetail,{id:"unknown"}),/ไม่พบใบแจ้งซ่อม/);
   assert.doesNotMatch(render(RepairDetail,{id:"repair-demo-6"}),/ยืนยันการดำเนินการจำลอง|รับงานจำลอง<|เริ่มซ่อม \/ กลับมาซ่อม</);
@@ -91,13 +93,13 @@ test("rendered work controls, individual part IDs, read-only closed records and 
   assert.match(html,/125.50/);assert.match(html,/บันทึกงานซ่อมและค่าใช้จ่ายจำลอง/);assert.doesNotMatch(render(WorkLogEditor,{request:{...request,status:"CLOSED"},onSave(){}}),/เพิ่มอะไหล่|บันทึกงานซ่อมและค่าใช้จ่ายจำลอง/);
 });
 test("all routes, nested active states, no database/API/storage writes or new master dataset",async()=>{
-  for(const route of ["repair-requests","repair-requests/new","repair-requests/[repairRequestId]","equipment","equipment/[equipmentId]","maintenance-reports"])assert.ok(existsSync(path.join(root,`app/(factory)/${route}/page.tsx`)),route);
+  for(const route of ["repair-requests","repair-requests/new","repair-requests/[repairRequestId]","maintenance-work","equipment","equipment/[equipmentId]","maintenance-reports"])assert.ok(existsSync(path.join(root,`app/(factory)/${route}/page.tsx`)),route);
   for(const file of readdirSync(path.join(root,dir)).filter(f=>/\.(ts|tsx)$/.test(f)))assert.doesNotMatch(read(dir+file),/fetch\s*\(|localStorage|sessionStorage|from ["'].*server\/|from ["']pg["']/);
   assert.match(read(dir+"repair-store.ts"),/useSyncExternalStore/);assert.match(read(dir+"repair-ui.tsx"),/useMasterData/);assert.match(read(dir+"repair-form.tsx"),/beforeunload/);
   const {isNavigationActive}=await import(moduleURL(path.join(root,"src/lib/constants/navigation.ts")));
   assert.equal(isNavigationActive("/repair-requests/new","/repair-requests"),true);assert.equal(isNavigationActive("/equipment/machine-1","/equipment"),true);assert.equal(isNavigationActive("/equipment-extra","/equipment"),false);
 });
 test("focused TypeScript diagnostics for Maintenance source and routes only",()=>{
-  const files=readdirSync(path.join(root,dir)).filter(f=>/\.(ts|tsx)$/.test(f)).map(f=>path.join(root,dir,f));for(const route of ["repair-requests","repair-requests/new","repair-requests/[repairRequestId]","equipment","equipment/[equipmentId]","maintenance-reports"])files.push(path.join(root,`app/(factory)/${route}/page.tsx`));
+  const files=readdirSync(path.join(root,dir)).filter(f=>/\.(ts|tsx)$/.test(f)).map(f=>path.join(root,dir,f));for(const route of ["repair-requests","repair-requests/new","repair-requests/[repairRequestId]","maintenance-work","equipment","equipment/[equipmentId]","maintenance-reports"])files.push(path.join(root,`app/(factory)/${route}/page.tsx`));
   const config=ts.parseJsonConfigFileContent(ts.readConfigFile(path.join(root,"tsconfig.json"),ts.sys.readFile).config,ts.sys,root);const program=ts.createProgram(files,{...config.options,noEmit:true,incremental:false});const selected=new Set(files.map(f=>f.replaceAll("\\","/").toLowerCase()));const errors=ts.getPreEmitDiagnostics(program).filter(d=>!d.file||selected.has(d.file.fileName.replaceAll("\\","/").toLowerCase()));assert.equal(errors.length,0,ts.formatDiagnostics(errors,{getCurrentDirectory:()=>root,getCanonicalFileName:f=>f,getNewLine:()=>"\n"}));
 });

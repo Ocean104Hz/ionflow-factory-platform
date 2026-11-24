@@ -174,6 +174,7 @@ export const navigation: FactoryNavigationItem[] = [
     icon: ReceiptText,
   },
   { group: "MAINTENANCE", title: "ใบแจ้งซ่อม", href: "/repair-requests", icon: Wrench },
+  { group: "MAINTENANCE", title: "งานของช่าง", href: "/maintenance-work", icon: Wrench },
   { group: "MAINTENANCE", title: "รายการอุปกรณ์", href: "/equipment", icon: Wrench },
   { group: "MAINTENANCE", title: "รายงานซ่อมบำรุง", href: "/maintenance-reports", icon: Wrench },
   {

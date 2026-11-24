@@ -42,6 +42,13 @@ export const demoMasterSettings: Record<MasterSettingKind, MasterSettingRow[]> =
         active: true,
       },
       { id: "dep-5", code: "DEP-005", name: "QC", type: "แผนก", active: false },
+      {
+        id: "dep-6",
+        code: "DEP-006",
+        name: "ซ่อมบำรุง",
+        type: "แผนก",
+        active: true,
+      },
     ],
     warehouses: [
       {

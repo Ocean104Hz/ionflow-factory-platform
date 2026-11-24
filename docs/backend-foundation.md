@@ -16,7 +16,7 @@ This is not a production-ready system. No database connectivity is claimed until
 
 ## Scope and data owner
 
-Factory owns its future factory-workflow persistence. Initial allowed target is exactly loopback `localhost` / `127.0.0.1` / `::1`, port 5432, database `ionflow_inventory_dev`, schema `inventory_sandbox`. This Phase 1 connector deliberately refuses `NODE_ENV=production` and other targets. Separate approval/security/configuration is required before supporting deployment or remote databases. IPv6/localhost resolution must reach the intended local PostgreSQL instance.
+Factory owns its future factory-workflow persistence. The approved development target is exactly Cloud SQL Proxy loopback `127.0.0.1`, port 5433, database `production`, schema `foliar_fertilizer`, using only `foliar_fertilizer_app`. The connector deliberately refuses `NODE_ENV=production`, owner/admin roles and other targets. Cloud Run connectivity remains a separate deployment change.
 
 `src/server/database/` is marked `server-only`; import it only from trusted Node.js server code, never from client components, Edge runtime, public barrels or `use server` export files. `use server` creates remotely callable Server Functions; it is not the marker for an internal database utility. No Server Action or API endpoint is introduced.
 
@@ -33,7 +33,7 @@ The connector uses bounded pool/connect/idle/statement/query/lock timeouts. TLS 
 ## Query and transaction conventions
 
 - Only read-only database methods are prepared: `query` wraps a checked-out client in `BEGIN READ ONLY` / COMMIT; `readOnly` supports several queries on the same client. Session also defaults to read-only.
-- Search path starts with `pg_catalog`; read transactions explicitly set `pg_catalog, inventory_sandbox`. Fully qualify business tables in future repositories. Schema is a fixed identifier, never user SQL.
+- Search path starts with `pg_catalog`; read transactions explicitly set `pg_catalog, foliar_fertilizer`. Fully qualify business tables in future repositories. Schema is a fixed identifier, never user SQL.
 - SQL text is **trusted static server source**, never user input, even on a read-only method. Bind every value as `$1`, `$2`, etc. Do not expose generic SQL execution or accept SQL/identifiers from requests. This layer is not an SQL parser or a sandbox for hostile query text.
 - Await every query inside the transaction callback. Do not issue transaction controls from callbacks or retain query handles after return; handles reject after transaction exit.
 - On query/callback/commit failure, attempt ROLLBACK. Release clients in `finally`; destroy connections if rollback fails. Surface stable sanitized errors, not raw PostgreSQL failures. No automatic retries: future writes need validated idempotency keys and explicit retry policy.
@@ -53,7 +53,7 @@ Explicit `.ts` import extensions let the verified Node 24 runtime run developer 
 
 ## Migration preparation — separate from execution
 
-Only `0001_foundation.up.sql` / `.down.sql` are prepared. They bootstrap `inventory_sandbox.schema_migrations` (version, SHA-256 checksum, applied timestamp and database actor). No schema/identity/tenant/product/material/BOM/order/stock table is invented. Absence of a schema or role is an administrator setup decision, not automatic DDL permission.
+The checked-in migrations still target the former local `inventory_sandbox` environment and must not be applied to `production.foliar_fertilizer` without a separate reviewed migration conversion. This connection phase creates no table, role, grant or business record.
 
 Manual plan after approval:
 

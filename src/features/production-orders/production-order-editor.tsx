@@ -5,6 +5,7 @@ import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { SectionCard, SelectField } from "@/src/components/factory/patterns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/src/components/ui/alert-dialog";
 import { useProductionOrders } from "./production-orders-provider";
 
 const blankItem = (): OrderItem => ({ sku: "", name: "", type: "", quantity: 0, unit: "", price: 0, note: "" });
@@ -19,8 +20,9 @@ export function ProductionOrderEditor({ existing, onClose }: { existing?: Produc
   const [draft, setDraft] = useState(() => existing ? structuredClone(existing) : blank());
   const [keys, setKeys] = useState(() => draft.items.map(() => crypto.randomUUID()));
   const [error, setError] = useState("");
+  const [discard, setDiscard] = useState(false);
   const locked = !!existing && (existing.production !== "ยังไม่เริ่มผลิต" || existing.document === "ยกเลิกแล้ว");
-  return <SectionCard title={existing ? "แก้ไขคำสั่ง Local" : "เพิ่มคำสั่งในฐานข้อมูล Local"} subtitle="บันทึกข้อมูลที่ระบุเอง ไม่ใช่การรับรองข้อมูลหรือส่งเอกสารไป Sales Hub / Datalink">
+  return <><SectionCard title={existing ? "แก้ไขคำสั่ง Local" : "เพิ่มคำสั่งในฐานข้อมูล Local"} subtitle="บันทึกข้อมูลที่ระบุเอง ไม่ใช่การรับรองข้อมูลหรือส่งเอกสารไป Sales Hub / Datalink">
     <form className="space-y-4" onSubmit={async (event) => { event.preventDefault(); try { await save(draft, expectedVersion); onClose(); } catch (e) { setError(e instanceof Error ? e.message : "บันทึกไม่ได้"); } }}>
       <fieldset disabled={busy} className="space-y-4" aria-busy={busy}>
         {existing ? <p className="text-sm">ต้นทางเดิม: {draft.source}</p> : <SelectField label="ต้นทางที่ระบุ" value={draft.source} onChange={(source) => setDraft({ ...draft, source: source as ProductionOrder["source"] })} options={[{ value: "Sales Hub", label: "Sales Hub" }, { value: "Datalink", label: "Datalink" }]} />}
@@ -39,8 +41,8 @@ export function ProductionOrderEditor({ existing, onClose }: { existing?: Produc
         </div>)}
         <Button type="button" variant="outline" disabled={locked} onClick={() => { setDraft({ ...draft, items: [...draft.items, blankItem()] }); setKeys([...keys, crypto.randomUUID()]); }}>เพิ่มรายการ</Button>
         {error && <p role="alert" className="text-danger">{error}</p>}
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { if (window.confirm("ละทิ้งการแก้ไขที่ยังไม่บันทึกหรือไม่?")) onClose(); }}>ยกเลิก</Button><Button type="submit" disabled={!!existing && existing.document === "ยกเลิกแล้ว"}>บันทึก PostgreSQL</Button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setDiscard(true)}>ยกเลิก</Button><Button type="submit" disabled={!!existing && existing.document === "ยกเลิกแล้ว"}>บันทึก PostgreSQL</Button></div>
       </fieldset>
     </form>
-  </SectionCard>;
+  </SectionCard><AlertDialog open={discard} onOpenChange={setDiscard}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>ทิ้งการแก้ไขที่ยังไม่บันทึก?</AlertDialogTitle><AlertDialogDescription>ข้อมูลที่แก้ไขในคำสั่งการผลิตนี้จะไม่ถูกบันทึก</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={onClose}>ทิ้งข้อมูล</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>;
 }
