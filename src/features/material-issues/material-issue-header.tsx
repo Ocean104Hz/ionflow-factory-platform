@@ -62,8 +62,18 @@ export function MaterialIssueHeader({
 
     return (
         <SectionCard title="ข้อมูลใบเบิกจ่ายวัสดุ">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
 
+                {/* วันที่ */}
+                <div className="[&_label]:leading-none">
+                    <ThaiBuddhistDatePicker
+                        label="วันที่"
+                        value={values.issueDate}
+                        onChange={(value) =>
+                            onChange("issueDate", value)
+                        }
+                    />
+                </div>
                 {/* สถานที่ */}
                 <div className="space-y-2">
                     <Label htmlFor="issue-location">
@@ -258,8 +268,8 @@ export function MaterialIssueHeader({
                     >
                         <span
                             className={`min-w-0 flex-1 truncate px-3 ${values.productName
-                                    ? "text-foreground"
-                                    : "text-muted-foreground"
+                                ? "text-foreground"
+                                : "text-muted-foreground"
                                 }`}
                         >
                             {values.productName ||
@@ -313,16 +323,6 @@ export function MaterialIssueHeader({
                         }
                     />
                 </div>
-
-                {/* วันที่ */}
-                <ThaiBuddhistDatePicker
-                    label="วันที่"
-                    value={values.issueDate}
-                    onChange={(value) =>
-                        onChange("issueDate", value)
-                    }
-                />
-
                 {/* ฝ่าย */}
                 <div className="space-y-2">
                     <Label htmlFor="issue-department">
