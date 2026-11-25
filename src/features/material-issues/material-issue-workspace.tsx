@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
 
 import {
@@ -35,12 +35,9 @@ import { MaterialIssueSigners } from "./material-issue-signers";
 import { MaterialIssueHistory } from "./material-issue-history";
 import { MaterialIssueDetailModal } from "./material-issue-detail-modal";
 
-import { MOCK_MATERIAL_ISSUE_HISTORY } from "./material-issue-history.mock";
-
 import {
     createEmptyMaterialIssueDraft,
     createEmptyMaterialIssueItem,
-    hasMaterialIssueItemData,
     type MaterialIssueDraft,
     type MaterialIssueHeaderValues,
     type MaterialIssueItem,
@@ -57,16 +54,63 @@ type PendingFormAction =
         record: MaterialIssueRecord;
     };
 
+function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasStringFields(value: unknown, fields: readonly string[]): boolean {
+    return isObject(value) && fields.every((field) => typeof value[field] === "string");
+}
+
+function isMaterialIssueRecord(value: unknown): value is MaterialIssueRecord {
+    return isObject(value) &&
+        typeof value.id === "string" &&
+        typeof value.documentNo === "string" &&
+        typeof value.version === "string" &&
+        /^[1-9]\d*$/.test(value.version) &&
+        hasStringFields(value.header, ["location", "productName", "quantity", "issueDate", "department"]) &&
+        hasStringFields(value.signers, ["requestedBy", "issuedBy", "inspectedBy"]) &&
+        Array.isArray(value.items) &&
+        value.items.every((item: unknown) => hasStringFields(item, ["id", "materialCode", "materialName", "quantity", "unit", "damagedQuantity", "additionalQuantity"]));
+}
+
+async function readApiData<T>(response: Response, validate: (value: unknown) => value is T, fallback: string): Promise<T> {
+    const result: unknown = await response.json();
+    if (!response.ok || !isObject(result) || result.ok !== true) {
+        throw new Error(isObject(result) && typeof result.message === "string" ? result.message : fallback);
+    }
+    if (!validate(result.data)) {
+        throw new Error("ข้อมูลตอบกลับจากระบบไม่ถูกต้อง กรุณาโหลดหน้าใหม่");
+    }
+    return result.data;
+}
+
+async function getCsrfToken(): Promise<string> {
+    const response = await fetch("/api/auth/csrf", { cache: "no-store" });
+    const result: unknown = await response.json();
+    if (!response.ok || !isObject(result) || result.ok !== true || typeof result.csrfToken !== "string" || !result.csrfToken) {
+        throw new Error("ไม่สามารถยืนยันคำขอได้");
+    }
+    return result.csrfToken;
+}
+
+async function fetchRecord(id: string): Promise<MaterialIssueRecord> {
+    const response = await fetch(`/api/material-issues?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+    return readApiData(response, (value): value is MaterialIssueRecord => isMaterialIssueRecord(value) && value.id === id, "โหลดเอกสารไม่สำเร็จ");
+}
+
 export function MaterialIssueWorkspace() {
     const [tab, setTab] = useState("form");
 
     const [records, setRecords] = useState<
         MaterialIssueRecord[]
-    >(() =>
-        structuredClone(
-            MOCK_MATERIAL_ISSUE_HISTORY,
-        ),
-    );
+    >([]);
+
+    const [saving, setSaving] = useState(false);
+
+    const [connected, setConnected] = useState(false);
+
+    const savingRef = useRef(false);
 
     const [header, setHeader] =
         useState<MaterialIssueHeaderValues>(
@@ -93,6 +137,10 @@ export function MaterialIssueWorkspace() {
     const [editingId, setEditingId] =
         useState<string | null>(null);
 
+    const [editingVersion, setEditingVersion] = useState<string | null>(null);
+    const [documentNo, setDocumentNo] = useState("");
+    const [baselineDocumentNo, setBaselineDocumentNo] = useState("");
+
     const [viewRecordId, setViewRecordId] =
         useState<string | null>(null);
 
@@ -111,10 +159,149 @@ export function MaterialIssueWorkspace() {
         );
 
     const nextRowId = useRef(4);
+    useEffect(() => {
+        const controller = new AbortController();
 
-    const nextDocumentNo = useRef(
-        MOCK_MATERIAL_ISSUE_HISTORY.length + 1,
-    );
+        async function loadRecords() {
+            try {
+                const response = await fetch(
+                    "/api/material-issues",
+                    {
+                        cache: "no-store",
+                        signal: controller.signal,
+                    },
+                );
+
+                const data = await readApiData(
+                    response,
+                    (value): value is MaterialIssueRecord[] => Array.isArray(value) && value.every(isMaterialIssueRecord),
+                    "โหลดประวัติไม่สำเร็จ",
+                );
+
+                if (!controller.signal.aborted) {
+                    setRecords(data);
+                    setConnected(true);
+                }
+            } catch (error: unknown) {
+                if (controller.signal.aborted) return;
+
+                setConnected(false);
+
+                setError(
+                    error instanceof Error
+                        ? error.message
+                        : "โหลดประวัติไม่สำเร็จ",
+                );
+            }
+        }
+
+        void loadRecords();
+
+        return () => controller.abort();
+    }, []);
+
+
+    async function handleSave(): Promise<void> {
+        if (savingRef.current) return;
+
+        clearMessages();
+        const requiredFields = [
+            { label: "เลขที่เอกสาร", value: documentNo },
+            { label: "วันที่", value: header.issueDate },
+            { label: "สถานที่", value: header.location },
+            { label: "ชื่อผลิตภัณฑ์", value: header.productName },
+            { label: "จำนวน", value: header.quantity },
+            { label: "ฝ่าย", value: header.department },
+        ];
+
+        const missingFields = requiredFields.filter(
+            (field) => !field.value.trim(),
+        );
+
+        if (missingFields.length > 0) {
+            setError(
+                `กรุณากรอกข้อมูลให้ครบถ้วน: ${missingFields
+                    .map((field) => field.label)
+                    .join(", ")}`,
+            );
+
+            return;
+        }
+
+        if (
+            !Number.isFinite(Number(header.quantity)) ||
+            Number(header.quantity) <= 0
+        ) {
+            setError("จำนวนผลิตภัณฑ์ต้องมากกว่า 0");
+            return;
+        }
+
+        if (!connected) {
+            setError("กรุณาโหลดข้อมูลจากระบบให้สำเร็จก่อนบันทึก");
+            return;
+        }
+
+        if (editingId && !editingVersion) {
+            setError("กรุณาเปิดเอกสารใหม่ก่อนแก้ไข");
+            return;
+        }
+
+        savingRef.current = true;
+        setSaving(true);
+
+        try {
+            const csrfToken = await getCsrfToken();
+            const response = await fetch(
+                editingId ? `/api/material-issues?id=${encodeURIComponent(editingId)}` : "/api/material-issues",
+                {
+                    method: editingId ? "PUT" : "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-csrf-token": csrfToken,
+                    },
+                    body: JSON.stringify({
+                        documentNo: documentNo.trim(),
+                        header,
+                        items,
+                        signers,
+                        ...(editingId ? { version: editingVersion } : {}),
+                    }),
+                },
+            );
+
+            const record = await readApiData(
+                response,
+                (value): value is MaterialIssueRecord => isMaterialIssueRecord(value) && (!editingId || value.id === editingId),
+                "บันทึกเอกสารไม่สำเร็จ",
+            );
+
+            setRecords((previous) => [
+                record,
+                ...previous.filter(
+                    (entry) => entry.id !== record.id,
+                ),
+            ]);
+
+            resetForm();
+
+            setConnected(true);
+
+            setMessage(
+                editingId ? "แก้ไขใบเบิกจ่ายวัสดุสำเร็จ" : "บันทึกใบเบิกจ่ายวัสดุสำเร็จ",
+            );
+
+            setTab("history");
+        } catch (error: unknown) {
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "บันทึกเอกสารไม่สำเร็จ",
+            );
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
+        }
+    }
 
     const currentDraft: MaterialIssueDraft = {
         header,
@@ -123,7 +310,8 @@ export function MaterialIssueWorkspace() {
     };
 
     const hasUnsavedChanges =
-        JSON.stringify(currentDraft) !== baseline;
+        JSON.stringify(currentDraft) !== baseline ||
+        documentNo !== baselineDocumentNo;
 
     const editingRecord = records.find(
         (record) => record.id === editingId,
@@ -146,6 +334,8 @@ export function MaterialIssueWorkspace() {
         field: keyof MaterialIssueHeaderValues,
         value: string,
     ): void {
+        if (savingRef.current) return;
+
         setHeader((previous) => ({
             ...previous,
             [field]: value,
@@ -166,6 +356,8 @@ export function MaterialIssueWorkspace() {
         >,
         value: string,
     ): void {
+        if (savingRef.current) return;
+
         setItems((previous) =>
             previous.map((item) =>
                 item.id === id
@@ -181,6 +373,8 @@ export function MaterialIssueWorkspace() {
     }
 
     function handleAddItem(): void {
+        if (savingRef.current) return;
+
         const id = `row-${nextRowId.current}`;
 
         nextRowId.current += 1;
@@ -196,6 +390,8 @@ export function MaterialIssueWorkspace() {
     function handleRemoveItem(
         id: string,
     ): void {
+        if (savingRef.current) return;
+
         setItems((previous) => {
             if (previous.length <= 1) {
                 return previous;
@@ -217,6 +413,8 @@ export function MaterialIssueWorkspace() {
         field: keyof MaterialIssueSignersValues,
         value: string,
     ): void {
+        if (savingRef.current) return;
+
         setSigners((previous) => ({
             ...previous,
             [field]: value,
@@ -238,6 +436,9 @@ export function MaterialIssueWorkspace() {
         setSigners(draft.signers);
 
         setEditingId(null);
+        setEditingVersion(null);
+        setDocumentNo("");
+        setBaselineDocumentNo("");
 
         setBaseline(JSON.stringify(draft));
 
@@ -272,6 +473,9 @@ export function MaterialIssueWorkspace() {
         setSigners(draft.signers);
 
         setEditingId(record.id);
+        setEditingVersion(record.version);
+        setDocumentNo(record.documentNo);
+        setBaselineDocumentNo(record.documentNo);
 
         setBaseline(JSON.stringify(draft));
 
@@ -295,6 +499,8 @@ export function MaterialIssueWorkspace() {
     }
 
     function requestNewDocument(): void {
+        if (savingRef.current) return;
+
         if (hasUnsavedChanges) {
             setPendingAction({
                 type: "new",
@@ -306,22 +512,30 @@ export function MaterialIssueWorkspace() {
         resetForm();
     }
 
-    function handleEditRecord(
-        record: MaterialIssueRecord,
-    ): void {
-        if (hasUnsavedChanges) {
-            setPendingAction({
-                type: "edit",
-                record,
-            });
-
-            return;
+    async function handleEditRecord(record: MaterialIssueRecord): Promise<void> {
+        if (savingRef.current) return;
+        clearMessages();
+        savingRef.current = true;
+        setSaving(true);
+        try {
+            const latest = await fetchRecord(record.id);
+            setRecords((previous) => previous.map((entry) => entry.id === latest.id ? latest : entry));
+            if (hasUnsavedChanges) {
+                setPendingAction({ type: "edit", record: latest });
+                return;
+            }
+            openRecord(latest);
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : "เปิดเอกสารไม่สำเร็จ");
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
         }
-
-        openRecord(record);
     }
 
     function confirmPendingAction(): void {
+        if (savingRef.current) return;
+
         if (!pendingAction) return;
 
         if (pendingAction.type === "new") {
@@ -334,176 +548,57 @@ export function MaterialIssueWorkspace() {
     }
 
     /* ==============================
-       Save Mock Document
-    ============================== */
-
-    function handleSave(): void {
-        clearMessages();
-
-        const validItems = items.filter(
-            hasMaterialIssueItemData,
-        );
-
-        if (!header.location.trim()) {
-            setError("กรุณาเลือกสถานที่");
-            return;
-        }
-
-        if (!header.productName.trim()) {
-            setError("กรุณาเลือกชื่อผลิตภัณฑ์");
-            return;
-        }
-
-        if (!header.issueDate.trim()) {
-            setError("กรุณาระบุวันที่");
-            return;
-        }
-
-        if (validItems.length === 0) {
-            setError(
-                "กรุณาระบุรายการวัสดุอย่างน้อย 1 รายการ",
-            );
-
-            return;
-        }
-
-        const incompleteItem =
-            validItems.find(
-                (item) =>
-                    !item.materialCode.trim() ||
-                    !item.materialName.trim() ||
-                    !item.unit.trim() ||
-                    !item.quantity.trim() ||
-                    !Number.isFinite(
-                        Number(item.quantity),
-                    ) ||
-                    Number(item.quantity) <= 0,
-            );
-
-        if (incompleteItem) {
-            setError(
-                "กรุณาระบุรหัสวัสดุ รายการวัสดุ หน่วย และจำนวนที่มากกว่า 0 ให้ครบ",
-            );
-
-            return;
-        }
-
-        const existingRecord = records.find(
-            (record) => record.id === editingId,
-        );
-
-        if (editingId && !existingRecord) {
-            setError(
-                "ไม่พบเอกสารที่ต้องการแก้ไข",
-            );
-
-            return;
-        }
-
-        let documentNo: string;
-
-        if (existingRecord) {
-            documentNo =
-                existingRecord.documentNo;
-        } else {
-            documentNo = `MI-DEMO-${String(
-                nextDocumentNo.current,
-            ).padStart(4, "0")}`;
-
-            nextDocumentNo.current += 1;
-        }
-
-        const savedRecord: MaterialIssueRecord = {
-            id:
-                existingRecord?.id ??
-                `material-issue-${documentNo}`,
-
-            documentNo,
-
-            header: {
-                ...header,
-            },
-
-            items: validItems.map((item) => ({
-                ...item,
-            })),
-
-            signers: {
-                ...signers,
-            },
-        };
-
-        setRecords((previous) => {
-            if (existingRecord) {
-                return previous.map((record) =>
-                    record.id === savedRecord.id
-                        ? savedRecord
-                        : record,
-                );
-            }
-
-            return [
-                savedRecord,
-                ...previous,
-            ];
-        });
-
-        setItems(savedRecord.items);
-        setEditingId(savedRecord.id);
-
-        setBaseline(
-            JSON.stringify({
-                header: savedRecord.header,
-                items: savedRecord.items,
-                signers: savedRecord.signers,
-            }),
-        );
-
-        setMessage(
-            `บันทึกข้อมูลตัวอย่าง ${documentNo} สำเร็จ ยังไม่ได้บันทึกลงฐานข้อมูลจริง`,
-        );
-
-        setTab("history");
-    }
-
-    /* ==============================
        History Actions
     ============================== */
 
-    function handleDeleteRecord(
-        record: MaterialIssueRecord,
-    ): void {
-        if (
-            editingId === record.id &&
-            hasUnsavedChanges
-        ) {
-            setError(
-                "เอกสารนี้กำลังแก้ไขและยังไม่ได้บันทึก กรุณาบันทึกหรือเริ่มเอกสารใหม่ก่อนลบ",
-            );
+    async function handleViewRecord(record: MaterialIssueRecord): Promise<void> {
+        if (savingRef.current) return;
+        clearMessages();
+        savingRef.current = true;
+        setSaving(true);
+        try {
+            const latest = await fetchRecord(record.id);
+            setRecords((previous) => previous.map((entry) => entry.id === latest.id ? latest : entry));
+            setViewRecordId(latest.id);
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : "โหลดรายละเอียดไม่สำเร็จ");
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
+        }
+    }
 
+    async function handleDeleteRecord(record: MaterialIssueRecord): Promise<void> {
+        if (savingRef.current) return;
+        clearMessages();
+        if (editingId === record.id && hasUnsavedChanges) {
+            setError("กรุณายกเลิกข้อมูลที่กำลังแก้ไขก่อนลบเอกสาร");
             return;
         }
-
-        setRecords((previous) =>
-            previous.filter(
-                (item) => item.id !== record.id,
-            ),
-        );
-
-        if (editingId === record.id) {
-            resetForm();
+        savingRef.current = true;
+        setSaving(true);
+        try {
+            const csrfToken = await getCsrfToken();
+            const response = await fetch(`/api/material-issues?id=${encodeURIComponent(record.id)}`, {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-csrf-token": csrfToken,
+                },
+                body: JSON.stringify({ version: record.version }),
+            });
+            await readApiData(response, (value): value is { id: string } => isObject(value) && value.id === record.id, "ลบเอกสารไม่สำเร็จ");
+            setRecords((previous) => previous.filter((entry) => entry.id !== record.id));
+            if (viewRecordId === record.id) setViewRecordId(null);
+            if (editingId === record.id) resetForm();
             setTab("history");
+            setMessage("ลบใบเบิกจ่ายวัสดุสำเร็จ");
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
         }
-
-        if (viewRecordId === record.id) {
-            setViewRecordId(null);
-        }
-
-        setError("");
-
-        setMessage(
-            `ลบข้อมูลตัวอย่าง ${record.documentNo} แล้ว`,
-        );
     }
 
     return (
@@ -514,7 +609,9 @@ export function MaterialIssueWorkspace() {
                 title="ใบเบิกจ่ายวัสดุ"
                 actions={
                     <StatusBadge tone="info">
-                        UI MOCK · ไม่เชื่อมระบบจริง
+                        {connected
+                            ? "เชื่อมต่อฐานข้อมูลแล้ว"
+                            : "ยังไม่เชื่อมต่อฐานข้อมูล"}
                     </StatusBadge>
                 }
             />
@@ -522,7 +619,9 @@ export function MaterialIssueWorkspace() {
             {/* Tabs */}
             <Tabs
                 value={tab}
-                onValueChange={setTab}
+                onValueChange={(value) => {
+                    if (!savingRef.current) setTab(value);
+                }}
                 className="min-w-0"
             >
                 <div className="max-w-full overflow-x-auto">
@@ -593,6 +692,12 @@ export function MaterialIssueWorkspace() {
 
                         {/* ฟอร์มเดิม */}
                         <MaterialIssueHeader
+                            documentNo={documentNo}
+                            onDocumentNoChange={(value) => {
+                                if (savingRef.current) return;
+                                setDocumentNo(value);
+                                clearMessages();
+                            }}
                             values={header}
                             onChange={
                                 handleHeaderChange
@@ -618,9 +723,10 @@ export function MaterialIssueWorkspace() {
                             <Button
                                 type="button"
                                 onClick={handleSave}
+                                disabled={saving}
                             >
                                 <Save className="size-4" />
-                                บันทึก
+                                {saving ? "กำลังบันทึก..." : "บันทึก"}
                             </Button>
                         </div>
                     </div>
@@ -636,9 +742,7 @@ export function MaterialIssueWorkspace() {
                 >
                     <MaterialIssueHistory
                         records={records}
-                        onView={(record) =>
-                            setViewRecordId(record.id)
-                        }
+                        onView={handleViewRecord}
                         onEdit={handleEditRecord}
                         onDelete={handleDeleteRecord}
                     />

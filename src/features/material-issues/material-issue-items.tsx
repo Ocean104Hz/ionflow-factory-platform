@@ -19,7 +19,7 @@ import {
 import { MaterialIssueStockPickerModal } from "./material-issue-stock-picker-modal";
 
 import type { MaterialIssueItem } from "./material-issue-domain";
-import type { MaterialIssueStockItem } from "./material-issue-stock.mock";
+import type { MaterialIssueStockItem } from "./material-issue-domain";
 
 type EditableItemField = Exclude<
   keyof MaterialIssueItem,
