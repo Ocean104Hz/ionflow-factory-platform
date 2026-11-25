@@ -12,6 +12,9 @@ import { PackagingProvider } from "@/src/features/packaging-reports/packaging-pr
 import { ProductionFlowProvider } from "@/src/features/production-flow/production-flow-provider";
 import { requireAuthenticatedFactoryUser } from "@/src/server/auth/server-auth";
 
+// The layout checks the session before rendering the protected workspace.
+export const instant = false;
+
 export default function FactoryLayout({
   children,
 }: {
