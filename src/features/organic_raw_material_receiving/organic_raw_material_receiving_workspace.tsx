@@ -1,5 +1,6 @@
 "use client";
 
+import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use-organic-documents";
 import { useRef, useState } from "react";
 
 import { Button } from "@/src/components/ui/button";
@@ -23,17 +24,13 @@ import {
 
 import {
   PageHeader,
-  StatusBadge,
 } from "@/src/components/factory/patterns";
 
-import { demoOrganicRawMaterialReceivingSheets } from "@/src/lib/mock-data/organic-raw-material-receiving";
 
 import {
   ORGANIC_RAW_MATERIAL_FORM_TITLE,
   blankOrganicRawMaterialSheet,
-  saveOrganicRawMaterialSheet,
   validateOrganicRawMaterialSheet,
-  deleteOrganicRawMaterialSheet,
   type OrganicRawMaterialReceivingSheet,
   type OrganicRawMaterialErrors,
 } from "./organic_raw_material_receiving_domain";
@@ -58,10 +55,8 @@ type ActiveView = {
 export function OrganicRawMaterialReceivingWorkspace() {
   /* ---------------- document state ---------------- */
 
-  const [records, setRecords] = useState<
-    OrganicRawMaterialReceivingSheet[]
-  >(() => structuredClone(demoOrganicRawMaterialReceivingSheets));
-
+  const documents = useOrganicDocuments<OrganicRawMaterialReceivingSheet>("organic_raw_material_receiving");
+  const { records, busy, loading, loadError } = documents;
   const [draft, setDraft] =
     useState<OrganicRawMaterialReceivingSheet>(() =>
       blankOrganicRawMaterialSheet(),
@@ -137,7 +132,8 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
   /* ---------------- save ---------------- */
 
-  function handleSave() {
+  async function handleSave() {
+    if (busy || loading || loadError) return;
     const validationErrors = validateOrganicRawMaterialSheet(draft);
 
     setErrors(validationErrors);
@@ -154,23 +150,16 @@ export function OrganicRawMaterialReceivingWorkspace() {
     }
 
     try {
-      const result = saveOrganicRawMaterialSheet(
-        records,
-        draft,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
+      const saved = await documents.save(draft);
+      setDraft(saved);
 
-      setRecords(result.records);
-      setDraft(result.saved);
-
-      setBaseline(JSON.stringify(result.saved));
+      setBaseline(JSON.stringify(saved));
 
       setErrors({});
 
       setMessageKind("success");
       setMessage(
-        "บันทึกข้อมูลจำลองเรียบร้อยแล้ว",
+        "บันทึกเอกสารเรียบร้อยแล้ว",
       );
 
       setTab("history");
@@ -211,16 +200,20 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
   /* ---------------- delete ---------------- */
 
-  function handleDeleteConfirm() {
-    if (!deleteSheet) {
+  async function handleDeleteConfirm() {
+    if (!deleteSheet || busy || loading || loadError) {
       return;
     }
 
     const deletedId = deleteSheet.id;
 
-    setRecords((current) =>
-      deleteOrganicRawMaterialSheet(current, deletedId),
-    );
+    try {
+      await documents.remove(deleteSheet);
+    } catch (error) {
+      setMessageKind("error");
+      setMessage(error instanceof Error ? error.message : "ไม่สามารถลบเอกสารได้");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = blankOrganicRawMaterialSheet();
@@ -239,7 +232,7 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
     setMessageKind("success");
     setMessage(
-      "ลบข้อมูลจำลองเรียบร้อยแล้ว",
+      "ลบเอกสารออกจากประวัติแล้ว",
     );
   }
 
@@ -247,16 +240,12 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
   return (
     <div className="min-w-0 space-y-5">
+      <OrganicLoadStatus {...documents} />
       {/* Page Header */}
 
       <PageHeader
         title={ORGANIC_RAW_MATERIAL_FORM_TITLE}
         description="ตรวจรับและบันทึกวัตถุดิบประจำวัน"
-        actions={
-          <StatusBadge tone="info">
-            UI MOCK · ไม่เชื่อมระบบจริง
-          </StatusBadge>
-        }
       />
 
       {/* Tabs */}
@@ -345,16 +334,18 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
           {/* Form Component */}
 
-          <OrganicRawMaterialReceivingForm
-            sheet={draft}
-            errors={errors}
-            onChange={(nextSheet) => {
-              setDraft(nextSheet);
-              setMessage("");
-            }}
-            onSave={handleSave}
-            onReset={handleNew}
-          />
+          <fieldset disabled={busy || loading || Boolean(loadError)} className="min-w-0">
+            <OrganicRawMaterialReceivingForm
+              sheet={draft}
+              errors={errors}
+              onChange={(nextSheet) => {
+                setDraft(nextSheet);
+                setMessage("");
+              }}
+              onSave={handleSave}
+              onReset={handleNew}
+            />
+          </fieldset>
         </TabsContent>
 
         {/* History Tab */}
@@ -435,7 +426,7 @@ export function OrganicRawMaterialReceivingWorkspace() {
             </AlertDialogTitle>
 
             <AlertDialogDescription>
-              ข้อมูลนี้จะถูกลบออกจากรายการจำลอง
+              เอกสารนี้จะไม่แสดงในประวัติ
               และไม่สามารถเรียกคืนจากสถานะปัจจุบันได้
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -446,7 +437,7 @@ export function OrganicRawMaterialReceivingWorkspace() {
             </AlertDialogCancel>
 
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
+              disabled={busy || loading || Boolean(loadError)} onClick={() => void handleDeleteConfirm()}
             >
               ยืนยันการลบ
             </AlertDialogAction>

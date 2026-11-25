@@ -21,7 +21,7 @@ export function MasterSelect({
   filter?: (id: string) => boolean;
   optional?: boolean;
 }) {
-  const { state } = useMasterData();
+  const { state, loading, loadError } = useMasterData();
   const rows = choices(state, kind).filter((r) => !filter || filter(r.id));
   const match =
     reference && reference.value === value
@@ -60,7 +60,7 @@ export function MasterSelect({
         options={[
           {
             value: "__none",
-            label: optional ? "ไม่ระบุ / เลือกข้อมูล" : "เลือกข้อมูล",
+            label: loading ? "กำลังโหลดข้อมูลหลัก…" : optional ? "ไม่ระบุ / เลือกข้อมูล" : "เลือกข้อมูล",
           },
           ...(stale
             ? [{ value: "__existing", label: `${value} (ค่าเดิม)` }]
@@ -68,6 +68,7 @@ export function MasterSelect({
           ...rows.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}` })),
         ]}
       />
+      {loadError && <p role="alert" className="text-xs text-destructive">{loadError}</p>}
       {stale && (
         <p className="text-xs text-muted-foreground">
           เก็บค่าเดิมไว้ · อาจเปลี่ยนชื่อ ปิดใช้งาน หรือยังไม่จับคู่

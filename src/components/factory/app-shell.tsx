@@ -195,7 +195,7 @@ function FactoryShell({
             </Alert>
           )}
           {children}
-          {!isSettingsPage && <FactoryFooter />}
+          {!isSettingsPage && <FactoryFooter live={current?.group === "ORGANIC"} />}
         </div>
       </SidebarInset>
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   MasterRow,
   MasterState,
@@ -9,14 +9,14 @@ import type {
 type Snapshot = {
   rows: MasterRow[];
   versions: Record<string, string>;
+  personnel: MasterState["personnel"];
 };
 
-const endpoint = "http://127.0.0.1:4317/masters";
-
-export function useSettingsPostgres() {
+function useSettingsStore() {
   const [snapshot, setSnapshot] = useState<Snapshot>({
     rows: [],
     versions: {},
+    personnel: [],
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -30,27 +30,31 @@ export function useSettingsPostgres() {
     let response: Response;
 
     try {
-      response = await fetch(endpoint, {
+      const headers = body ? {
+        "Content-Type": "application/json",
+        "x-csrf-token": await readFactoryCsrfToken(),
+      } : undefined;
+      response = await fetch("/api/settings/masters", {
         method,
         cache: "no-store",
-        credentials: "omit",
-        headers: body ? { "Content-Type": "application/json" } : undefined,
+        credentials: "same-origin",
+        headers,
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(10000),
       });
     } catch {
       throw new Error(
-        "เชื่อมต่อ Local Settings API ไม่ได้ โปรดตรวจ server และ write role",
+        "เชื่อมต่อระบบตั้งค่าไม่สำเร็จ กรุณาลองใหม่",
       );
     }
 
-    const result = await response.json();
+    const result = await response.json().catch(() => null);
 
-    if (!response.ok || result.ok !== true) {
-      throw new Error(result.error || "Settings PostgreSQL ไม่พร้อมใช้งาน");
+    if (!response.ok || result?.ok !== true) {
+      throw new Error(result?.error || result?.message || "Settings PostgreSQL ไม่พร้อมใช้งาน");
     }
 
-    if (!Array.isArray(result.data?.rows) || !result.data.versions) {
+    if (!Array.isArray(result.data?.rows) || !result.data.versions || !Array.isArray(result.data.personnel)) {
       throw new Error("ข้อมูล Settings ตอบกลับไม่ถูกต้อง");
     }
 
@@ -87,7 +91,7 @@ export function useSettingsPostgres() {
 
   const state: MasterState = {
     rows: snapshot.rows,
-    personnel: [],
+    personnel: snapshot.personnel,
     used: [],
   };
 
@@ -126,10 +130,31 @@ export function useSettingsPostgres() {
     },
 
     async remove(id: string): Promise<void> {
-      // Preserve the caller contract.
-      // The local server currently rejects DELETE requests.
       void id;
-      await request("DELETE");
+      throw new Error("กรุณาปิดใช้งานข้อมูลหลักเพื่อเก็บการอ้างอิงของเอกสารเดิม");
     },
   };
+}
+
+const SettingsContext = createContext<ReturnType<typeof useSettingsStore> | null>(null);
+
+export function SettingsPostgresProvider({ children }: { children: ReactNode }) {
+  const store = useSettingsStore();
+  return createElement(SettingsContext.Provider, { value: store }, children);
+}
+
+export function useSettingsPostgres() {
+  const store = useContext(SettingsContext);
+  if (!store) throw new Error("SettingsPostgresProvider is required");
+  return store;
+}
+
+export async function readFactoryCsrfToken(): Promise<string> {
+  const prefix = "ionflow_factory_csrf=";
+  const token = document.cookie.split("; ").find((part) => part.startsWith(prefix))?.slice(prefix.length);
+  if (token) return decodeURIComponent(token);
+  const response = await fetch("/api/auth/csrf", { cache: "no-store", credentials: "same-origin" });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || typeof body?.csrfToken !== "string") throw new Error("เริ่มคำขอบันทึกไม่สำเร็จ");
+  return body.csrfToken;
 }

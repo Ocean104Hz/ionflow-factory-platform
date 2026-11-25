@@ -44,6 +44,7 @@ export function BOMMasterDetail({
   const { state, removeMaster } = useBOM();
   const [error, setError] = useState("");
   const formulas = state.formulas.filter((f) => f.masterId === master.id);
+  const fromSettings = master.id.startsWith("settings-");
   const columns: Column<Formula>[] = [
     {
       key: "code",
@@ -89,12 +90,12 @@ export function BOMMasterDetail({
     <div className="space-y-5">
       <SectionCard
         title={`${master.code} · ${master.name}`}
-        action={
+        action={fromSettings ? undefined : (
           <Button variant="outline" onClick={onEdit}>
             <Pencil />
             แก้ไขข้อมูลหลัก
           </Button>
-        }
+        )}
       >
         <InfoGrid>
           {[
@@ -118,6 +119,7 @@ export function BOMMasterDetail({
         <p className="mt-5 text-sm whitespace-pre-wrap">
           หมายเหตุ: {master.notes || "—"}
         </p>
+        {fromSettings && <p className="mt-2 text-sm text-muted-foreground">แก้ไขวัตถุดิบนี้ได้ที่ทะเบียนวัตถุดิบในตั้งค่าระบบ</p>}
       </SectionCard>
       <SectionCard
         title={`สูตรที่เชื่อมโยง (${formulas.length})`}
@@ -147,7 +149,7 @@ export function BOMMasterDetail({
           {error}
         </p>
       )}
-      <ConfirmDialog
+      {!fromSettings && <ConfirmDialog
         title="ลบข้อมูลหลักนี้?"
         description="จะลบได้เฉพาะรายการที่ไม่มีสูตรและไม่ถูกใช้เป็นส่วนประกอบ ไม่มีการลบสูตรแบบต่อเนื่อง"
         trigger={
@@ -156,15 +158,15 @@ export function BOMMasterDetail({
             ลบข้อมูลหลัก
           </Button>
         }
-        onConfirm={() => {
+        onConfirm={async () => {
           try {
-            removeMaster(master.id);
+            await removeMaster(master.id);
             onDeleted();
           } catch (e) {
             setError(e instanceof Error ? e.message : "ลบไม่ได้");
           }
         }}
-      />
+      />}
     </div>
   );
 }
@@ -182,9 +184,9 @@ export function BOMFormulaDetail({
 }) {
   const { state, setDefault, removeFormula } = useBOM();
   const [error, setError] = useState("");
-  function run(action: () => void) {
+  async function run(action: () => Promise<unknown>) {
     try {
-      action();
+      await action();
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "ทำรายการไม่ได้");
@@ -282,7 +284,7 @@ export function BOMFormulaDetail({
       </SectionCard>
       {materials(formula.ingredients, "ส่วนประกอบวัตถุดิบ")}
       {materials(formula.packaging, "ส่วนประกอบบรรจุภัณฑ์")}
-      <SectionCard title="ประวัติการเปลี่ยนแปลง (สาธิต)">
+      <SectionCard title="ประวัติการเปลี่ยนแปลง">
         <ol className="space-y-3">
           {formula.history.map((event, i) => (
             <li
@@ -326,7 +328,7 @@ export function BOMFormulaDetail({
           )}
           <ConfirmDialog
             title="ลบสูตรนี้?"
-            description={`สูตร ${formula.code} ${formula.version} จะถูกลบจากข้อมูลสาธิต หากเป็นค่าเริ่มต้นต้องยกเลิกค่าเริ่มต้นก่อน`}
+            description={`สูตร ${formula.code} ${formula.version} จะถูกลบ หากเป็นค่าเริ่มต้นต้องยกเลิกค่าเริ่มต้นก่อน`}
             trigger={
               <Button variant="outline" className="text-danger">
                 <Trash2 />
@@ -334,8 +336,8 @@ export function BOMFormulaDetail({
               </Button>
             }
             onConfirm={() =>
-              run(() => {
-                removeFormula(formula.id);
+              run(async () => {
+                await removeFormula(formula.id);
                 onBack();
               })
             }

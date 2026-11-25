@@ -113,7 +113,7 @@ export function EffervescentMaterialLedgerForm({
     >
       <SectionCard
         title="ข้อมูลแบบบันทึก"
-        subtitle="แบบบันทึกการรับ - จ่าย วัตถุดิบเม็ดฟู่ (ข้อมูลจำลอง)"
+        subtitle="แบบบันทึกการรับ - จ่าย วัตถุดิบเม็ดฟู่"
       >
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -342,7 +342,7 @@ export function EffervescentMaterialLedgerForm({
           {sheet.id ? "ยกเลิกการแก้ไข / เริ่มใหม่" : "ล้างข้อมูล"}
         </Button>
         <Button type="submit">
-          {sheet.id ? "บันทึกการแก้ไข (Mock)" : "บันทึกข้อมูล (Mock)"}
+          {sheet.id ? "บันทึกการแก้ไข" : "บันทึกข้อมูล"}
         </Button>
       </div>
     </form>

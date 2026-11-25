@@ -143,7 +143,7 @@ export function OrganicExtractionTemperatureHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติใบบันทึกการใช้วัตถุสกัด/อุณหภูมิในการผลิต"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสารจำลอง`}
+        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
         <form
           className="space-y-4"

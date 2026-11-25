@@ -7,7 +7,8 @@ import {
   FileText,
   History,
 } from "lucide-react";
-import { SectionCard } from "@/src/components/factory/patterns";
+import { FactoryDataTable, SectionCard, SelectField } from "@/src/components/factory/patterns";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
@@ -27,6 +28,9 @@ import {
   type ReceiptGroupV1,
 } from "./production-receipt-v1-types";
 import { ProductionReceiptV1Table } from "./production-receipt-v1-table";
+import { productionRequest, useProductionV1Data } from "../production-flow/production-v1-client";
+
+type SavedReceipt = ReceiptDocumentV1 & { id: string; orderId: string; createdAt: string };
 
 function Field({
   label,
@@ -64,9 +68,34 @@ function Field({
 export function ProductionReceiptV1Workspace() {
   const [tab, setTab] = useState<"form" | "history">("form");
   const [doc, setDoc] = useState<ReceiptDocumentV1>(newReceiptDocumentV1);
+  const [orderId, setOrderId] = useState("none");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [view, setView] = useState<SavedReceipt | null>(null);
+  const { data, loading, error, refresh } = useProductionV1Data<{
+    documents: SavedReceipt[];
+    orders: { id: string; documentNumber: string; location: string }[];
+  }>("receipt");
 
   function updateDocument(patch: Partial<ReceiptDocumentV1>) {
     setDoc((current) => ({ ...current, ...patch }));
+  }
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setSaveError("");
+    setNotice("");
+    try {
+      const result = await productionRequest<SavedReceipt>("receipt", { action: "save", row: { ...doc, orderId } });
+      setNotice(`บันทึก ${result.documentNumber} แล้ว`);
+      setDoc(newReceiptDocumentV1());
+      setOrderId("none");
+      setTab("history");
+      refresh();
+    } catch (issue) { setSaveError(issue instanceof Error ? issue.message : "บันทึกใบรับยอดผลิตไม่สำเร็จ"); }
+    finally { setSaving(false); }
   }
 
   const {
@@ -136,10 +165,10 @@ export function ProductionReceiptV1Workspace() {
             Production Receipt · รูปแบบเอกสาร iTECH
           </p>
         </div>
-        <span className="rounded-full border border-border bg-muted/30 px-3 py-1.5 text-xs font-medium">
-          UI DRAFT
-        </span>
       </div>
+      {notice && <p role="status">{notice}</p>}
+      {saveError && <p role="alert" className="text-danger">{saveError}</p>}
+      {error && <div><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
 
       <Tabs
         value={tab}
@@ -184,20 +213,26 @@ export function ProductionReceiptV1Workspace() {
                 label="เอกสารเลขที่"
                 value={doc.documentNumber}
                 readOnly
-                placeholder="รอเชื่อมระบบสร้างเลขเอกสาร"
+                placeholder="ระบบออกเลขเมื่อบันทึก"
               />
             </div>
           </SectionCard>
 
           <SectionCard
             title="เอกสารอ้างอิง"
-            subtitle="เตรียมเชื่อมกับใบสั่งผลิตสินค้า V1 ของ iTECH"
+            subtitle="เลือกจากใบสั่งผลิต V1 ที่บันทึกแล้ว"
           >
-            <Field
+            <SelectField
               label="ใบสั่งผลิตที่อ้างอิง"
-              value={doc.productionOrderNumber}
-              readOnly
-              placeholder="ยังไม่ได้เชื่อมใบสั่งผลิต"
+              value={orderId}
+              options={[{ value: "none", label: loading ? "กำลังโหลด…" : "เลือกใบสั่งผลิต" }, ...(data?.orders ?? []).map((row) => ({
+                value: row.id, label: `${row.documentNumber} · ${row.location}`,
+              }))]}
+              onChange={(id) => {
+                setOrderId(id);
+                const row = data?.orders.find((order) => order.id === id);
+                updateDocument({ productionOrderNumber: row?.documentNumber ?? "", ...(row && { location: row.location }) });
+              }}
             />
           </SectionCard>
 
@@ -345,30 +380,52 @@ export function ProductionReceiptV1Workspace() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <AlertCircle aria-hidden="true" className="size-4" />
-              หน้านี้ยังไม่บันทึกข้อมูลจริง
+              บันทึกเอกสารรับยอดผลิต โดยยังไม่ลงสต็อก
             </p>
-            <Button type="button" disabled>
+            <Button type="button" disabled={saving || loading || unitsLoading || Boolean(unitsError)} onClick={() => void save()}>
               <FileText aria-hidden="true" className="size-4" />
-              บันทึก (รอเชื่อม PostgreSQL)
+              {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </div>
         </TabsContent>
 
         <TabsContent value="history">
           <SectionCard title="ประวัติใบรับยอดผลิต V1">
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-              <History
-                aria-hidden="true"
-                className="size-8 text-muted-foreground"
-              />
-              <p className="font-medium">ยังไม่มีประวัติใบรับยอดผลิต V1</p>
-              <p className="text-sm text-muted-foreground">
-                ตารางประวัติจะเปิดใช้งานเมื่อมีระบบบันทึกข้อมูล V1
-              </p>
-            </div>
+            <FactoryDataTable rows={data?.documents ?? []} rowKey={(row) => row.id} state={loading ? "loading" : "normal"} minWidth={720}
+              columns={[
+                { key: "number", label: "เลขที่เอกสาร", render: (row) => row.documentNumber },
+                { key: "date", label: "วันที่", render: (row) => row.documentDate },
+                { key: "location", label: "สถานที่", render: (row) => row.location },
+                { key: "order", label: "ใบสั่งผลิต", render: (row) => row.productionOrderNumber },
+                { key: "action", label: "จัดการ", render: (row) => <Button variant="outline" size="sm" onClick={() => setView(row)}>ดูรายละเอียด</Button> },
+              ]}
+            />
           </SectionCard>
         </TabsContent>
       </Tabs>
+      <Dialog open={view !== null} onOpenChange={(open) => { if (!open) setView(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader><DialogTitle>{view?.documentNumber}</DialogTitle>
+            <DialogDescription>อ้างอิง {view?.productionOrderNumber} · {view?.location} · {view?.documentDate}</DialogDescription>
+          </DialogHeader>
+          {view && <>
+            {([["P1", view.p1Items], ["P2", view.p2Items], ["ปั้นเม็ด", view.moldingItems]] as const).map(([label, rows]) => (
+              <section key={label}><h3 className="mb-2 font-semibold">{label}</h3>
+                <FactoryDataTable rows={rows} rowKey={(row) => row.id} minWidth={640}
+                  columns={[
+                    { key: "name", label: "รายการ", render: (row) => row.name },
+                    { key: "size", label: "ขนาด (กก.)", render: (row) => row.sizeKg || "—" },
+                    { key: "quantity", label: "จำนวน / หน่วย", render: (row) => `${row.quantity} ${row.unit}` },
+                    { key: "lot", label: "Lot", render: (row) => row.lot || "—" },
+                    { key: "note", label: "หมายเหตุ", render: (row) => row.note || "—" },
+                  ]} />
+              </section>
+            ))}
+            <p>เจ้าหน้าที่คลัง {view.warehouseOfficer || "—"} · ผู้ตรวจสอบ {view.inspector || "—"}</p>
+            {view.note && <p>หมายเหตุ {view.note}</p>}
+          </>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

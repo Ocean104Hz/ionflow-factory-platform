@@ -18,7 +18,7 @@ export type PurchaseOrder = {
   currency_code: string; vat_type: "NON_VAT" | "VAT_EXCLUDED" | "VAT_INCLUDED";
   payment_term: string; credit_days: string; expected_delivery_date: string;
   request_ref_id: string; request_ref_no: string; remarks: string; status: PoStatus;
-  items: PoItem[]; created_at: string; updated_at: string;
+  items: PoItem[]; created_at: string; updated_at: string; created_by?: string;
 };
 export type PoErrors = Record<string, string>;
 export type MasterOption = { id: string; code: string; name: string; unit?: string; price?: string; specification?: string; contact_name?: string; phone?: string; address?: string; site_name?: string; note?: string };
@@ -49,9 +49,14 @@ export function decimalCents(value: string): bigint | null {
   const [whole, fraction = ""] = value.split(".");
   return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2,"0"));
 }
+function quantityTicks(value: string): bigint {
+  if (!/^\d{1,9}(?:\.\d{1,4})?$/.test(value)) return BigInt(0);
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * BigInt(10_000) + BigInt(fraction.padEnd(4, "0"));
+}
 export function lineAmount(item: PoItem): bigint {
-  const qty = decimalCents(item.ordered_qty) ?? BigInt(0), price = decimalCents(item.unit_price) ?? BigInt(0);
-  const gross = (qty * price + BigInt(50)) / BigInt(100);
+  const qty = quantityTicks(item.ordered_qty), price = decimalCents(item.unit_price) ?? BigInt(0);
+  const gross = (qty * price + BigInt(5_000)) / BigInt(10_000);
   const net = gross - (decimalCents(item.discount_amount) ?? BigInt(0));
   return net > BigInt(0) ? net : BigInt(0);
 }
@@ -67,7 +72,7 @@ export function validatePo(doc: PurchaseOrder, records: readonly PurchaseOrder[]
   const errors: PoErrors = {};
   for (const [key,label] of [["po_no","เลขที่ PO"],["supplier_name_snapshot","ชื่อผู้ขาย"],["warehouse_name","คลังรับเข้า"]] as const)
     if (!doc[key].trim()) errors[key] = `กรุณาระบุ${label}`;
-  if (records.some((r) => r.id !== doc.id && r.po_no.trim().toLowerCase() === doc.po_no.trim().toLowerCase())) errors.po_no = "เลขที่ PO ซ้ำกับเอกสารตัวอย่างที่บันทึกแล้ว";
+  if (records.some((r) => r.id !== doc.id && r.po_no.trim().toLowerCase() === doc.po_no.trim().toLowerCase())) errors.po_no = "เลขที่ PO ซ้ำกับเอกสารที่บันทึกแล้ว";
   if (!validDay(doc.po_date)) errors.po_date = "กรุณาระบุวันที่เอกสารที่ถูกต้อง";
   if (doc.expected_delivery_date && !validDay(doc.expected_delivery_date)) errors.expected_delivery_date = "วันที่ส่งมอบไม่ถูกต้อง";
   if (doc.credit_days && (!/^\d{1,5}$/.test(doc.credit_days))) errors.credit_days = "เครดิตวันต้องเป็นจำนวนเต็มไม่ติดลบ";
@@ -79,8 +84,8 @@ export function validatePo(doc: PurchaseOrder, records: readonly PurchaseOrder[]
     if (!row.material_code_snapshot.trim()) errors[`${base}.material_code_snapshot`] = "กรุณาระบุรหัสสินค้า";
     if (!row.material_name_snapshot.trim()) errors[`${base}.material_name_snapshot`] = "กรุณาระบุชื่อสินค้า";
     if (!row.unit.trim()) errors[`${base}.unit`] = "กรุณาระบุหน่วย";
-    for (const key of ["ordered_qty","unit_price"] as const)
-      if ((decimalCents(row[key]) ?? BigInt(0)) <= BigInt(0)) errors[`${base}.${key}`] = "ต้องมากกว่า 0 และทศนิยมไม่เกิน 2 ตำแหน่ง";
+    if (quantityTicks(row.ordered_qty) <= BigInt(0)) errors[`${base}.ordered_qty`] = "จำนวนต้องมากกว่า 0 และทศนิยมไม่เกิน 4 ตำแหน่ง";
+    if ((decimalCents(row.unit_price) ?? BigInt(0)) <= BigInt(0)) errors[`${base}.unit_price`] = "ราคาต้องมากกว่า 0 และทศนิยมไม่เกิน 2 ตำแหน่ง";
     for (const key of ["tax_amount","discount_amount"] as const)
       if (row[key] && decimalCents(row[key]) === null) errors[`${base}.${key}`] = "ต้องเป็นตัวเลขไม่ติดลบ ทศนิยมไม่เกิน 2 ตำแหน่ง";
     if (row.expected_delivery_date && !validDay(row.expected_delivery_date)) errors[`${base}.expected_delivery_date`] = "วันที่จัดส่งไม่ถูกต้อง";
@@ -110,7 +115,7 @@ export function transitionPo(records: readonly PurchaseOrder[], ids: readonly st
   return records.map((r) => ids.includes(r.id) ? { ...r, status, updated_at: at } : r);
 }
 export function previewPoNo(date: string, department: string, records: readonly PurchaseOrder[]) {
-  if (!validDay(date) || !/^[A-Z0-9]{2}$/.test(department)) throw Error("ระบุวันที่และรหัสแผนก 2 ตัวให้ถูกต้อง");
+  if (!validDay(date) || !/^[A-Z0-9]{1,8}$/.test(department)) throw Error("ระบุวันที่และรหัสแผนกให้ถูกต้อง");
   const prefix = `PO-${department}${date.slice(2,4)}${date.slice(5,7)}`;
   let sequence = 1;
   while (records.some((r) => r.po_no.toUpperCase() === `${prefix}${String(sequence).padStart(3,"0")}`)) sequence++;

@@ -12,11 +12,14 @@ export const date = (value: string) =>
     year: "numeric",
     timeZone: "Asia/Bangkok",
   }).format(new Date(value.length === 10 ? `${value}T00:00:00+07:00` : value));
-export const dateTime = (value: string) =>
-  new Intl.DateTimeFormat("th-TH", {
+export const dateTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return new Intl.DateTimeFormat("th-TH", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Asia/Bangkok",
-  }).format(new Date(value));
+  }).format(parsed);
+};

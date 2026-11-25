@@ -61,7 +61,7 @@ import {
   actionLabel,
   actionRules,
   filterPRs,
-  importExamplePR,
+
   quantitySummary,
   statusLabel,
   statusTone,
@@ -82,7 +82,7 @@ type RowOverlay =
   | { type: "workflow"; id: string; action: PRAction }
   | { type: "delete" | "create-po" | "print"; id: string };
 export function PRList() {
-  const { records, create, batch, act, copy, remove } = usePR();
+  const { records, batch, act, copy, remove, loading, loadError, retry, canApprove, user } = usePR();
   const [draft, setDraft] = useState(emptyFilters);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
@@ -117,17 +117,17 @@ export function PRList() {
     setSelected((ids) =>
       ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
     );
-  function runBatch(
+  async function runBatch(
     action: "submit" | "approve" | "reject" | "cancel",
     reason: string,
   ) {
-    batch(
+    await batch(
       selectedRows.map((pr) => pr.id),
       action,
       reason,
     );
     setSelected([]);
-    setMessage(`ดำเนินการ ${selectedRows.length} ใบสำเร็จ (สาธิต)`);
+    setMessage(`ดำเนินการ ${selectedRows.length} ใบสำเร็จ`);
   }
   function afterMenu(id: string, action: () => void) {
     returnFocusId.current = id;
@@ -259,9 +259,9 @@ export function PRList() {
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() =>
-                afterMenu(pr.id, () => {
+                afterMenu(pr.id, async () => {
                   try {
-                    setDocument({ mode: "edit", id: copy(pr.id) });
+                    setDocument({ mode: "edit", id: await copy(pr.id) });
                   } catch (issue) {
                     setMessage(
                       issue instanceof Error ? issue.message : "คัดลอกไม่ได้",
@@ -297,7 +297,7 @@ export function PRList() {
               พรีวิว / พิมพ์
             </DropdownMenuItem>
             {(Object.keys(actionRules) as PRAction[])
-              .filter((action) => actionRules[action].from.includes(pr.status))
+              .filter((action) => (canApprove || !["approve", "reject"].includes(action)) && actionRules[action].from.includes(pr.status))
               .map((action) => (
                 <DropdownMenuItem
                   key={action}
@@ -323,7 +323,7 @@ export function PRList() {
                 ลบฉบับร่าง
               </DropdownMenuItem>
             )}
-            {["approved", "partial_po_created"].includes(pr.status) && (
+            {user.modules.includes("purchase_orders") && ["approved", "partial_po_created"].includes(pr.status) && (
               <DropdownMenuItem
                 onSelect={() =>
                   afterMenu(pr.id, () =>
@@ -331,7 +331,7 @@ export function PRList() {
                   )
                 }
               >
-                สร้าง PO สาธิต
+                สร้าง PO จาก PR
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -339,11 +339,13 @@ export function PRList() {
       ),
     },
   ];
+  if (loading) return <p role="status">กำลังโหลดใบขอซื้อ…</p>;
+  if (loadError) return <div><p role="alert">{loadError}</p><Button onClick={retry}>ลองอีกครั้ง</Button></div>;
   return (
     <div className="space-y-5">
       <PageHeader
         title="ใบขอซื้อ (PR)"
-        description="ข้อมูลและ workflow สาธิตเท่านั้น · โหลดแอปใหม่จะกลับเป็นข้อมูลเริ่มต้น"
+        description="จัดทำและติดตามใบขอซื้อของโรงงาน"
         actions={
           <Button onClick={() => setDocument({ mode: "new" })}>
             <FilePlus2 aria-hidden="true" />
@@ -456,23 +458,6 @@ export function PRList() {
           )}
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              <PRCommand
-                title="Import Excel (สาธิต)"
-                description="ยังไม่อ่านไฟล์ Excel ทดลองนำเข้าข้อมูลตัวอย่าง 1 ใบ ตรวจซ้ำด้วยเลขอ้างอิงก่อนสร้าง ไม่มีการทับข้อมูลเดิม"
-                trigger={
-                  <Button variant="outline">Import Excel (สาธิต)</Button>
-                }
-                onConfirm={() => {
-                  create(importExamplePR(), false, true);
-                  setPage(1);
-                  setMessage("นำเข้าตัวอย่างแล้ว ค้นหา IMPORT-DEMO-001 ได้");
-                }}
-              >
-                <p className="text-sm">
-                  IMPORT-DEMO-001 · วัสดุทดลองสำหรับงานซ่อมบำรุง · 1 ชิ้น ·
-                  120.50 บาท · บันทึกเป็นฉบับร่าง
-                </p>
-              </PRCommand>
               <PRPreview
                 records={selectedRows.length ? selectedRows : filtered}
                 mode="print"
@@ -503,7 +488,7 @@ export function PRList() {
                   ["reject", "ไม่อนุมัติ"],
                   ["cancel", "ยกเลิก"],
                 ] as const
-              ).map(([action, label]) => (
+              ).filter(([action]) => canApprove || !["approve", "reject"].includes(action)).map(([action, label]) => (
                 <PRCommand
                   key={action}
                   title={`${label}หลายใบ`}
@@ -584,9 +569,9 @@ export function PRList() {
               title={`${actionLabel[action]} PR`}
               description={
                 action === "cancel" && pr.purchaseOrders.length
-                  ? "ยกเลิกยอดค้างซื้อของ PR เท่านั้น PO สาธิตที่ออกแล้วคงอยู่ ไม่ได้ยกเลิกตาม"
+                  ? "ยกเลิกยอดค้างซื้อของ PR โดยเก็บใบสั่งซื้อเดิมไว้"
                   : action === "approve" || action === "reject"
-                    ? `ผู้อนุมัติที่กำหนด: ${pr.approver} · ผู้ใช้ปัจจุบันในต้นแบบเป็นผู้ดูแลสาธิต`
+                    ? `ผู้อนุมัติที่กำหนด: ${pr.approver}`
                     : "ตรวจสอบข้อมูลก่อนยืนยัน"
               }
               requiresReason={action === "reject" || action === "cancel"}
@@ -600,7 +585,7 @@ export function PRList() {
           open
           onOpenChange={closeRowOverlay}
           title="ลบฉบับร่าง PR"
-          description="ลบออกจากรายการสาธิต ประวัติการลบยังอยู่จนโหลดแอปใหม่"
+          description="นำฉบับร่างออกจากรายการและเก็บประวัติการลบ"
           onConfirm={() => remove(rowOverlay.id)}
         />
       )}
@@ -650,10 +635,10 @@ export function PRList() {
             </DialogTitle>
             <DialogDescription>
               {document?.mode === "new"
-                ? "กรอกข้อมูลใบขอซื้อใหม่ · ข้อมูลสาธิต"
+                ? "กรอกข้อมูลใบขอซื้อใหม่"
                 : document?.mode === "edit"
                   ? `แก้ไขข้อมูลเอกสาร · Rev. ${dialogPR?.revision ?? "—"}`
-                  : "ดูข้อมูลและประวัติเอกสาร · ข้อมูลสาธิต"}
+                  : "ดูข้อมูลและประวัติเอกสาร"}
             </DialogDescription>
             {document?.mode === "edit" && dialogPR && (
               <div className="pt-1">

@@ -227,7 +227,7 @@ test("production receipt UI keeps the iTECH document structure and Factory behav
   );
 
   for (const text of [
-    'title="ใบรับยอดผลิต"',
+    'title="ใบรับยอดผลิต V2"',
     "สร้างใบรับยอดผลิต",
     "ประวัติใบรับยอดผลิต",
     "ส่วนหัวเอกสาร",
@@ -254,7 +254,7 @@ test("production receipt UI keeps the iTECH document structure and Factory behav
   assert.ok(document.includes("receipt.ledgerEventId"));
 });
 
-test("isolated production receipt V1 stays UI-only and keeps the iTECH form sections", () => {
+test("production receipt V1 stores the document and keeps the iTECH form sections", () => {
   const workspace = readFileSync(
     path.join(
       root,
@@ -272,21 +272,22 @@ test("isolated production receipt V1 stays UI-only and keeps the iTECH form sect
 
   for (const text of [
     "ใบรับยอดผลิต V1",
-    "UI DRAFT",
     "เอกสารอ้างอิง",
-    "รายละเอียดวัสดุ / สินค้า",
-    "รายละเอียดการผลิต",
+    "กระสอบปุ๋ยอินทรีย์ / สารปรับสภาพดิน (P1)",
+    "กระสอบปุ๋ยอินทรีย์ / สารปรับสภาพดิน (P2)",
+    "ยอดผลิตปั้น",
     "รายชื่อผู้ลงนาม",
     "ประวัติใบรับยอดผลิต V1",
-    "หน้านี้ยังไม่บันทึกข้อมูลจริง",
+    "บันทึกเอกสารรับยอดผลิต โดยยังไม่ลงสต็อก",
   ])
     assert.ok(workspace.includes(text), text);
 
   assert.ok(workspace.includes("newReceiptItemV1()"));
   assert.ok(workspace.includes("disabled"));
-  assert.ok(!workspace.includes("saveReceipt("));
+  assert.ok(workspace.includes('productionRequest<SavedReceipt>("receipt"'));
   assert.ok(!workspace.includes("confirmReceipt("));
-  assert.ok(types.includes("items: [newReceiptItemV1()]"));
+  for (const group of ["p1Items", "p2Items", "moldingItems"])
+    assert.ok(types.includes(`${group}: [newReceiptItemV1()]`));
   assert.ok(
     existsSync(
       path.join(root, "app/(factory)/production-receipts-v1/page.tsx"),

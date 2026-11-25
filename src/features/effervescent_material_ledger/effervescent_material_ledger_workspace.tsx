@@ -1,5 +1,6 @@
 "use client";
 
+import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use-organic-documents";
 import { useRef, useState } from "react";
 import { FilePlus2, Printer } from "lucide-react";
 
@@ -24,13 +25,10 @@ import {
   DialogTitle,
 } from "@/src/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { PageHeader, StatusBadge } from "@/src/components/factory/patterns";
-import {
-  createBlankEffervescentMaterialLedgerSheet,
-  demoEffervescentMaterialLedgerSheets,
-} from "@/src/lib/mock-data/effervescent-material-ledger";
+import { PageHeader } from "@/src/components/factory/patterns";
 
 import {
+  createBlankEffervescentMaterialLedgerSheet,
   EFFERVESCENT_MATERIAL_LEDGER_DOCUMENT,
   type EffervescentMaterialLedgerSheet,
 } from "./effervescent_material_ledger_domain";
@@ -43,15 +41,9 @@ type TabKey = "form" | "history";
 
 const INITIAL_DOCUMENT_KEY = "effervescent-initial";
 
-/**
- * UI MOCK ONLY.
- * Records live in React state until the page is refreshed.
- * No API, database, localStorage, stock calculation, or adjustment rule.
- */
 export function EffervescentMaterialLedgerWorkspace() {
-  const [records, setRecords] = useState<EffervescentMaterialLedgerSheet[]>(
-    () => structuredClone(demoEffervescentMaterialLedgerSheets),
-  );
+  const documents = useOrganicDocuments<EffervescentMaterialLedgerSheet>("effervescent_material_ledger");
+  const { records, busy, loading, loadError } = documents;
   const [draft, setDraft] = useState<EffervescentMaterialLedgerSheet>(() =>
     createBlankEffervescentMaterialLedgerSheet(INITIAL_DOCUMENT_KEY),
   );
@@ -61,6 +53,7 @@ export function EffervescentMaterialLedgerWorkspace() {
 
   const [tab, setTab] = useState<TabKey>("form");
   const [message, setMessage] = useState("");
+  const [messageError, setMessageError] = useState(false);
   const [pendingSheet, setPendingSheet] = useState<EffervescentMaterialLedgerSheet | null>(null);
   const [deleteSheet, setDeleteSheet] = useState<EffervescentMaterialLedgerSheet | null>(null);
   const [activeDetailId, setActiveDetailId] = useState<string | null>(null);
@@ -96,33 +89,19 @@ export function EffervescentMaterialLedgerWorkspace() {
     requestOpenSheet(createBlankEffervescentMaterialLedgerSheet(crypto.randomUUID()));
   }
 
-  function handleSave() {
-    const previous = draft.id
-      ? records.find((sheet) => sheet.id === draft.id)
-      : undefined;
-
-    if (draft.id && !previous) {
-      setMessage("ไม่พบเอกสารที่ต้องการแก้ไขในข้อมูลจำลอง");
-      return;
+  async function handleSave() {
+    if (busy || loading || loadError) return;
+    try {
+      const saved = await documents.save(draft);
+      setDraft(saved);
+      setBaseline(JSON.stringify(saved));
+      setMessageError(false);
+      setMessage("บันทึกเอกสารเรียบร้อยแล้ว");
+      setTab("history");
+    } catch (error) {
+      setMessageError(true);
+      setMessage(error instanceof Error ? error.message : "ไม่สามารถบันทึกเอกสารได้");
     }
-
-    const savedAt = new Date().toISOString();
-    const saved: EffervescentMaterialLedgerSheet = structuredClone({
-      ...draft,
-      id: draft.id || crypto.randomUUID(),
-      created_at: previous?.created_at || savedAt,
-      updated_at: savedAt,
-    });
-
-    setRecords((current) =>
-      previous
-        ? current.map((sheet) => (sheet.id === saved.id ? saved : sheet))
-        : [saved, ...current],
-    );
-    setDraft(saved);
-    setBaseline(JSON.stringify(saved));
-    setMessage("บันทึกข้อมูลจำลองเรียบร้อยแล้ว (ยังไม่เชื่อมฐานข้อมูล)");
-    setTab("history");
   }
 
   function handleEdit(sheet: EffervescentMaterialLedgerSheet) {
@@ -141,13 +120,19 @@ export function EffervescentMaterialLedgerWorkspace() {
     setActivePrintId(sheet.id);
   }
 
-  function handleConfirmDelete() {
-    if (!deleteSheet) {
+  async function handleConfirmDelete() {
+    if (!deleteSheet || busy || loading || loadError) {
       return;
     }
 
     const deletedId = deleteSheet.id;
-    setRecords((current) => current.filter((sheet) => sheet.id !== deletedId));
+    try {
+      await documents.remove(deleteSheet);
+    } catch (error) {
+      setMessageError(true);
+      setMessage(error instanceof Error ? error.message : "ไม่สามารถลบเอกสารได้");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = createBlankEffervescentMaterialLedgerSheet(crypto.randomUUID());
@@ -158,7 +143,8 @@ export function EffervescentMaterialLedgerWorkspace() {
     setActiveDetailId(null);
     setActivePrintId(null);
     setDeleteSheet(null);
-    setMessage("ลบเอกสารจำลองออกจากรายการเรียบร้อยแล้ว");
+    setMessageError(false);
+    setMessage("ลบเอกสารออกจากประวัติแล้ว");
   }
 
   function handleBrowserPrint() {
@@ -221,10 +207,10 @@ export function EffervescentMaterialLedgerWorkspace() {
 
   return (
     <div className="min-w-0 space-y-5">
+      <OrganicLoadStatus {...documents} />
       <PageHeader
         title="บันทึกการรับ - จ่าย วัตถุดิบเม็ดฟู่"
         description="แบบบันทึกวัตถุดิบเม็ดฟู่ตามเอกสาร FR-P2-36/Rev.00"
-        actions={<StatusBadge tone="info">UI MOCK · ไม่เชื่อมฐานข้อมูล</StatusBadge>}
       />
 
       <Tabs
@@ -246,7 +232,7 @@ export function EffervescentMaterialLedgerWorkspace() {
         </div>
 
         {message && (
-          <p role="status" className="text-sm text-primary">
+          <p role={messageError ? "alert" : "status"} className={messageError ? "text-sm text-destructive" : "text-sm text-primary"}>
             {message}
           </p>
         )}
@@ -257,15 +243,17 @@ export function EffervescentMaterialLedgerWorkspace() {
               กำลังแก้ไขเอกสาร <span className="break-all font-semibold">{draft.id}</span>
             </div>
           )}
-          <EffervescentMaterialLedgerForm
-            sheet={draft}
-            onChange={(next) => {
-              setDraft(next);
-              setMessage("");
-            }}
-            onSave={handleSave}
-            onReset={handleNew}
-          />
+          <fieldset disabled={busy || loading || Boolean(loadError)} className="min-w-0">
+            <EffervescentMaterialLedgerForm
+              sheet={draft}
+              onChange={(next) => {
+                setDraft(next);
+                setMessage("");
+              }}
+              onSave={handleSave}
+              onReset={handleNew}
+            />
+          </fieldset>
         </TabsContent>
 
         <TabsContent value="history" className="mt-3 min-w-0">
@@ -362,12 +350,12 @@ export function EffervescentMaterialLedgerWorkspace() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ต้องการลบเอกสารจำลองนี้หรือไม่?</AlertDialogTitle>
-            <AlertDialogDescription>เอกสารจะถูกลบออกจากรายการจำลองบนหน้านี้เท่านั้น</AlertDialogDescription>
+            <AlertDialogTitle>ต้องการลบเอกสารนี้หรือไม่?</AlertDialogTitle>
+            <AlertDialogDescription>เอกสารนี้จะไม่แสดงในประวัติ</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>
+            <AlertDialogAction disabled={busy || loading || Boolean(loadError)} onClick={() => void handleConfirmDelete()}>
               ยืนยันการลบ
             </AlertDialogAction>
           </AlertDialogFooter>

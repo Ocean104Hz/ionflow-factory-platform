@@ -56,7 +56,7 @@ const text = {
   all: "ทั้งหมด",
   found: "พบ",
   fromCount: "จาก",
-  demo: "เอกสารจำลอง",
+  demo: "เอกสาร",
   viewDocument: "ดูใบตรวจรับวัตถุดิบวันที่",
   printDocument: "พรีวิวใบตรวจรับวัตถุดิบวันที่",
   editDocument: "แก้ไขใบตรวจรับวัตถุดิบวันที่",

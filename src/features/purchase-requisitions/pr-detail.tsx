@@ -40,15 +40,17 @@ export function PRDetail({
   onClose?: () => void;
   variant?: "page" | "dialog";
 }) {
-  const { records, act, remove, copy } = usePR();
+  const { records, act, remove, copy, loading, loadError, retry, canApprove } = usePR();
   const pr = records.find((row) => row.id === id);
   const router = useRouter();
   const [error, setError] = useState("");
+  if (loading) return <p role="status">กำลังโหลดใบขอซื้อ…</p>;
+  if (loadError) return <div><p role="alert">{loadError}</p><Button onClick={retry}>ลองอีกครั้ง</Button></div>;
   if (!pr)
     return (
       <div className="space-y-3">
         <p role="alert">
-          ไม่พบ PR ในหน่วยความจำ · เอกสารที่สร้างเองจะหายเมื่อโหลดแอปใหม่
+          ไม่พบใบขอซื้อ
         </p>
         <Button asChild variant="outline">
           <Link href="/pr">กลับรายการ</Link>
@@ -81,7 +83,7 @@ export function PRDetail({
               {pr.number}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              รายละเอียดใบขอซื้อสาธิต · Rev. {pr.revision}
+              รายละเอียดใบขอซื้อ · Rev. {pr.revision}
             </p>
           </div>
           <StatusBadge tone={statusTone[pr.status]}>
@@ -91,7 +93,7 @@ export function PRDetail({
       ) : (
         <PageHeader
           title={pr.number}
-          description={`รายละเอียดใบขอซื้อสาธิต · Rev. ${pr.revision}`}
+          description={`รายละเอียดใบขอซื้อ · Rev. ${pr.revision}`}
           parent={onEdit ? undefined : { title: "รายการ PR", href: "/pr" }}
           actions={
             <StatusBadge tone={statusTone[pr.status]}>
@@ -113,9 +115,9 @@ export function PRDetail({
           ))}
         <Button
           variant="outline"
-          onClick={() => {
+          onClick={async () => {
             try {
-              const copiedId = copy(id);
+              const copiedId = await copy(id);
               if (onEdit) onEdit(copiedId);
               else router.push(`/pr/${copiedId}/edit`);
             } catch (issue) {
@@ -126,6 +128,7 @@ export function PRDetail({
           คัดลอกเป็นฉบับร่าง
         </Button>
         {(Object.keys(actionRules) as PRAction[])
+          .filter((action) => canApprove || !["approve", "reject"].includes(action))
           .filter((action) => actionRules[action].from.includes(pr.status))
           .map((action) => (
             <PRCommand
@@ -133,9 +136,9 @@ export function PRDetail({
               title={`${actionLabel[action]} PR`}
               description={
                 action === "cancel" && pr.purchaseOrders.length
-                  ? "ยกเลิกยอดค้างซื้อของ PR เท่านั้น PO สาธิตที่ออกแล้วคงอยู่ ไม่ได้ยกเลิกตาม"
+                  ? "ยกเลิกยอดค้างซื้อของ PR โดยเก็บใบสั่งซื้อเดิมไว้"
                   : action === "approve" || action === "reject"
-                    ? `ผู้อนุมัติที่กำหนด: ${pr.approver} · ผู้ใช้ปัจจุบันในต้นแบบเป็นผู้ดูแลสาธิต`
+                    ? `ผู้อนุมัติที่กำหนด: ${pr.approver}`
                     : "ตรวจสอบข้อมูลก่อนยืนยัน"
               }
               requiresReason={action === "reject" || action === "cancel"}
@@ -155,10 +158,10 @@ export function PRDetail({
         {pr.status === "draft" && (
           <PRCommand
             title="ลบฉบับร่าง PR"
-            description="ลบออกจากรายการสาธิต ประวัติการลบยังอยู่จนโหลดแอปใหม่"
+            description="นำฉบับร่างออกจากรายการและเก็บประวัติการลบ"
             trigger={<Button variant="destructive">ลบฉบับร่าง</Button>}
-            onConfirm={() => {
-              remove(id);
+            onConfirm={async () => {
+              await remove(id);
               if (onClose) onClose();
               else router.push("/pr");
             }}
@@ -192,7 +195,7 @@ export function PRDetail({
         <PRTotals pr={pr} variant={variant === "dialog" ? "detail" : "default"} />
       </SectionCard>
       <SectionCard
-        title="PO สาธิตที่เกี่ยวข้อง"
+        title="PO ที่เกี่ยวข้อง"
         subtitle="ติดตามจำนวนที่ออกซื้อเท่านั้น ไม่ใช่โมดูลใบสั่งซื้อจริง"
       >
         <FactoryDataTable
@@ -200,7 +203,7 @@ export function PRDetail({
           rowKey={(po) => po.id}
           minWidth={800}
           columns={[
-            { key: "number", label: "เลข PO สาธิต", render: (po) => po.number },
+            { key: "number", label: "เลข PO ", render: (po) => po.number },
             { key: "at", label: "วันที่", render: (po) => prDate(po.at) },
             { key: "actor", label: "ผู้ดำเนินการ", render: (po) => po.actor },
             {
@@ -221,17 +224,17 @@ export function PRDetail({
         />
         {pr.status === "cancelled" && pr.purchaseOrders.length > 0 && (
           <p className="mt-3 text-sm text-warning">
-            PR ถูกยกเลิก แต่ PO สาธิตที่ออกก่อนหน้ายังคงอยู่
+            PR ถูกยกเลิก แต่ PO ที่ออกก่อนหน้ายังคงอยู่
           </p>
         )}
       </SectionCard>
       <SectionCard
         title="ประวัติการดำเนินการ"
-        subtitle="ผู้ดำเนินการจริงในโหมดสาธิต พร้อมสถานะและค่าก่อน–หลัง"
+        subtitle="ผู้ดำเนินการจริงในโหมด พร้อมสถานะและค่าก่อน–หลัง"
       >
         {!pr.history.length ? (
           <p className="text-sm text-muted-foreground">
-            ยังไม่มีเหตุการณ์สาธิต
+            ยังไม่มีเหตุการณ์
           </p>
         ) : (
           <ol className="space-y-4">

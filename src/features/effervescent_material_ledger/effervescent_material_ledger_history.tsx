@@ -20,7 +20,6 @@ import {
 } from "./effervescent_material_ledger_domain";
 
 /**
- * UI MOCK ONLY
  * แสดงประวัติจาก props ที่ Workspace ส่งมา
  * ปุ่มจัดการเรียก callbacks เท่านั้น ไม่มี API หรือฐานข้อมูล
  */
@@ -190,7 +189,7 @@ export function EffervescentMaterialLedgerHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติการรับ - จ่าย วัตถุดิบเม็ดฟู่"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร (UI Mock)`}
+        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
         <form
           noValidate
@@ -305,7 +304,7 @@ export function EffervescentMaterialLedgerHistory({
         columns={[
           {
             key: "id",
-            label: "รหัสเอกสาร (Mock)",
+            label: "รหัสเอกสาร",
             render: (sheet) => (
               <Button
                 type="button"

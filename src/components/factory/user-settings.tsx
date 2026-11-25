@@ -93,6 +93,9 @@ export function UserSettings({
   const [passwordSent, setPasswordSent] = useState(false);
   const [sendOnCreate, setSendOnCreate] = useState(false);
   const dialogOpener = useRef<HTMLButtonElement | null>(null);
+  const roleOpener = useRef<HTMLButtonElement | null>(null);
+  const [roleDialog, setRoleDialog] = useState(false);
+  const [roleError, setRoleError] = useState("");
   const [role, setRole] = useState({
     id: "",
     code: "",
@@ -268,19 +271,37 @@ export function UserSettings({
   }
 
   async function save(payload: Record<string, unknown>, success: string) {
+    if (saving) return;
     setSaving(true);
     setMessage("");
-    setError("");
+    setRoleError("");
     try {
       const result = await requestAccess(payload, "บันทึกสิทธิ์ไม่สำเร็จ");
       updateData(result, success);
+      setRoleDialog(false);
     } catch (reason) {
-      setError(
+      setRoleError(
         reason instanceof Error ? reason.message : "บันทึกสิทธิ์ไม่สำเร็จ",
       );
     } finally {
       setSaving(false);
     }
+  }
+
+  function openRoleDialog(opener: HTMLButtonElement, item?: AccessData["roles"][number]) {
+    roleOpener.current = opener;
+    setRole({
+      id: item?.id ?? "",
+      code: item?.code ?? "",
+      name: item?.name ?? "",
+      active: item?.active ?? true,
+      moduleKeys: [...(item?.moduleKeys ?? [])],
+      system: item?.system ?? false,
+    });
+    setDirty(false);
+    setRoleError("");
+    setMessage("");
+    setRoleDialog(true);
   }
 
   if (loading)
@@ -397,6 +418,7 @@ export function UserSettings({
             <DialogContent
               className="max-h-[calc(100dvh-2rem)] overflow-y-auto motion-reduce:animate-none sm:max-w-xl"
               showCloseButton={false}
+              onInteractOutside={(event) => event.preventDefault()}
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
                 dialogOpener.current?.focus();
@@ -566,19 +588,8 @@ export function UserSettings({
               <Button
                 key={item.id}
                 type="button"
-                variant={role.id === item.id ? "secondary" : "outline"}
-                onClick={() => {
-                  setRole({
-                    id: item.id,
-                    code: item.code,
-                    name: item.name,
-                    active: item.active,
-                    moduleKeys: [...item.moduleKeys],
-                    system: item.system,
-                  });
-                  setDirty(false);
-                  setMessage("");
-                }}
+                variant="outline"
+                onClick={(event) => openRoleDialog(event.currentTarget, item)}
               >
                 {item.name}
                 {item.system && <Badge variant="outline">ระบบ</Badge>}
@@ -586,135 +597,148 @@ export function UserSettings({
             ))}
             <Button
               type="button"
-              variant="outline"
-              onClick={() => {
-                setRole({
-                  id: "",
-                  code: "",
-                  name: "",
-                  active: true,
-                  moduleKeys: [],
-                  system: false,
-                });
-                setDirty(false);
-              }}
+              onClick={(event) => openRoleDialog(event.currentTarget)}
             >
-              เพิ่ม Role
+              <Plus aria-hidden="true" />
+              สร้าง Role
             </Button>
           </div>
 
-          <form
-            className="space-y-4 rounded-lg border bg-card p-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save(
-                {
-                  action: "saveRole",
-                  id: role.id || undefined,
-                  code: role.code,
-                  name: role.name,
-                  active: role.active,
-                  moduleKeys: role.moduleKeys,
-                },
-                "บันทึก Role และ Module แล้ว",
-              );
-            }}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="access-role-code">รหัส Role</Label>
-                <Input
-                  id="access-role-code"
-                  required
-                  pattern="[a-z][a-z0-9_]{1,62}"
-                  disabled={role.system}
-                  value={role.code}
-                  onChange={(event) => {
-                    setRole({
-                      ...role,
-                      code: event.target.value.toLowerCase(),
-                    });
-                    setDirty(true);
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="access-role-name">ชื่อ Role</Label>
-                <Input
-                  id="access-role-name"
-                  required
-                  maxLength={100}
-                  disabled={role.system}
-                  value={role.name}
-                  onChange={(event) => {
-                    setRole({ ...role, name: event.target.value });
-                    setDirty(true);
-                  }}
-                />
-              </div>
-            </div>
-            {modulesByGroup.map(([group, modules]) => (
-              <fieldset key={group} className="space-y-2 border-t pt-4">
-                <legend className="text-sm font-semibold">{group}</legend>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {modules.map((module) => (
-                    <label
-                      key={module.key}
-                      className="flex items-start gap-2 rounded-md border p-3"
-                    >
-                      <Checkbox
-                        disabled={role.system || module.key === "settings"}
-                        checked={role.moduleKeys.includes(module.key)}
-                        onCheckedChange={(checked) => {
+          <Dialog open={roleDialog} onOpenChange={(open) => {
+            if (!open && !saving) {
+              setRoleDialog(false);
+              setDirty(false);
+            }
+          }}>
+            <DialogContent
+              className="max-h-[calc(100dvh-2rem)] overflow-y-auto motion-reduce:animate-none sm:max-w-3xl"
+              showCloseButton={false}
+              onInteractOutside={(event) => event.preventDefault()}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                roleOpener.current?.focus();
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>{role.system ? "ดูสิทธิ์ Role ระบบ" : role.id ? "แก้ไข Role" : "สร้าง Role"}</DialogTitle>
+                <DialogDescription>กำหนดชื่อ Role สถานะ และ Module ที่เปิดให้ใช้งาน</DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (saving || role.system || !dirty) return;
+                  void save(
+                    {
+                      action: "saveRole",
+                      id: role.id || undefined,
+                      code: role.code,
+                      name: role.name,
+                      active: role.active,
+                      moduleKeys: role.moduleKeys,
+                    },
+                    "บันทึก Role และ Module แล้ว",
+                  );
+                }}
+              >
+                <fieldset disabled={saving} aria-busy={saving} className="min-w-0 space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="access-role-code">รหัส Role</Label>
+                      <Input
+                        id="access-role-code"
+                        required
+                        pattern="[a-z][a-z0-9_]{1,62}"
+                        disabled={role.system}
+                        value={role.code}
+                        onChange={(event) => {
                           setRole({
                             ...role,
-                            moduleKeys: checked
-                              ? [...role.moduleKeys, module.key]
-                              : role.moduleKeys.filter(
-                                  (key) => key !== module.key,
-                                ),
+                            code: event.target.value.toLowerCase(),
                           });
                           setDirty(true);
                         }}
                       />
-                      <span>
-                        <span className="block text-sm">{module.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {module.href}
-                        </span>
-                        {module.key === "settings" && !role.system && (
-                          <span className="block text-xs text-muted-foreground">
-                            เฉพาะผู้ดูแลระบบ
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
-            {!role.system && (
-              <label className="flex items-center gap-2">
-                <Checkbox
-                  checked={role.active}
-                  onCheckedChange={(checked) => {
-                    setRole({ ...role, active: checked === true });
-                    setDirty(true);
-                  }}
-                />
-                <span className="text-sm">เปิดใช้งาน Role นี้</span>
-              </label>
-            )}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={saving || role.system || !dirty}>
-                {role.system
-                  ? "Role ระบบแก้ไขไม่ได้"
-                  : saving
-                    ? "กำลังบันทึก…"
-                    : "บันทึก Role"}
-              </Button>
-            </div>
-          </form>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="access-role-name">ชื่อ Role</Label>
+                      <Input
+                        id="access-role-name"
+                        required
+                        maxLength={100}
+                        disabled={role.system}
+                        value={role.name}
+                        onChange={(event) => {
+                          setRole({ ...role, name: event.target.value });
+                          setDirty(true);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {modulesByGroup.map(([group, modules]) => (
+                    <fieldset key={group} className="space-y-2 border-t pt-4">
+                      <legend className="text-sm font-semibold">{group}</legend>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {modules.map((module) => (
+                          <label
+                            key={module.key}
+                            className="flex items-start gap-2 rounded-md border p-3"
+                          >
+                            <Checkbox
+                              disabled={role.system || module.key === "settings"}
+                              checked={role.moduleKeys.includes(module.key)}
+                              onCheckedChange={(checked) => {
+                                setRole({
+                                  ...role,
+                                  moduleKeys: checked
+                                    ? [...role.moduleKeys, module.key]
+                                    : role.moduleKeys.filter(
+                                        (key) => key !== module.key,
+                                      ),
+                                });
+                                setDirty(true);
+                              }}
+                            />
+                            <span>
+                              <span className="block text-sm">{module.title}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {module.href}
+                              </span>
+                              {module.key === "settings" && !role.system && (
+                                <span className="block text-xs text-muted-foreground">
+                                  เฉพาะผู้ดูแลระบบ
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                  </fieldset>
+                ))}
+                {!role.system && (
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      checked={role.active}
+                      onCheckedChange={(checked) => {
+                        setRole({ ...role, active: checked === true });
+                        setDirty(true);
+                      }}
+                    />
+                    <span className="text-sm">เปิดใช้งาน Role นี้</span>
+                  </label>
+                )}
+                {roleError && <p role="alert" className="text-sm text-danger">{roleError}</p>}
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">{role.system ? "ปิด" : "ยกเลิก"}</Button>
+                  </DialogClose>
+                  {!role.system && <Button type="submit" disabled={saving || !dirty}>
+                    {saving ? "กำลังบันทึก…" : "บันทึก Role"}
+                  </Button>}
+                </DialogFooter>
+                </fieldset>
+              </form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>

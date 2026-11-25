@@ -1,206 +1,85 @@
 "use client";
-import {
-  createContext,
-  useContext,
-  useRef,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import {
-  actionLabel,
-  batchPRRecords,
-  copyPR,
-  createDemoPO,
-  createPRRecord,
-  deletePREvent,
-  demoPRs,
-  demoPRUser,
-  prUsers,
-  prMaterials,
-  savePRRecord,
-  transitionPR,
-  type PR,
-  type PRAction,
-  type PREvent,
-} from "./pr-domain";
+
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { readFactoryCsrfToken } from "@/src/components/factory/use-settings-postgres";
 import type { AuditEntry } from "@/src/lib/mock-data/audit-log";
-import { useMasterData } from "@/src/features/master-data/master-provider";
-import {
-  prFields,
-  fieldsForSave,
-} from "@/src/features/master-data/internal-references";
-type PRContextValue = {
-  records: PR[];
+import type { PR, PRAction } from "./pr-domain";
+import type { PurchaseOrder, PoAction } from "../purchase-orders/po-domain";
+
+type User = { id: string; displayName: string; modules: readonly string[] };
+type Snapshot = {
+  prs: PR[];
+  pos: PurchaseOrder[];
+  references: Pick<PR, "id" | "number" | "warehouseCode" | "neededDate" | "items">[];
   audit: AuditEntry[];
-  create: (draft: PR, submit?: boolean, imported?: boolean) => string;
-  save: (draft: PR, submit?: boolean) => void;
-  act: (id: string, action: PRAction, note?: string) => void;
-  order: (id: string, quantities: Record<string, number>) => void;
-  remove: (id: string) => void;
-  copy: (id: string) => string;
-  batch: (ids: string[], action: PRAction, note?: string) => void;
+  canApprove: boolean;
 };
-const PRContext = createContext<PRContextValue | null>(null);
-function auditEvent(pr: PR, event: PREvent): AuditEntry {
+const empty: Snapshot = { prs: [], pos: [], references: [], audit: [], canApprove: false };
+
+function usePurchasing(user: User) {
+  const enabled = ["pr", "purchase_orders", "audit_log"].some((module) => user.modules.includes(module));
+  const [data, setData] = useState<Snapshot>(empty);
+  const [loading, setLoading] = useState(enabled);
+  const [loadError, setLoadError] = useState("");
+  const [reload, setReload] = useState(0);
+  const pending = useRef(false);
+
+  async function request(payload?: Record<string, unknown>, signal?: AbortSignal) {
+    const response = await fetch("/api/purchasing", {
+      cache: "no-store", signal,
+      ...(payload && {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": await readFactoryCsrfToken() },
+        body: JSON.stringify(payload),
+      }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.ok) throw new Error(result?.message || "เชื่อมต่อระบบจัดซื้อไม่สำเร็จ");
+    return result as Snapshot & { createdId?: string };
+  }
+
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    request(undefined, controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setData(result); })
+      .catch((error) => { if (!controller.signal.aborted) setLoadError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [enabled, reload]);
+
+  async function command(kind: "pr" | "po", action: string, fields: Record<string, unknown>) {
+    if (loading || loadError || pending.current) throw new Error(loadError || "กำลังดำเนินการ กรุณารอสักครู่");
+    pending.current = true;
+    try {
+      const result = await request({ ...fields, kind, action });
+      setData(result);
+      return result.createdId ?? "";
+    } finally { pending.current = false; }
+  }
   return {
-    id: `PR-${event.id}`,
-    occurredAt: event.at,
-    user: event.actor,
-    email:
-      (event.actor === demoPRUser.name
-        ? demoPRUser.email
-        : prUsers.find((user) => user.name === event.actor)?.email) ??
-      "demo@example.com",
-    action:
-      event.action === "delete"
-        ? "DELETE"
-        : event.action === "create" || event.action === "import"
-          ? "CREATE"
-          : "UPDATE",
-    module: "ใบขอซื้อ (PR)",
-    reference: pr.number,
-    summary: `${actionLabel[event.action] ?? event.action}${event.note ? ` · ${event.note}` : ""}`,
-    ipAddress: "192.0.2.10",
-    changes: event.changes,
+    ...data, user, records: data.prs, loading, loadError,
+    retry: () => { setLoading(true); setLoadError(""); setReload((count) => count + 1); },
+    create: (draft: PR, submit = false) => command("pr", "create", { draft, submit }),
+    save: (draft: PR, submit = false) => command("pr", "save", { draft, submit }),
+    act: (id: string, action: PRAction, note?: string) => command("pr", action, { ids: [id], note }),
+    remove: (id: string) => command("pr", "delete", { ids: [id] }),
+    copy: (id: string) => command("pr", "copy", { ids: [id] }),
+    batch: (ids: string[], action: PRAction, note?: string) => command("pr", action, { ids, note }),
+    savePO: (draft: PurchaseOrder, submit: boolean) => command("po", "save", { draft, submit }),
+    actPO: (ids: string[], action: PoAction) => command("po", action, { ids }),
   };
 }
-export function PRProvider({ children }: { children: ReactNode }) {
-  const masters = useMasterData();
-  const [state, setState] = useState<{ records: PR[]; audit: AuditEntry[] }>(
-    () => ({
-      records: demoPRs.map((row) => ({
-        ...row,
-        masterRefs: masters.capture(prFields(row), {}, true),
-      })),
-      audit: [],
-    }),
-  );
-  const current = useRef(state);
-  useEffect(() => {
-    for (const row of state.records) masters.retain(row.masterRefs ?? {});
-  }, [state.records]);
-  const actor = demoPRUser.name;
-  // Synchronous snapshot prevents rapid demo commands from reading stale React state.
-  function commit(records: PR[], events: AuditEntry[]) {
-    current.current = { records, audit: [...events, ...current.current.audit] };
-    setState(current.current);
-  }
-  function get(id: string) {
-    const pr = current.current.records.find((row) => row.id === id);
-    if (!pr) throw new Error("ไม่พบ PR");
-    return pr;
-  }
-  function replace(pr: PR, old: PR) {
-    commit(
-      current.current.records.map((row) => (row.id === pr.id ? pr : row)),
-      pr.history
-        .slice(old.history.length)
-        .map((event) => auditEvent(pr, event)),
-    );
-  }
-  function create(draft: PR, submit = false, imported = false) {
-    draft = { ...draft, masterRefs: masters.capture(prFields(draft)) };
-    validateUnits(draft);
-    if (
-      imported &&
-      current.current.records.some((pr) => pr.referenceNo === draft.referenceNo)
-    )
-      throw new Error("นำเข้าข้อมูลตัวอย่างนี้แล้ว ไม่สร้างรายการซ้ำ");
-    // Deleted numbers remain reserved in this demo session's audit trail.
-    const reserved = current.current.audit
-      .filter((event) => event.action === "DELETE")
-      .map((event) => ({ ...draft, number: event.reference }));
-    const pr = createPRRecord(
-      draft,
-      [...current.current.records, ...reserved],
-      actor,
-      submit,
-      imported,
-    );
-    commit(
-      [pr, ...current.current.records],
-      pr.history.map((event) => auditEvent(pr, event)),
-    );
-    return pr.id;
-  }
-  function save(draft: PR, submit = false) {
-    const old = get(draft.id);
-    draft = {
-      ...draft,
-      masterRefs: masters.capture(
-        fieldsForSave(prFields(draft), prFields(old), old.masterRefs),
-        old.masterRefs,
-      ),
-    };
-    validateUnits(draft);
-    replace(savePRRecord(old, draft, actor, submit), old);
-  }
-  function validateUnits(row: PR) {
-    for (const item of row.items) {
-      const source = prMaterials.find((m) => m.code === item.code);
-      const ref = row.masterRefs?.[`unit:${item.id}`];
-      if (
-        source &&
-        item.unit !== source.unit &&
-        !masters.state.rows.some(
-          (m) =>
-            m.kind === "units" &&
-            m.id === ref?.id &&
-            [m.name, ...m.aliases].includes(source.unit),
-        )
-      )
-        throw new Error("หน่วยต้องตรงกับสินค้าเดิม · ยังไม่รองรับการแปลงหน่วย");
-    }
-  }
-  function act(id: string, action: PRAction, note = "") {
-    const old = get(id);
-    replace(transitionPR(old, action, actor, note), old);
-  }
-  function order(id: string, quantities: Record<string, number>) {
-    const old = get(id);
-    replace(createDemoPO(old, quantities, actor), old);
-  }
-  function remove(id: string) {
-    const old = get(id);
-    const event = deletePREvent(old, actor);
-    commit(
-      current.current.records.filter((row) => row.id !== id),
-      [auditEvent(old, event)],
-    );
-  }
-  function batch(ids: string[], action: PRAction, note = "") {
-    const old = current.current.records;
-    const next = batchPRRecords(old, ids, action, actor, note);
-    // Validate every selected document before committing any, never partly apply a batch.
-    commit(
-      next,
-      next.flatMap((pr) =>
-        pr.history
-          .slice(old.find((row) => row.id === pr.id)!.history.length)
-          .map((event) => auditEvent(pr, event)),
-      ),
-    );
-  }
-  return (
-    <PRContext.Provider
-      value={{
-        ...state,
-        create,
-        save,
-        act,
-        order,
-        remove,
-        copy: (id) => create(copyPR(get(id))),
-        batch,
-      }}
-    >
-      {children}
-    </PRContext.Provider>
-  );
+
+const PRContext = createContext<ReturnType<typeof usePurchasing> | null>(null);
+
+export function PRProvider({ children, user }: { children: ReactNode; user: User }) {
+  const value = usePurchasing(user);
+  return <PRContext.Provider value={value}>{children}</PRContext.Provider>;
 }
+
 export function usePR() {
-  const context = useContext(PRContext);
-  if (!context) throw new Error("PRProvider is required");
-  return context;
+  const value = useContext(PRContext);
+  if (!value) throw new Error("PRProvider is required");
+  return value;
 }

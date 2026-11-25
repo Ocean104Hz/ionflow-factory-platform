@@ -15,12 +15,16 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
-import { useProductionFlow } from "./production-flow-provider";
+import { productionRequest, useProductionV1Data } from "./production-v1-client";
 import { ProductionReportDialog } from "./production-report-document";
-import type { ProductionFlowErrors, ProductionReport } from "./production-flow-domain";
+import { newProductionReport, type ProductionFlowErrors, type ProductionFormulaSheet, type ProductionReport } from "./production-flow-domain";
 
 export function ProductionReportsWorkspace() {
-  const flow = useProductionFlow();
+  const { data, loading, error, refresh } = useProductionV1Data<{
+    documents: ProductionReport[]; sheets: ProductionFormulaSheet[]; lockedOrderIds: string[];
+  }>("report");
+  const flow = { reports: data?.documents ?? [], formulaSheets: data?.sheets ?? [] };
+  const [saving, setSaving] = useState(false);
   const [report, setReport] = useState<ProductionReport | null>(null);
   const [errors, setErrors] = useState<ProductionFlowErrors>({});
   const [message, setMessage] = useState("");
@@ -82,35 +86,44 @@ export function ProductionReportsWorkspace() {
   function chooseSource(value: string) {
     const [orderId, orderLineId] = value.split("|");
     try {
-      setReport(flow.createReport(orderId, orderLineId));
+      const source = flow.formulaSheets.find((row) => row.orderId === orderId);
+      if (!source) throw new Error("ไม่พบใบสั่งผลิต V1 ต้นทาง");
+      setReport({ ...newProductionReport(source, orderLineId, ""), reportDate: source.orderDate });
       setErrors({});
       setMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "เปิดรายการไม่ได้");
     }
   }
-  function save(status: ProductionReport["status"]) {
-    if (!report) return;
-    const result = flow.saveReport({ ...report, status });
-    setErrors(result.errors);
-    if (!result.saved) {
-      setMessage("ยังบันทึกไม่ได้ กรุณาตรวจสอบข้อมูล");
-      return;
+  async function save(status: ProductionReport["status"]) {
+    if (!report || saving) return;
+    setSaving(true);
+    try {
+      const result = await productionRequest<{ saved?: ProductionReport; errors: ProductionFlowErrors }>("report", {
+        action: "save", row: { ...report, status },
+      });
+      setErrors(result.errors);
+      if (!result.saved) {
+        setMessage("ยังบันทึกไม่ได้ กรุณาตรวจสอบข้อมูล");
+        return;
+      }
+      setReport(result.saved);
+      setMessage(status === "RECORDED" ? "บันทึกรายงานการผลิตแล้ว" : "บันทึกแบบร่างแล้ว");
+      refresh();
+    } catch (issue) {
+      setMessage(issue instanceof Error ? issue.message : "บันทึกรายงานไม่สำเร็จ");
+    } finally {
+      setSaving(false);
     }
-    setReport(result.saved);
-    setMessage(
-      status === "RECORDED"
-        ? "บันทึกรายงานการผลิตแล้ว · ยังไม่รับสินค้าเข้าคลัง"
-        : "บันทึกแบบร่างแล้ว",
-    );
   }
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="รายงานการผลิต"
-        description="บันทึกผลผลิตจริงและวัตถุดิบใช้จริงจากใบสูตรผลิต โดยไม่ลงสต็อก"
-        actions={<StatusBadge tone="info">UI MOCK · ผลผลิตจริง</StatusBadge>}
+        description="บันทึกผลผลิตจริงจากใบสั่งผลิต V1 และสูตร BOM ที่บันทึกไว้"
       />
+      {loading && <p role="status">กำลังโหลดรายงาน…</p>}
+      {error && <div><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
       {message && <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">{message}</p>}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList aria-label="มุมมองรายงานการผลิต">
@@ -120,10 +133,10 @@ export function ProductionReportsWorkspace() {
         <TabsContent value="form" className="space-y-5">
           <SectionCard
             title="เอกสารต้นทาง"
-            subtitle="ต้องออกใบสูตรผลิตจากใบสั่งผลิตก่อน และหนึ่งรายการผลิตมีรายงานหลักหนึ่งฉบับ"
+            subtitle="เลือกใบสั่งผลิต V1 ที่บันทึกแล้ว ระบบจะใช้สูตร BOM ที่บันทึกไว้ในใบนั้น"
             action={
               <Button asChild variant="outline" size="sm">
-                <Link href="/bulk-production-orders"><Plus />ไปใบสั่งผลิต</Link>
+                <Link href="/product-production-orders-v1"><Plus />ไปใบสั่งผลิต</Link>
               </Button>
             }
           >
@@ -144,7 +157,7 @@ export function ProductionReportsWorkspace() {
               noValidate
               onSubmit={(event) => {
                 event.preventDefault();
-                save("RECORDED");
+                void save("RECORDED");
               }}
             >
               {!!Object.keys(errors).length && (
@@ -246,8 +259,8 @@ export function ProductionReportsWorkspace() {
                 />
               </SectionCard>
               <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => save("DRAFT")}>บันทึกแบบร่าง</Button>
-                <Button type="submit">บันทึกรายงาน</Button>
+                {report.status === "DRAFT" && <Button type="button" variant="outline" disabled={saving} onClick={() => void save("DRAFT")}>บันทึกแบบร่าง</Button>}
+                <Button type="submit" disabled={saving}>บันทึกรายงาน</Button>
               </div>
             </form>
           )}
@@ -279,11 +292,7 @@ export function ProductionReportsWorkspace() {
                   render: (row) => (
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" aria-label={`ดู ${row.documentNumber}`} onClick={() => setView(row)}><Eye /></Button>
-                      {!flow.receipts.some(
-                        (receipt) =>
-                          receipt.reportId === row.id &&
-                          receipt.status === "CONFIRMED",
-                      ) && (
+                      {!(row.status === "RECORDED" && data?.lockedOrderIds.includes(row.orderId)) && (
                         <Button variant="ghost" size="icon" aria-label={`แก้ไข ${row.documentNumber}`} onClick={() => { setReport(structuredClone(row)); setErrors({}); setTab("form"); }}><Pencil /></Button>
                       )}
                     </div>

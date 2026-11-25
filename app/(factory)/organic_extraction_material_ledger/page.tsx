@@ -1,10 +1,7 @@
 import { OrganicExtractionMaterialLedgerWorkspace } from "@/src/features/organic_extraction_material_ledger/organic_extraction_material_ledger_workspace";
-import { demoOrganicExtractionMaterialLedgerSheets } from "@/src/lib/mock-data/organic-extraction-material-ledger";
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
 
-export default function Page() {
-  return (
-    <OrganicExtractionMaterialLedgerWorkspace
-      initialRecords={demoOrganicExtractionMaterialLedgerSheets}
-    />
-  );
+export default async function Page() {
+  await requireAuthenticatedFactoryModule("organic_extraction_material_ledger");
+  return <OrganicExtractionMaterialLedgerWorkspace />;
 }

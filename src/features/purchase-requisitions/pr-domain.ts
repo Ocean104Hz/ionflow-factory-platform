@@ -101,6 +101,7 @@ export const actionLabel: Record<string, string> = {
   cancel: "ยกเลิก PR",
   close: "ปิดงาน",
   create_po: "สร้าง PO สาธิต",
+  purchase_order: "ปรับยอดจากใบสั่งซื้อ",
   delete: "ลบฉบับร่าง",
   import: "นำเข้าข้อมูลตัวอย่าง",
 };
@@ -340,6 +341,7 @@ export function validatePR(pr: PR, submit = true): string | null {
     pr.items.some(
       (item) =>
         (item.code &&
+          pr.masterRefs?.[`material:${item.id}`]?.code !== item.code &&
           !prMaterials.some(
             (material) =>
               material.code === item.code &&
@@ -397,8 +399,7 @@ export function eventFor(
   note: string,
   changes: PRChange[] = [],
 ): PREvent {
-  if (actor !== demoPRUser.name && !prUsers.some((user) => user.name === actor))
-    throw new Error("ไม่พบผู้ดำเนินการสาธิต");
+  if (!actor.trim()) throw new Error("ไม่พบผู้ดำเนินการ");
   return {
     id: crypto.randomUUID(),
     action,
@@ -415,6 +416,7 @@ export function transitionPR(
   action: PRAction,
   actor: string,
   note = "",
+  approvedByServer = false,
 ): PR {
   const rule = actionRules[action];
   if (!rule.from.includes(pr.status))
@@ -425,6 +427,7 @@ export function transitionPR(
   }
   if (
     (action === "approve" || action === "reject") &&
+    !approvedByServer &&
     actor !== pr.approver &&
     actor !== demoPRUser.name
   )
@@ -669,7 +672,7 @@ export function savePRRecord(
 }
 export function deletePREvent(pr: PR, actor: string): PREvent {
   if (pr.status !== "draft") throw new Error("ลบได้เฉพาะฉบับร่าง");
-  return eventFor(pr, "delete", actor, "ลบฉบับร่างสาธิต", [
+  return eventFor(pr, "delete", actor, "ลบฉบับร่าง", [
     { field: "เอกสาร", before: pr.number, after: "ลบแล้ว" },
   ]);
 }

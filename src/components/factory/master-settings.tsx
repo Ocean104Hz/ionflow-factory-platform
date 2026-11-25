@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Alert, AlertDescription } from "../ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { ConfirmDialog } from "./confirm-dialog";
 import {
   FactoryDataTable,
@@ -43,6 +51,7 @@ export function MasterSettings({
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const editorOpener = useRef<HTMLButtonElement | null>(null);
   const savedDraft = draft ? rows.find((row) => row.id === draft.id) : null;
   useEffect(() => {
     onDirtyChange?.(
@@ -68,7 +77,8 @@ export function MasterSettings({
     Math.max(1, Math.ceil(filtered.length / 10)),
   );
   const isEditing = draft ? rows.some((row) => row.id === draft.id) : false;
-  function openEditor(row?: MasterSettingRow) {
+  function openEditor(opener: HTMLButtonElement, row?: MasterSettingRow) {
+    editorOpener.current = opener;
     setDraft(
       row
         ? { ...row }
@@ -76,6 +86,10 @@ export function MasterSettings({
     );
     setError("");
     setMessage("");
+  }
+  function closeEditor() {
+    setDraft(null);
+    setError("");
   }
   const columns: Column<MasterSettingRow>[] = [
     {
@@ -127,7 +141,7 @@ export function MasterSettings({
             size="sm"
             variant="outline"
             aria-label={`แก้ไข ${row.code}`}
-            onClick={() => openEditor(row)}
+            onClick={(event) => openEditor(event.currentTarget, row)}
           >
             <Pencil aria-hidden="true" />
             แก้ไข
@@ -202,9 +216,9 @@ export function MasterSettings({
         title={`ตั้งค่า${title}`}
         subtitle={`จัดการรหัส ชื่อ ความสัมพันธ์ และสถานะ${title}สำหรับงานภายใน`}
         action={
-          <Button type="button" onClick={() => openEditor()}>
+          <Button type="button" onClick={(event) => openEditor(event.currentTarget)}>
             <Plus aria-hidden="true" />
-            เพิ่ม{title}
+            สร้าง{title}
           </Button>
         }
       >
@@ -284,15 +298,24 @@ export function MasterSettings({
           {error}
         </p>
       )}
-      {draft && (
-        <SectionCard
-          title={`${isEditing ? "แก้ไข" : "เพิ่ม"}${title}`}
-          subtitle="กรอกข้อมูลด้านล่างแล้วกดบันทึก · ไม่เปิด modal"
+      <Dialog open={draft !== null} onOpenChange={(open) => { if (!open && !busy) closeEditor(); }}>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto motion-reduce:animate-none sm:max-w-xl"
+          showCloseButton={false}
+          onInteractOutside={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            editorOpener.current?.focus();
+          }}
         >
-          <form
-            className="space-y-4"
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "แก้ไข" : "สร้าง"}{title}</DialogTitle>
+            <DialogDescription>ระบุข้อมูล{title}สำหรับใช้งานภายในโรงงาน</DialogDescription>
+          </DialogHeader>
+          {draft && <form
             onSubmit={async (event) => {
               event.preventDefault();
+              if (busy) return;
               const saved = {
                 ...draft,
                 code: draft.code.trim().toUpperCase(),
@@ -312,146 +335,145 @@ export function MasterSettings({
               );
             }}
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${id}-code`}>รหัส *</Label>
-                <Input
-                  id={`${id}-code`}
-                  value={draft.code}
-                  maxLength={30}
-                  required
-                  onChange={(event) =>
-                    setDraft({ ...draft, code: event.target.value })
-                  }
-                  aria-describedby={error ? `${id}-error` : undefined}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${id}-name`}>ชื่อ{title} *</Label>
-                <Input
-                  id={`${id}-name`}
-                  value={draft.name}
-                  maxLength={100}
-                  required
-                  onChange={(event) =>
-                    setDraft({ ...draft, name: event.target.value })
-                  }
-                />
-              </div>
-              {types.length > 0 && (
-                <SelectField
-                  label="ประเภท *"
-                  value={draft.type}
-                  onChange={(value) => setDraft({ ...draft, type: value })}
-                  options={types.map((value) => ({ value, label: value }))}
-                />
-              )}
-              {parentKinds[kind] && (
-                <SelectField
-                  label="หน่วยงาน / พื้นที่ต้นสังกัด"
-                  value={draft.parentId || "none"}
-                  onChange={(v) =>
-                    setDraft({ ...draft, parentId: v === "none" ? "" : v })
-                  }
-                  options={[
-                    { value: "none", label: "ไม่ระบุ" },
-                    ...state.rows
-                      .filter(
-                        (r) =>
-                          r.id !== draft.id &&
-                          parentKinds[kind]?.includes(r.kind) &&
-                          (r.active || r.id === draft.parentId),
-                      )
-                      .map((r) => ({
-                        value: r.id,
-                        label: `${r.code} · ${r.name}${r.active ? "" : " (ปิดใช้งาน)"}`,
-                      })),
-                  ]}
-                />
-              )}
-              {kind === "vehicles" && (
-                <SelectField
-                  label="ประเภทรถ *"
-                  value={draft.typeId || "none"}
-                  onChange={(v) =>
-                    setDraft({ ...draft, typeId: v === "none" ? "" : v })
-                  }
-                  options={[
-                    { value: "none", label: "เลือกประเภทรถ" },
-                    ...state.rows
-                      .filter(
-                        (r) =>
-                          r.kind === "vehicleTypes" &&
-                          (r.active || r.id === draft.typeId),
-                      )
-                      .map((r) => ({ value: r.id, label: r.name })),
-                  ]}
-                />
-              )}
-              {(kind === "shifts"
-                ? (["start", "end"] as const)
-                : kind === "suppliers"
-                  ? (["contact", "phone"] as const)
-                  : []
-              ).map((key) => (
-                <div className="grid gap-2" key={key}>
-                  <Label htmlFor={`${id}-${key}`}>
-                    {
-                      {
-                        start: "เวลาเริ่มกะ *",
-                        end: "เวลาสิ้นสุดกะ *",
-                        contact: "ผู้ติดต่อ (จำลอง)",
-                        phone: "โทรศัพท์ (จำลอง)",
-                      }[key]
-                    }
-                  </Label>
+            <fieldset disabled={busy} aria-busy={busy} className="min-w-0 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor={`${id}-code`}>รหัส *</Label>
                   <Input
-                    id={`${id}-${key}`}
-                    type={kind === "shifts" ? "time" : "text"}
-                    value={draft[key]}
-                    onChange={(e) =>
-                      setDraft({ ...draft, [key]: e.target.value })
+                    id={`${id}-code`}
+                    value={draft.code}
+                    maxLength={30}
+                    required
+                    onChange={(event) =>
+                      setDraft({ ...draft, code: event.target.value })
+                    }
+                    aria-describedby={error ? `${id}-error` : undefined}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor={`${id}-name`}>ชื่อ{title} *</Label>
+                  <Input
+                    id={`${id}-name`}
+                    value={draft.name}
+                    maxLength={100}
+                    required
+                    onChange={(event) =>
+                      setDraft({ ...draft, name: event.target.value })
                     }
                   />
                 </div>
-              ))}
-              <SelectField
-                label="สถานะการใช้งาน"
-                value={draft.active ? "active" : "inactive"}
-                onChange={(value) =>
-                  setDraft({ ...draft, active: value === "active" })
-                }
-                options={[
-                  { value: "active", label: "ใช้งาน" },
-                  { value: "inactive", label: "ปิดใช้งาน" },
-                ]}
-              />
-            </div>
-            {error && (
-              <p
-                id={`${id}-error`}
-                role="alert"
-                className="text-sm text-danger"
-              >
-                {error}
-              </p>
-            )}
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDraft(null);
-                  setError("");
-                }}
-              >
-                ยกเลิก
-              </Button>
-              <Button type="submit">บันทึก{title}</Button>
-            </div>
-          </form>
-        </SectionCard>
-      )}
+                {types.length > 0 && (
+                  <SelectField
+                    label="ประเภท *"
+                    value={draft.type}
+                    onChange={(value) => setDraft({ ...draft, type: value })}
+                    options={types.map((value) => ({ value, label: value }))}
+                  />
+                )}
+                {parentKinds[kind] && (
+                  <SelectField
+                    label="หน่วยงาน / พื้นที่ต้นสังกัด"
+                    value={draft.parentId || "none"}
+                    onChange={(v) =>
+                      setDraft({ ...draft, parentId: v === "none" ? "" : v })
+                    }
+                    options={[
+                      { value: "none", label: "ไม่ระบุ" },
+                      ...state.rows
+                        .filter(
+                          (r) =>
+                            r.id !== draft.id &&
+                            parentKinds[kind]?.includes(r.kind) &&
+                            (r.active || r.id === draft.parentId),
+                        )
+                        .map((r) => ({
+                          value: r.id,
+                          label: `${r.code} · ${r.name}${r.active ? "" : " (ปิดใช้งาน)"}`,
+                        })),
+                    ]}
+                  />
+                )}
+                {(kind === "vehicles" || kind === "materials") && (
+                  <SelectField
+                    label={kind === "materials" ? "หน่วยนับ *" : "ประเภทรถ *"}
+                    value={draft.typeId || "none"}
+                    onChange={(v) =>
+                      setDraft({ ...draft, typeId: v === "none" ? "" : v })
+                    }
+                    options={[
+                      { value: "none", label: kind === "materials" ? "เลือกหน่วยนับ" : "เลือกประเภทรถ" },
+                      ...state.rows
+                        .filter(
+                          (r) =>
+                            r.kind === (kind === "materials" ? "units" : "vehicleTypes") &&
+                            (r.active || r.id === draft.typeId),
+                        )
+                        .map((r) => ({ value: r.id, label: r.name })),
+                    ]}
+                  />
+                )}
+                {(kind === "shifts"
+                  ? (["start", "end"] as const)
+                  : kind === "suppliers"
+                    ? (["contact", "phone"] as const)
+                    : []
+                ).map((key) => (
+                  <div className="grid gap-2" key={key}>
+                    <Label htmlFor={`${id}-${key}`}>
+                      {
+                        {
+                          start: "เวลาเริ่มกะ *",
+                          end: "เวลาสิ้นสุดกะ *",
+                          contact: "ผู้ติดต่อ (จำลอง)",
+                          phone: "โทรศัพท์ (จำลอง)",
+                        }[key]
+                      }
+                    </Label>
+                    <Input
+                      id={`${id}-${key}`}
+                      type={kind === "shifts" ? "time" : "text"}
+                      value={draft[key]}
+                      onChange={(e) =>
+                        setDraft({ ...draft, [key]: e.target.value })
+                      }
+                    />
+                  </div>
+                ))}
+                <SelectField
+                  label="สถานะการใช้งาน"
+                  value={draft.active ? "active" : "inactive"}
+                  onChange={(value) =>
+                    setDraft({ ...draft, active: value === "active" })
+                  }
+                  options={[
+                    { value: "active", label: "ใช้งาน" },
+                    { value: "inactive", label: "ปิดใช้งาน" },
+                  ]}
+                />
+              </div>
+              {error && (
+                <p
+                  id={`${id}-error`}
+                  role="alert"
+                  className="text-sm text-danger"
+                >
+                  {error}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeEditor}
+                >
+                  ยกเลิก
+                </Button>
+                <Button type="submit">{busy ? "กำลังบันทึก…" : `บันทึก${title}`}</Button>
+              </DialogFooter>
+            </fieldset>
+          </form>}
+        </DialogContent>
+      </Dialog>
       <p role="status" className="text-sm text-muted-foreground">
         {message}
       </p>

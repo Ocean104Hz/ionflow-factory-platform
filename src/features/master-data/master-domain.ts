@@ -13,6 +13,7 @@ export const masterKinds = {
   brands: "แบรนด์",
   processes: "กระบวนการผลิต",
   suppliers: "ผู้ขาย",
+  materials: "ทะเบียนวัตถุดิบ",
 } as const;
 export type MasterKind = keyof typeof masterKinds;
 export type MasterRow = {
@@ -105,7 +106,11 @@ export function masterError(state: MasterState, row: MasterRow): string {
       next = state.rows.find((r) => r.id === next?.parentId);
     }
   }
-  if (row.kind === "vehicles") {
+  if (row.kind === "materials") {
+    const unit = state.rows.find((r) => r.id === row.typeId && r.kind === "units");
+    if (!unit || (!unit.active && state.rows.find((r) => r.id === row.id)?.typeId !== unit.id))
+      return "กรุณาเลือกหน่วยนับจากข้อมูลตั้งค่า";
+  } else if (row.kind === "vehicles") {
     const type = state.rows.find(
       (r) => r.id === row.typeId && r.kind === "vehicleTypes",
     );

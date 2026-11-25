@@ -1,5 +1,6 @@
 "use client";
 
+import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use-organic-documents";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/src/components/ui/button";
@@ -19,13 +20,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/src/components/ui/tabs";
-import { PageHeader, StatusBadge } from "@/src/components/factory/patterns";
+import { PageHeader } from "@/src/components/factory/patterns";
 
 import {
   ORGANIC_EXTRACTION_FORM_TITLE,
   blankOrganicExtractionSheet,
-  deleteOrganicExtractionSheet,
-  saveOrganicExtractionSheet,
   validateOrganicExtractionSheet,
   type OrganicExtractionErrors,
   type OrganicExtractionTemperatureSheet,
@@ -42,21 +41,9 @@ type ActiveView = {
   print: boolean;
 };
 
-type Props = {
-  /** Optional mock records supplied by the page. No database connection. */
-  initialRecords?: readonly OrganicExtractionTemperatureSheet[];
-};
-
-/**
- * In-memory workspace. The two rounds remain together in a single sheet,
- * but their B1-B6 quantities, temperatures and pH are independently stored.
- */
-export function OrganicExtractionTemperatureWorkspace({
-  initialRecords = [],
-}: Props) {
-  const [records, setRecords] = useState<OrganicExtractionTemperatureSheet[]>(
-    () => structuredClone([...initialRecords]),
-  );
+export function OrganicExtractionTemperatureWorkspace() {
+  const documents = useOrganicDocuments<OrganicExtractionTemperatureSheet>("organic_extraction_temperature");
+  const { records, busy, loading, loadError } = documents;
   const [draft, setDraft] = useState<OrganicExtractionTemperatureSheet>(
     blankOrganicExtractionSheet,
   );
@@ -108,7 +95,8 @@ export function OrganicExtractionTemperatureWorkspace({
     requestOpenSheet(blankOrganicExtractionSheet());
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (busy || loading || loadError) return;
     const validationErrors = validateOrganicExtractionSheet(draft);
     setErrors(validationErrors);
 
@@ -120,19 +108,12 @@ export function OrganicExtractionTemperatureWorkspace({
     }
 
     try {
-      const result = saveOrganicExtractionSheet(
-        records,
-        draft,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
-
-      setRecords(result.records);
-      setDraft(result.saved);
-      setBaseline(JSON.stringify(result.saved));
+      const saved = await documents.save(draft);
+      setDraft(saved);
+      setBaseline(JSON.stringify(saved));
       setErrors({});
       setMessageKind("success");
-      setMessage("บันทึกข้อมูลจำลองเรียบร้อยแล้ว");
+      setMessage("บันทึกเอกสารเรียบร้อยแล้ว");
       setTab("history");
     } catch (error) {
       setMessageKind("error");
@@ -156,13 +137,19 @@ export function OrganicExtractionTemperatureWorkspace({
     setActiveView({ id: sheet.id, print: true });
   }
 
-  function handleDeleteConfirm() {
-    if (!deleteSheet) {
+  async function handleDeleteConfirm() {
+    if (!deleteSheet || busy || loading || loadError) {
       return;
     }
 
     const deletedId = deleteSheet.id;
-    setRecords((current) => deleteOrganicExtractionSheet(current, deletedId));
+    try {
+      await documents.remove(deleteSheet);
+    } catch (error) {
+      setMessageKind("error");
+      setMessage(error instanceof Error ? error.message : "ไม่สามารถลบเอกสารได้");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = blankOrganicExtractionSheet();
@@ -177,17 +164,17 @@ export function OrganicExtractionTemperatureWorkspace({
 
     setDeleteSheet(null);
     setMessageKind("success");
-    setMessage("ลบข้อมูลจำลองเรียบร้อยแล้ว");
+    setMessage("ลบเอกสารออกจากประวัติแล้ว");
   }
 
   return (
     <div className="min-w-0 space-y-5">
+      <OrganicLoadStatus {...documents} />
       <PageHeader
         title={ORGANIC_EXTRACTION_FORM_TITLE}
         description="บันทึกการใช้วัตถุดิบ อุณหภูมิ และ pH แยก 2 รอบการผลิต"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone="info">UI MOCK · ไม่เชื่อมระบบจริง</StatusBadge>
             <Button type="button" variant="outline" onClick={handleNew}>
               สร้างเอกสารใหม่
             </Button>
@@ -253,19 +240,21 @@ export function OrganicExtractionTemperatureWorkspace({
             </div>
           )}
 
-          <OrganicExtractionTemperatureForm
-            sheet={draft}
-            errors={errors}
-            onChange={(nextSheet: OrganicExtractionTemperatureSheet) => {
-              setDraft(nextSheet);
-              setMessage("");
-              if (Object.keys(errors).length > 0) {
-                setErrors({});
-              }
-            }}
-            onSave={handleSave}
-            onReset={handleNew}
-          />
+          <fieldset disabled={busy || loading || Boolean(loadError)} className="min-w-0">
+            <OrganicExtractionTemperatureForm
+              sheet={draft}
+              errors={errors}
+              onChange={(nextSheet: OrganicExtractionTemperatureSheet) => {
+                setDraft(nextSheet);
+                setMessage("");
+                if (Object.keys(errors).length > 0) {
+                  setErrors({});
+                }
+              }}
+              onSave={handleSave}
+              onReset={handleNew}
+            />
+          </fieldset>
         </TabsContent>
 
         <TabsContent value="history" className="mt-3 min-w-0">
@@ -328,12 +317,12 @@ export function OrganicExtractionTemperatureWorkspace({
               ต้องการลบใบบันทึกการใช้วัตถุสกัดนี้หรือไม่?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              เอกสารจำลองนี้จะถูกลบออกจากรายการในหน้านี้ และไม่สามารถกู้คืนได้
+              เอกสารนี้จะไม่แสดงในประวัติ
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>
+            <AlertDialogAction disabled={busy || loading || Boolean(loadError)} onClick={() => void handleDeleteConfirm()}>
               ยืนยันการลบ
             </AlertDialogAction>
           </AlertDialogFooter>

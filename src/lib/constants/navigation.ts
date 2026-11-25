@@ -164,19 +164,19 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "WAREHOUSE",
-    title: "วัสดุคงเหลือ Foliar Fertilizer",
+    title: "วัสดุคงเหลือ ",
     href: "/stock_remaining_materials_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก WIP Foliar Fertilizer",
+    title: "สต็อก WIP ",
     href: "/stock_wip_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก RM Foliar Fertilizer",
+    title: "สต็อก RM ",
     href: "/stock_rm_ff",
     icon: Boxes,
   },
@@ -184,12 +184,6 @@ export const navigation: FactoryNavigationItem[] = [
     group: "PRODUCTION",
     title: "ใบสั่งผลิตสินค้า V1",
     href: "/product-production-orders-v1",
-    icon: Factory,
-  },
-  {
-    group: "PRODUCTION",
-    title: "ใบสั่งผลิตสินค้า V2",
-    href: "/bulk-production-orders",
     icon: Factory,
   },
   { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", href: "/bom", icon: Beaker },
@@ -203,12 +197,6 @@ export const navigation: FactoryNavigationItem[] = [
     group: "PRODUCTION",
     title: "ใบรับยอดผลิต V1",
     href: "/production-receipts-v1",
-    icon: ClipboardList,
-  },
-  {
-    group: "PRODUCTION",
-    title: "ใบรับยอดผลิต V2",
-    href: "/production-receipts",
     icon: ClipboardList,
   },
   {

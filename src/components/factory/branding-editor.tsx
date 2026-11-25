@@ -23,6 +23,12 @@ export function BrandingEditor({
 }: {
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const { loading, error } = useBranding();
+  if (loading || error) return <p role={error ? "alert" : "status"}>{error || "กำลังโหลดหน้าตาโรงงาน…"}</p>;
+  return <BrandingForm onDirtyChange={onDirtyChange} />;
+}
+
+function BrandingForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void }) {
   const { branding, updateBranding } = useBranding();
   const [draft, setDraft] = useState<FactoryBranding>(branding);
   const [message, setMessage] = useState("");
@@ -37,6 +43,18 @@ export function BrandingEditor({
     onDirtyChange?.(busy || normalizedDraft !== JSON.stringify(branding));
   }, [busy, normalizedDraft, branding, onDirtyChange]);
   const id = useId();
+  async function saveBranding(value: FactoryBranding, message: string) {
+    setBusy(true);
+    try {
+      await updateBranding(value);
+      setDraft(value);
+      setMessage(message);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function loadLogo(
     file: File | undefined,
     key: "logoDataUrl" | "loginImageDataUrl" = "logoDataUrl",
@@ -93,12 +111,7 @@ export function BrandingEditor({
           setMessage("กรุณาระบุชื่อ ชื่อย่อ และสี #RRGGBB ที่ถูกต้อง");
           return;
         }
-        const saved = updateBranding(draft);
-        setMessage(
-          saved
-            ? "บันทึก branding แล้ว"
-            : "ปรับแต่งแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้บันทึกถาวร",
-        );
+        void saveBranding(draft, "บันทึกหน้าตาโรงงานแล้ว");
       }}
     >
       <h3 className="text-sm font-semibold">ข้อมูลแบรนด์</h3>
@@ -271,15 +284,7 @@ export function BrandingEditor({
           type="button"
           variant="ghost"
           disabled={busy}
-          onClick={() => {
-            setDraft(defaultBranding);
-            const saved = updateBranding(defaultBranding);
-            setMessage(
-              saved
-                ? "คืนค่าเริ่มต้นแล้ว"
-                : "คืนค่าแล้ว แต่เบราว์เซอร์ไม่อนุญาตให้บันทึกถาวร",
-            );
-          }}
+          onClick={() => void saveBranding(defaultBranding, "คืนค่าเริ่มต้นแล้ว")}
         >
           คืนค่าเริ่มต้น
         </Button>

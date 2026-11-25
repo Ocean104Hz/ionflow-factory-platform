@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   AlertCircle,
   FileSpreadsheet,
@@ -47,6 +47,11 @@ import {
   TabsTrigger,
 } from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
+import { Pagination } from "@/src/components/factory/patterns";
+import { useBOM } from "../bom/bom-provider";
+import { productionRequest, useProductionV1Data } from "../production-flow/production-v1-client";
+import type { ProductionOrderV1 } from "./types";
+import { ProductionFormulaDocument } from "../production-flow/production-formula-sheet";
 
 type ProductionLine = {
   id: string;
@@ -124,10 +129,12 @@ function Field({
   type?: React.HTMLInputTypeAttribute;
   placeholder?: string;
 }) {
+  const id = useId();
   return (
     <div className="min-w-0 space-y-2">
-      <Label>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <Input
+        id={id}
         type={type}
         value={value}
         placeholder={placeholder}
@@ -169,6 +176,14 @@ export function ProductProductionOrdersV1Workspace() {
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
   const [formula, setFormula] = useState("");
+  const [mixingReference, setMixingReference] = useState("");
+  const { state: bom, loading: formulasLoading, error: formulasError } = useBOM();
+  const { data, loading, error, refresh } = useProductionV1Data<{ documents: ProductionOrderV1[]; produced: Record<string, number> }>("order");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [page, setPage] = useState(1);
+  const [view, setView] = useState<ProductionOrderV1 | null>(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [rows, setRows] = useState<ProductionLine[]>([newLine()]);
@@ -188,6 +203,34 @@ export function ProductProductionOrdersV1Workspace() {
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [referenceSearch, setReferenceSearch] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const formulaOptions = bom.formulas.filter((row) => row.status === "ACTIVE").flatMap((row) => {
+    const product = bom.masters.find((master) => master.id === row.masterId);
+    return product ? [{ row, product }] : [];
+  });
+  const selectedFormula = formulaOptions.find(({ row }) => row.id === formula);
+  const filtered = (data?.documents ?? []).filter((order) =>
+    (!historyFrom || order.date >= historyFrom) && (!historyTo || order.date <= historyTo) &&
+    `${order.documentNumber} ${order.location} ${order.sheet.lines[0].productName}`.toLowerCase().includes(historySearch.trim().toLowerCase()),
+  );
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / Number(pageSize))));
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setSaveError("");
+    setNotice("");
+    try {
+      const result = await productionRequest<ProductionOrderV1>("order", {
+        action: "save", row: { date, location, formulaId: formula, amount, note, mixingReference, rows, signers },
+      });
+      setNotice(`บันทึก ${result.documentNumber} แล้ว`);
+      setTab("history");
+      setFormula(""); setAmount(""); setNote(""); setMixingReference(""); setRows([newLine()]);
+      setSigners({ preparedBy: "", qaOfficer: "", productionOfficer: "", manager: "" });
+      refresh();
+    } catch (issue) { setSaveError(issue instanceof Error ? issue.message : "บันทึกไม่สำเร็จ"); }
+    finally { setSaving(false); }
+  }
 
   const produced = useMemo(
     () =>
@@ -223,6 +266,9 @@ export function ProductProductionOrdersV1Workspace() {
 
   return (
     <div className="min-w-0 pb-10 text-[#1e3868]">
+      {notice && <p role="status" className="mb-4 text-sm">{notice}</p>}
+      {saveError && <p role="alert" className="mb-4 text-sm text-danger">{saveError}</p>}
+      {error && <div className="mb-4 flex items-center gap-2"><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <div className="flex justify-center">
           <TabsList className="h-auto w-full max-w-xl rounded-full border border-gray-200 bg-white p-1 shadow-sm">
@@ -263,7 +309,7 @@ export function ProductProductionOrdersV1Workspace() {
               <div className="min-w-0 space-y-2 md:col-span-2">
                 <Label>เลขที่เอกสาร</Label>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input value="" readOnly placeholder="กดสร้างเลข PRD" className="min-w-0 flex-1 bg-muted/40" />
+                  <Input value="" readOnly placeholder="ระบบออกเลขเมื่อบันทึก" className="min-w-0 flex-1 bg-muted/40" />
                   <Button
                     type="button"
                     variant="outline"
@@ -284,8 +330,8 @@ export function ProductProductionOrdersV1Workspace() {
                 <Label>ผลิตปุ๋ย</Label>
                 <div className="flex gap-2">
                   <Input
-                    value={formula}
-                    onChange={(event) => setFormula(event.target.value)}
+                    value={selectedFormula ? `${selectedFormula.product.name} · ${selectedFormula.row.code} ${selectedFormula.row.version}` : ""}
+                    readOnly
                     placeholder="ค้นหาสูตรปุ๋ย"
                   />
                   <Button
@@ -323,9 +369,9 @@ export function ProductProductionOrdersV1Workspace() {
                 <Label>อ้างอิงเอกสาร ใบรายงานผสมปุ๋ยผง</Label>
                 <div className="flex flex-col gap-2 lg:flex-row">
                   <Input
-                    value=""
-                    readOnly
-                    placeholder="กดเลือกเอกสาร ใบรายงานผสมปุ๋ยผง"
+                    value={mixingReference}
+                    onChange={(event) => setMixingReference(event.target.value)}
+                    placeholder="กรอกเลขที่ใบรายงานผสมปุ๋ยผง (ถ้ามี)"
                     className="min-w-0 flex-1 bg-muted/40"
                   />
                   <Button
@@ -336,7 +382,7 @@ export function ProductProductionOrdersV1Workspace() {
                     <Link2 className="size-4" aria-hidden="true" />
                     ผูกกับ ใบรายงานผสมปุ๋ยผง
                   </Button>
-                  <Button type="button" variant="outline" disabled>ล้างการผูก</Button>
+                  <Button type="button" variant="outline" disabled={!mixingReference} onClick={() => setMixingReference("")}>ล้างเลขอ้างอิง</Button>
                 </div>
               </div>
             </div>
@@ -466,10 +512,10 @@ export function ProductProductionOrdersV1Workspace() {
           <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="flex items-start gap-2 text-sm text-muted-foreground">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              หน้านี้เป็นโครง UI เท่านั้น ยังไม่สร้างเลขเอกสารหรือบันทึกข้อมูลจริง
+              ระบบออกเลข PRD เมื่อบันทึกใบสั่งผลิต
             </p>
-            <Button type="button" disabled className="h-10 px-6">
-              บันทึก
+            <Button type="button" disabled={saving || formulasLoading || Boolean(formulasError)} onClick={() => void save()} className="h-10 px-6">
+              {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </div>
         </TabsContent>
@@ -477,7 +523,7 @@ export function ProductProductionOrdersV1Workspace() {
         <TabsContent value="history">
           <DocumentSection
             title="ข้อมูลที่บันทึก"
-            subtitle="ยังไม่มีข้อมูลจาก PostgreSQL"
+            subtitle="รายการจากใบสั่งผลิต V1 ที่บันทึกแล้ว"
           >
             <div className="mb-4 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-12">
               <div className="space-y-2 xl:col-span-4">
@@ -530,28 +576,59 @@ export function ProductProductionOrdersV1Workspace() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
+                  {filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize)).map((order, index) => {
+                    const actual = data?.produced[order.id] ?? 0;
+                    return <TableRow key={order.id}>
+                      {[(currentPage - 1) * Number(pageSize) + index + 1, order.documentNumber, order.location, order.date,
+                        order.sheet.lines[0].productName, order.amount, actual.toFixed(3), Math.max(0, Number(order.amount) - actual).toFixed(3),
+                        order.rows.filter((row) => row.date).map((row) => row.date).join(", ") || "—", order.note || "—",
+                        order.signers.preparedBy, order.signers.qaOfficer, order.signers.productionOfficer, order.signers.manager].map((value, column) => <TableCell key={column}>{value}</TableCell>)}
+                      <TableCell><Button variant="outline" size="sm" onClick={() => setView(order)}>ดูรายละเอียด</Button></TableCell>
+                    </TableRow>;
+                  })}
+                  {!filtered.length && <TableRow>
                     <TableCell colSpan={historyColumns.length} className="h-28 text-center text-muted-foreground">
-                      ไม่พบข้อมูลตามเงื่อนไข · รอเชื่อม PostgreSQL
+                      {loading ? "กำลังโหลด…" : "ไม่พบข้อมูลตามเงื่อนไข"}
                     </TableCell>
-                  </TableRow>
+                  </TableRow>}
                 </TableBody>
               </Table>
             </div>
-            <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <span>แสดง 0 จากทั้งหมด 0 รายการ (หน้า 1/1)</span>
-              <span>การดู แก้ไข พิมพ์ ส่งออก Excel และลบ จะแสดงเมื่อมีข้อมูลจริง</span>
-            </div>
+            <Pagination page={currentPage} pageSize={Number(pageSize)} total={filtered.length} onChange={setPage} />
           </DocumentSection>
         </TabsContent>
       </Tabs>
+      <Dialog open={view !== null} onOpenChange={(open) => { if (!open) setView(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader><DialogTitle>{view?.documentNumber}</DialogTitle>
+            <DialogDescription>ใบสั่งผลิต V1 · {view?.location}</DialogDescription>
+          </DialogHeader>
+          {view && <>
+            <ProductionFormulaDocument sheet={view.sheet} />
+            {view.mixingReference && <p>อ้างอิงใบรายงานผสมปุ๋ยผง {view.mixingReference}</p>}
+            {view.note && <p>หมายเหตุ {view.note}</p>}
+            <dl className="grid gap-2 sm:grid-cols-2">{signerFields.map(({ key, label }) => (
+              <div key={key}><dt>{label}</dt><dd>{view.signers[key] || "—"}</dd></div>
+            ))}</dl>
+            <Table><TableHeader><TableRow>{["วันที่ผลิต", "T1 (ตัน) / Lot", "T2 (ตัน) / Lot", "T4 (ตัน) / Lot", "กะ", "ผู้ผลิต"].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+              <TableBody>{view.rows.map((row) => <TableRow key={row.id}>
+                <TableCell>{row.date || "—"}</TableCell>
+                <TableCell>{row.lineT1Qty || "—"} / {row.lineT1Lot || "—"}</TableCell>
+                <TableCell>{row.lineT2Qty || "—"} / {row.lineT2Lot || "—"}</TableCell>
+                <TableCell>{row.lineT4Qty || "—"} / {row.lineT4Lot || "—"}</TableCell>
+                <TableCell>{row.shift || "—"}</TableCell><TableCell>{row.producer || "—"}</TableCell>
+              </TableRow>)}</TableBody>
+            </Table>
+          </>}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={docNumberOpen} onOpenChange={setDocNumberOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-5xl">
           <DialogHeader className="bg-[#84CAED] px-5 py-4 text-left text-white">
             <DialogTitle>สร้างหมายเลข PRD</DialogTitle>
             <DialogDescription className="text-white/90">
-              เลข PRD จะถูกจองจริงหลังเชื่อมระบบและกด “ใช้เลขนี้”
+              ตัวอย่างรูปแบบเลขที่ใบสั่งผลิต
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 px-5">
@@ -578,16 +655,13 @@ export function ProductProductionOrdersV1Workspace() {
               ))}
             </div>
             <p className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-[#1e3868]">
-              UI นี้ยังไม่จองเลขลงฐานข้อมูล
+              ระบบจะกำหนดเลขจริงเมื่อบันทึกเอกสาร
             </p>
           </div>
           <DialogFooter className="border-t px-5 py-4">
             <DialogClose asChild>
               <Button variant="outline">ปิด</Button>
             </DialogClose>
-            <Button disabled className="bg-[#84CAED] text-white">
-              ใช้เลขนี้ · รอเชื่อมระบบ
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -616,11 +690,16 @@ export function ProductProductionOrdersV1Workspace() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
+                  {formulaOptions.filter(({ row, product }) => `${row.code} ${row.name} ${product.code} ${product.name}`.toLowerCase().includes(formulaSearch.trim().toLowerCase())).map(({ row, product }) => (
+                    <TableRow key={row.id}><TableCell>{product.code}</TableCell><TableCell>{product.name}</TableCell>
+                    <TableCell>{product.usageType || "—"}</TableCell><TableCell>{row.code} · {row.version}</TableCell>
+                    <TableCell><Button size="sm" variant="outline" onClick={() => { setFormula(row.id); setFormulaOpen(false); }}>เลือกสูตร</Button></TableCell></TableRow>
+                  ))}
+                  {(!formulaOptions.length || formulasError) && <TableRow>
                     <TableCell colSpan={5} className="h-28 text-center text-gray-500">
-                      ยังไม่เชื่อมข้อมูลสูตรจาก BOM
+                      {formulasError || (formulasLoading ? "กำลังโหลดสูตร…" : "ยังไม่มีสูตร BOM ที่เปิดใช้งาน")}
                     </TableCell>
-                  </TableRow>
+                  </TableRow>}
                 </TableBody>
               </Table>
             </div>
