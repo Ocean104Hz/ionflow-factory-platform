@@ -156,7 +156,7 @@ export function StockWipTable({
     CLOSING_COLUMN,
   ];
 
-  const totalColumns = 5 + quantityColumns.length + (onViewDaily ? 1 : 0);
+  const totalColumns = 4 + quantityColumns.length + (onViewDaily ? 1 : 0);
 
   return (
     <section aria-label="ตาราง Stock WIP" className="min-w-0 space-y-3">
@@ -189,9 +189,6 @@ export function StockWipTable({
               </TableHead>
               <TableHead rowSpan={2} scope="col" className="min-w-52">
                 รายการ
-              </TableHead>
-              <TableHead rowSpan={2} scope="col" className="w-20 text-center">
-                หน่วย
               </TableHead>
               <TableHead
                 rowSpan={2}
@@ -291,9 +288,6 @@ export function StockWipTable({
                   </TableCell>
                   <TableCell className="max-w-60 whitespace-normal font-medium leading-relaxed text-foreground">
                     {row.item.name}
-                  </TableCell>
-                  <TableCell className="text-center text-muted-foreground">
-                    {row.item.unit}
                   </TableCell>
                   {quantityColumns.map((column) => (
                     <TableCell

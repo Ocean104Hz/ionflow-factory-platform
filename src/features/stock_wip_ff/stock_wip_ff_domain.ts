@@ -9,17 +9,6 @@ export const STOCK_WIP_MONTHS = [
 ] as const;
 
 export type StockWipMonth = (typeof STOCK_WIP_MONTHS)[number];
-export type StockWipCategory = "LIQUID_FERTILIZER" | "TABLET";
-export type StockWipUnit = "L" | "Pcs.";
-
-export const STOCK_WIP_CATEGORIES = [
-  { id: "LIQUID_FERTILIZER", label: "Lliquid fertilizer (L)", unit: "L" },
-  { id: "TABLET", label: "Tablet (Pcs.)", unit: "Pcs." },
-] as const satisfies readonly {
-  id: StockWipCategory;
-  label: string;
-  unit: StockWipUnit;
-}[];
 
 /** The workbook has annual sheets for 2568/2569 and monthly sheets for 2569. */
 export type StockWipPeriod =
@@ -68,8 +57,6 @@ export interface StockWipItem {
   code_new: string;
   code_old: string | null;
   name: string;
-  category: StockWipCategory;
-  unit: StockWipUnit;
 }
 
 export interface StockWipDailyEntry {
@@ -93,15 +80,21 @@ export interface StockWipSheet {
   updated_at: string;
 }
 
+/** Input for creating one WIP item in a monthly draft. */
+export interface StockWipCreateInput {
+  code_new: string;
+  code_old: string;
+  name: string;
+  daily: StockWipDailyEntry[];
+}
+
 export interface StockWipFilters {
   period: StockWipPeriod;
-  category: StockWipCategory | "ALL";
   search: string;
 }
 
 export const DEFAULT_STOCK_WIP_FILTERS: StockWipFilters = {
   period: { view: "MONTH", year_be: 2569, month: 1 },
-  category: "ALL",
   search: "",
 };
 
@@ -146,6 +139,15 @@ export function blankStockWipSummary(
     opening_balance: "",
     ...blankStockWipMovement(supportsBioTransfer),
     closing_balance: "",
+  };
+}
+
+export function blankStockWipCreateInput(): StockWipCreateInput {
+  return {
+    code_new: "",
+    code_old: "",
+    name: "",
+    daily: [],
   };
 }
 
@@ -304,13 +306,6 @@ export function validateStockWipSheet(
     }
     itemCodes.add(code);
 
-    const category = STOCK_WIP_CATEGORIES.find(
-      (candidate) => candidate.id === row.item.category,
-    );
-    if (!category || category.unit !== row.item.unit) {
-      errors[`${code}.item.unit`] = "Item category and unit do not match.";
-    }
-
     for (const field of STOCK_WIP_SUMMARY_FIELDS) {
       const value = row.summary[field];
       const key = `${code}.summary.${field}`;
@@ -356,6 +351,74 @@ export function validateStockWipSheet(
   }
 
   return errors;
+}
+
+/** Add one WIP item to the selected monthly draft without changing other rows. */
+export function addStockWipRow(
+  sheet: StockWipSheet,
+  input: StockWipCreateInput,
+): StockWipSheet {
+  if (sheet.period.view !== "MONTH") {
+    throw new Error("Stock WIP FF creation requires a monthly sheet.");
+  }
+
+  const codeNew = input.code_new.trim();
+  const name = input.name.trim();
+  if (!codeNew) {
+    throw new Error("The WIP item code is required.");
+  }
+  if (!name) {
+    throw new Error("The WIP item name is required.");
+  }
+  if (sheet.rows.some((row) => row.item.code_new.trim() === codeNew)) {
+    throw new Error("The WIP item code already exists in the selected month.");
+  }
+
+  const nextNo =
+    sheet.rows.reduce((highest, row) => Math.max(highest, row.item.no), 0) +
+    1;
+  if (!Number.isSafeInteger(nextNo) || nextNo < 1) {
+    throw new Error("Cannot assign a valid WIP item number.");
+  }
+
+  const row: StockWipRow = {
+    item: {
+      no: nextNo,
+      code_new: codeNew,
+      code_old: input.code_old.trim() || null,
+      name,
+    },
+    summary: blankStockWipSummary(sheet.supports_bio_transfer),
+    daily: input.daily
+      .map((entry) => ({
+        date: entry.date,
+        values: { ...entry.values },
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
+  };
+
+  // Check every new daily cell, including the unavailable BIO column.
+  for (const entry of row.daily) {
+    for (const field of STOCK_WIP_MOVEMENT_FIELDS) {
+      const value = entry.values[field];
+      if (field === "transfer_bio" && !sheet.supports_bio_transfer) {
+        if (value !== null) {
+          throw new Error("BIO transfer is unavailable in this source sheet.");
+        }
+      } else if (typeof value !== "string" || !isValidStockWipQuantity(value)) {
+        throw new Error("Enter a nonnegative number or leave the cell empty.");
+      }
+    }
+  }
+
+  // Validate the new row without blocking creation on other draft edits.
+  const errors = validateStockWipSheet({ ...sheet, rows: [row] });
+  const firstError = Object.values(errors)[0];
+  if (firstError) {
+    throw new Error(firstError);
+  }
+
+  return { ...sheet, rows: [...sheet.rows, row] };
 }
 
 /** Immutable in-memory save/upsert. A browser reload resets to mock fixtures. */

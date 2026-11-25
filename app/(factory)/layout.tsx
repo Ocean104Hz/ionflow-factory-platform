@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { AppShell } from "@/src/components/factory/app-shell";
 import { DemoProvider } from "@/src/components/factory/demo-provider";
 import { PRProvider } from "@/src/features/purchase-requisitions/pr-provider";
@@ -12,6 +13,9 @@ import { PackagingProvider } from "@/src/features/packaging-reports/packaging-pr
 import { ProductionFlowProvider } from "@/src/features/production-flow/production-flow-provider";
 import { requireAuthenticatedFactoryUser } from "@/src/server/auth/server-auth";
 
+// The layout checks the session before rendering the protected workspace.
+export const instant = false;
+
 export default function FactoryLayout({
   children,
 }: {
@@ -24,7 +28,13 @@ export default function FactoryLayout({
   );
 }
 
-async function AuthenticatedFactory({ children }: { children: React.ReactNode }) {
+async function AuthenticatedFactory({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  await connection();
+
   const user = await requireAuthenticatedFactoryUser();
   return (
     <MasterDataProvider>

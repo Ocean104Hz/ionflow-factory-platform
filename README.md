@@ -4,13 +4,7 @@ Phase 1 reusable factory interface. Next.js App Router + TypeScript + Tailwind C
 
 ## Run locally
 
-```powershell
-cd "D:\Program Files\Project\ionflow-factory-platform"
-npm run dev
-```
-
-Open the localhost URL printed by Next.js. The root redirects to `/login`.
-No environment variables, credentials, database, or authentication are required.
+See the [installation guide](INSTALL.md) for package setup and local startup on Windows. For Firebase sign-in and database access, follow the [identity and access setup](docs/identity-access.md).
 
 ## Pages
 
