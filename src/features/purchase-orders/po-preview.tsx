@@ -41,5 +41,21 @@ export function PoPreview({ docs,onClose }: { docs: PurchaseOrder[]; onClose: ()
     iframe.srcdoc = "<!doctype html><html lang='th'><head><meta charset='utf-8'></head><body></body></html>";
     frame.current = iframe; document.body.append(iframe);
   }
-  return <Dialog open={docs.length>0} onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="flex max-h-[94dvh] w-[96vw] flex-col sm:max-w-5xl"><DialogHeader><DialogTitle>พรีวิวใบสั่งซื้อ</DialogTitle><DialogDescription>A4 แนวตั้ง · {docs.length} เอกสาร</DialogDescription></DialogHeader><div ref={content} className="min-h-0 space-y-5 overflow-y-auto">{docs.map((doc) => <PoPaper key={doc.id} doc={doc} />)}</div><DialogFooter><Button variant="outline" onClick={onClose}>ปิด</Button><Button onClick={print}>พิมพ์</Button></DialogFooter></DialogContent></Dialog>;
+  return (
+    <Dialog open={docs.length > 0} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent variant="preview" className="sm:max-w-5xl">
+        <DialogHeader className="pr-8">
+          <DialogTitle>พรีวิวใบสั่งซื้อ</DialogTitle>
+          <DialogDescription>A4 แนวตั้ง · {docs.length} เอกสาร</DialogDescription>
+        </DialogHeader>
+        <div ref={content} className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+          {docs.map((doc) => <PoPaper key={doc.id} doc={doc} />)}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>ปิด</Button>
+          <Button onClick={print}>พิมพ์</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

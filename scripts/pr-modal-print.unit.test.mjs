@@ -59,7 +59,6 @@ test("PR modals keep document forms responsive, action footers visible and stand
   const list = read("src/features/purchase-requisitions/pr-list.tsx");
   const editor = read("src/features/purchase-requisitions/pr-editor.tsx");
   const components = read("src/features/purchase-requisitions/pr-components.tsx");
-  const preview = read("src/features/purchase-requisitions/pr-print-preview.tsx");
 
   assert.ok(list.includes('w-[min(96vw,1500px)]'));
   assert.ok(list.includes('flex max-h-[94dvh] min-h-0'));
@@ -81,6 +80,15 @@ test("PR modals keep document forms responsive, action footers visible and stand
   assert.ok(components.includes('size="wide"'));
   assert.ok(components.includes('w-[min(96vw,1250px)]'));
   assert.ok(components.includes('variant="detail"'));
+});
+
+test("PR print preview gives the document frame the viewport space left by the header and actions", () => {
+  const preview = read("src/features/purchase-requisitions/pr-print-preview.tsx");
+  const dialog = read("src/components/ui/dialog.tsx");
+
   assert.ok(preview.includes('w-[min(96vw,1200px)]'));
-  assert.ok(preview.includes('h-[65dvh] min-h-64 w-full flex-1'));
+  assert.ok(preview.includes('<DialogContent variant="preview"'));
+  assert.ok(preview.includes('min-h-0 w-full flex-1'));
+  assert.ok(dialog.includes('h-[calc(100dvh-1rem)]'));
+  assert.ok(dialog.includes('sm:h-[92dvh]'));
 });

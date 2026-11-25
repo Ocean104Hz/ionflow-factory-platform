@@ -407,7 +407,7 @@ export function PRPreview({
           พรีวิวข้อมูล Excel
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[94dvh] min-h-0 w-[min(96vw,1250px)] max-w-none flex-col overflow-hidden sm:max-w-none">
+      <DialogContent variant="preview" className="w-[min(96vw,1250px)] max-w-none sm:max-w-none">
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>พรีวิวข้อมูลสำหรับ Excel</DialogTitle>
           <DialogDescription>

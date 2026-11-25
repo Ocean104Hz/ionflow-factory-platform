@@ -108,6 +108,7 @@ export function LabSampleReceivingDetail({
       }}
     >
       <DialogContent
+        variant={print ? "preview" : "default"}
         className={
           "flex max-h-[94dvh] w-[96vw] max-w-none " +
           "flex-col gap-4 overflow-hidden p-4 " +

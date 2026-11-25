@@ -185,7 +185,7 @@ export function MixingExportPreview({ rows }: { rows: MixingReport[] }) {
       <DialogTrigger asChild>
         <Button variant="outline">Excel Preview</Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[90dvh] w-[96vw] max-w-[96vw] flex-col overflow-hidden sm:max-w-5xl">
+      <DialogContent variant="preview" className="sm:max-w-5xl">
         <DialogHeader className="pr-8">
           <DialogTitle>ตัวอย่างตารางส่งออก Excel · UI Demo</DialogTitle>
           <DialogDescription>
@@ -193,7 +193,7 @@ export function MixingExportPreview({ rows }: { rows: MixingReport[] }) {
             แสดงคอลัมน์ตัวอย่างเท่านั้น ยังไม่สร้างหรือดาวน์โหลดไฟล์ Excel
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <FactoryDataTable
             rows={rows}
             columns={columns}

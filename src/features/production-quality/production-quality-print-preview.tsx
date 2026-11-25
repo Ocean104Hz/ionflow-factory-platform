@@ -37,7 +37,7 @@ export function QualityPrintPreview({ row }: { row: Inspection }) {
           พรีวิวพิมพ์
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] max-w-[96vw] flex-col overflow-hidden sm:max-w-6xl">
+      <DialogContent variant="preview">
         <DialogHeader className="pr-8">
           <DialogTitle>ตัวอย่างพิมพ์การตรวจสอบคุณภาพ</DialogTitle>
           <DialogDescription>
@@ -51,7 +51,7 @@ export function QualityPrintPreview({ row }: { row: Inspection }) {
           sandbox="allow-same-origin allow-modals"
           srcDoc={html}
           onLoad={() => setLoaded(html)}
-          className="h-[65dvh] min-h-0 w-full rounded-lg border bg-white"
+          className="min-h-0 w-full flex-1 rounded-lg border bg-white"
         />
         {error && (
           <p role="alert" className="text-danger">

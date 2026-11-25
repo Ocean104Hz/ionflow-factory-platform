@@ -51,9 +51,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  variant = "default",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
+  variant?: "default" | "preview";
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -62,6 +64,8 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          variant === "preview" &&
+            "flex h-[calc(100dvh-1rem)] min-h-0 w-[calc(100%-1rem)] max-w-none flex-col gap-3 overflow-hidden p-3 sm:h-[92dvh] sm:max-w-6xl sm:gap-4 sm:p-6 [@media(max-height:480px)]:gap-2 [@media(max-height:480px)]:p-3 [&>[data-slot=dialog-header]]:shrink-0 [&>[data-slot=dialog-footer]]:shrink-0 [&>[data-slot=dialog-footer]]:flex-row [&>[data-slot=dialog-footer]]:flex-wrap [&>[data-slot=dialog-footer]]:justify-end",
           className,
         )}
         {...props}

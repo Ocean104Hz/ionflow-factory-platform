@@ -47,7 +47,7 @@ export function MixingPrintPreview({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] max-w-[96vw] flex-col overflow-hidden sm:max-w-5xl">
+      <DialogContent variant="preview" className="sm:max-w-5xl">
         <DialogHeader className="pr-8">
           <DialogTitle>ตัวอย่างพิมพ์รายงานผสมปุ๋ยผง</DialogTitle>
           <DialogDescription>
@@ -61,7 +61,7 @@ export function MixingPrintPreview({
           sandbox="allow-same-origin allow-modals"
           srcDoc={html}
           onLoad={() => setLoaded(html)}
-          className="h-[64dvh] min-h-0 w-full rounded-lg border bg-white"
+          className="min-h-0 w-full flex-1 rounded-lg border bg-white"
         />
         {error && (
           <p role="alert" className="text-danger">

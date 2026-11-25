@@ -26,7 +26,7 @@ export function NCReportPrintPreview({
         if (!v) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] flex-col sm:max-w-7xl">
+      <DialogContent variant="preview" className="sm:max-w-7xl">
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>พรีวิวพิมพ์ใบ NC</DialogTitle>
           <DialogDescription>
@@ -35,7 +35,7 @@ export function NCReportPrintPreview({
           </DialogDescription>
         </DialogHeader>
         <div
-          className="min-h-0 overflow-auto rounded-lg border bg-muted p-3"
+          className="min-h-0 flex-1 overflow-auto rounded-lg border bg-muted p-3"
           role="region"
           aria-label="เอกสาร NC A4 แนวนอน เลื่อนเพื่ออ่านทั้งหมด"
           tabIndex={0}

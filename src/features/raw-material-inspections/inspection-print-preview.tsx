@@ -61,7 +61,7 @@ export function InspectionPrintPreview({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] max-w-[96vw] flex-col sm:max-w-6xl">
+      <DialogContent variant="preview">
         <DialogHeader className="pr-8">
           <DialogTitle>ตัวอย่างใบตรวจสอบคุณภาพวัตถุดิบก่อนพิมพ์</DialogTitle>
           <DialogDescription>
@@ -73,7 +73,7 @@ export function InspectionPrintPreview({
         <iframe
           ref={frame}
           title="พรีวิวใบตรวจสอบคุณภาพวัตถุดิบ"
-          className="h-[65dvh] min-h-0 w-full rounded-md border bg-white"
+          className="min-h-0 w-full flex-1 rounded-md border bg-white"
           sandbox="allow-same-origin allow-modals"
           srcDoc={html}
           onLoad={() => setLoadedHtml(html)}

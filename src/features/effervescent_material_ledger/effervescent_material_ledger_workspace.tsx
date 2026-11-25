@@ -284,7 +284,8 @@ export function EffervescentMaterialLedgerWorkspace() {
       >
         <DialogContent
           showCloseButton={false}
-          className="flex max-h-[94dvh] w-[96vw] max-w-none flex-col gap-4 overflow-hidden p-4 sm:max-w-330 sm:p-6"
+          variant="preview"
+          className="sm:max-w-330"
         >
           <DialogHeader className="shrink-0">
             <DialogTitle>ตัวอย่างเอกสารก่อนพิมพ์</DialogTitle>

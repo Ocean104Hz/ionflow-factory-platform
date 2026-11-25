@@ -142,7 +142,7 @@ export function OrganicExtractionMaterialLedgerDetail({
         }
       }}
     >
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] max-w-none flex-col gap-4 overflow-hidden p-4 sm:max-w-350 sm:p-6">
+      <DialogContent variant={print ? "preview" : "default"} className="flex max-h-[94dvh] w-[96vw] max-w-none flex-col gap-4 overflow-hidden p-4 sm:max-w-350 sm:p-6">
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>
             {print ? labels.paper : labels.details}{" "}
