@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { CalendarDays, Trash2 } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
@@ -338,20 +339,12 @@ export function StockWipTable({
                     </TableCell>
                   )}
                   {onDelete && (
-                    <TableCell className="text-center">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={disabled}
-                        onClick={() => onDelete(row)}
-                        aria-label={`ลบรายการ ${row.item.code_new} ${row.item.name}`}
-                        className="text-destructive hover:text-destructive"
-                      >
+                    <TableCell className="text-center"><RowActionMenu>
+                      <RowActionItem type="button" disabled={disabled} onClick={() => onDelete(row)} aria-label={`ลบรายการ ${row.item.code_new} ${row.item.name}`} className="w-full justify-start text-destructive">
                         <Trash2 className="size-4" aria-hidden="true" />
                         ลบ
-                      </Button>
-                    </TableCell>
+                      </RowActionItem>
+                    </RowActionMenu></TableCell>
                   )}
                 </TableRow>
               ))

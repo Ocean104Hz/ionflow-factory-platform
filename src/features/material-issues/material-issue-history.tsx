@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import {
     Eye,
@@ -225,7 +226,7 @@ export function MaterialIssueHistory({
             </div>
 
             {/* ตารางประวัติ */}
-            <FactoryDataTable
+            <FactoryDataTable variant="history"
                 rows={visibleRecords}
                 rowKey={(record) => record.id}
                 minWidth={1100}
@@ -297,67 +298,36 @@ export function MaterialIssueHistory({
                         key: "actions",
                         label: "จัดการ",
                         render: (record) => (
-                            <div className="flex items-center gap-1">
+                            <RowActionMenu containsDialog>
                                 {/* ดูรายละเอียด */}
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-9 hover:bg-primary/5 hover:text-primary"
-                                    title="ดูรายละเอียด"
-                                    aria-label="ดูรายละเอียด"
-                                    onClick={() => onView(record)}
-                                >
+                                <RowActionItem type="button" title="ดูรายละเอียด" aria-label="ดูรายละเอียด" onClick={() => onView(record)}>
                                     <Eye className="size-4" />
-                                </Button>
+                                 ดูรายละเอียด</RowActionItem>
 
                                 {/* แก้ไข */}
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-9 hover:bg-primary/5 hover:text-primary"
-                                    title="แก้ไข"
-                                    aria-label="แก้ไข"
-                                    onClick={() => onEdit(record)}
-                                >
+                                <RowActionItem type="button" title="แก้ไข" aria-label="แก้ไข" onClick={() => onEdit(record)}>
                                     <Pencil className="size-4" />
-                                </Button>
+                                 แก้ไข</RowActionItem>
 
                                 {/* พิมพ์เอกสาร */}
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-9 hover:bg-primary/5 hover:text-primary"
-                                    title="พิมพ์เอกสาร"
-                                    aria-label="พิมพ์เอกสาร"
-                                    onClick={() => {
+                                <RowActionItem type="button" title="พิมพ์เอกสาร" aria-label="พิมพ์เอกสาร" onClick={() => {
                                         window.alert("ยังไม่ได้พัฒนาระบบพิมพ์เอกสาร");
-                                    }}
-                                >
+                                    }}>
                                     <Printer className="size-4" />
-                                </Button>
+                                 พิมพ์เอกสาร</RowActionItem>
 
                                 {/* ลบเอกสาร */}
                                 <ConfirmDialog
                                     title={`ลบ ${record.documentNo}?`}
                                     description="เป็นการลบข้อมูลใบเบิกจ่ายวัสดุตัวอย่างเท่านั้น ไม่มีผลต่อฐานข้อมูลหรือสต็อกจริง"
                                     trigger={
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="size-9 hover:bg-destructive/5 hover:text-destructive"
-                                            title="ลบเอกสาร"
-                                            aria-label="ลบเอกสาร"
-                                        >
+                                        <RowActionItem type="button" title="ลบเอกสาร" aria-label="ลบเอกสาร" className="w-full justify-start text-destructive">
                                             <Trash2 className="size-4" />
-                                        </Button>
+                                         ลบเอกสาร</RowActionItem>
                                     }
                                     onConfirm={() => onDelete(record)}
                                 />
-                            </div>
+                            </RowActionMenu>
                         ),
                     },
                 ]}

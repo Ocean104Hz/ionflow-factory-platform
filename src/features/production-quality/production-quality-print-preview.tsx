@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
 import { useBranding } from "@/src/components/factory/branding-provider";
 import { buildQualityPrintHtml } from "./production-quality-print";
 import type { Inspection } from "./production-quality-domain";
-export function QualityPrintPreview({ row }: { row: Inspection }) {
+export function QualityPrintPreview({ row, trigger }: { row: Inspection; trigger?: ReactNode }) {
   const { branding } = useBranding();
   const frame = useRef<HTMLIFrameElement>(null);
   const html = useMemo(
@@ -33,9 +33,9 @@ export function QualityPrintPreview({ row }: { row: Inspection }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        {trigger ?? (<Button type="button" variant="outline" size="sm">
           พรีวิวพิมพ์
-        </Button>
+        </Button>)}
       </DialogTrigger>
       <DialogContent variant="preview">
         <DialogHeader className="pr-8">

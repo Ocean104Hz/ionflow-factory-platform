@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Pencil, CircleDollarSign } from "lucide-react";
 import { useDemo } from "@/src/components/factory/demo-provider";
@@ -13,25 +14,22 @@ import {
   type Filters,
 } from "@/src/components/factory/patterns";
 import { FormDialog } from "@/src/components/factory/confirm-dialog";
-import { Button } from "@/src/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { money, date, dateTime } from "@/src/lib/formatters";
 import { demoDate, type Product } from "@/src/lib/mock-data";
 function PriceAction({ product }: { product: Product }) {
   const { updateProduct } = useDemo();
   return (
-    <FormDialog
+    <RowActionMenu containsDialog><FormDialog
       title={product.price === null ? "ตั้งราคาสินค้า" : "เปลี่ยนราคาสินค้า"}
       description={`${product.sku} · ${product.name} · ราคา demo เท่านั้น`}
       trigger={
-        <Button
-          variant="outline"
-          size="sm"
+        <RowActionItem
           disabled={product.status !== "ใช้งาน"}
         >
           <CircleDollarSign />
           {product.price === null ? "ตั้งราคา" : "เปลี่ยนราคา"}
-        </Button>
+        </RowActionItem>
       }
       fields={[
         {
@@ -67,7 +65,7 @@ function PriceAction({ product }: { product: Product }) {
         })
       }
       submitLabel="บันทึกราคา"
-    />
+    /></RowActionMenu>
   );
 }
 export function Products() {
@@ -114,14 +112,14 @@ export function Products() {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <FormDialog
+        <RowActionMenu containsDialog><FormDialog
           title="รายละเอียดสินค้า"
           description={`${r.sku} · แก้ไขเฉพาะชื่อและรายละเอียด demo`}
           trigger={
-            <Button variant="ghost" size="sm">
+            <RowActionItem >
               <Pencil />
               รายละเอียด
-            </Button>
+            </RowActionItem>
           }
           fields={[
             {
@@ -141,7 +139,7 @@ export function Products() {
               updated: new Date().toISOString(),
             })
           }
-        />
+        /></RowActionMenu>
       ),
     },
   ];

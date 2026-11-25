@@ -1,6 +1,7 @@
 
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 
 import {
@@ -330,7 +331,7 @@ export function QcProductWeightCheckHistory({
 
       {/* History Table */}
 
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paginated.items}
         rowKey={(document) => document.id}
         minWidth={1350}
@@ -453,68 +454,47 @@ export function QcProductWeightCheckHistory({
             key: "actions",
             label: "จัดการ",
             render: (document) => (
-              <div className="flex flex-wrap items-center gap-2">
+              <RowActionMenu>
                 {/* View */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onView(document)}
-                >
+                <RowActionItem type="button" onClick={() => onView(document)}>
                   <Eye
                     className="size-4"
                     aria-hidden="true"
                   />
                   ดู
-                </Button>
+                </RowActionItem>
 
                 {/* Print Preview */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onPrint(document)}
-                >
+                <RowActionItem type="button" onClick={() => onPrint(document)}>
                   <Printer
                     className="size-4"
                     aria-hidden="true"
                   />
                   พรีวิว
-                </Button>
+                </RowActionItem>
 
                 {/* Edit */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(document)}
-                >
+                <RowActionItem type="button" onClick={() => onEdit(document)}>
                   <Pencil
                     className="size-4"
                     aria-hidden="true"
                   />
                   แก้ไข
-                </Button>
+                </RowActionItem>
 
                 {/* Delete */}
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger hover:text-danger"
-                  onClick={() => onDelete(document)}
-                >
+                <RowActionItem type="button" onClick={() => onDelete(document)} className="w-full justify-start text-destructive">
                   <Trash2
                     className="size-4"
                     aria-hidden="true"
                   />
                   ลบ
-                </Button>
-              </div>
+                </RowActionItem>
+              </RowActionMenu>
             ),
           },
         ]}

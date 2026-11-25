@@ -11,10 +11,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { ReceivingHistory } from "./receiving-history";
 import { Label } from "@/src/components/ui/label";
-import { PageHeader, SectionCard } from "@/src/components/factory/patterns";
+import { DocumentViewActions, PageHeader, SectionCard } from "@/src/components/factory/patterns";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import {
   Dialog,
@@ -146,7 +145,7 @@ export function ReceivingHeaderWorkspace() {
     null,
   );
   const [generatingDocNo, setGeneratingDocNo] = useState(false);
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [version, setVersion] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const isEditing = editingDocumentNo !== null;
@@ -327,14 +326,27 @@ export function ReceivingHeaderWorkspace() {
       <PageHeader
         title="รับวัตถุดิบและวัสดุ"
         description="บันทึกและเปิดใบรับวัตถุดิบและวัสดุ"
+        actions={tab === "history" && editingDocumentNo ? (
+          <ConfirmDialog
+            title="สร้างใบรับใหม่?"
+            description="หากใบรับที่เปิดไว้มีการแก้ไขที่ยังไม่ได้บันทึก ข้อมูลนั้นจะถูกแทนที่"
+            trigger={<Button type="button" variant="outline" disabled={saving || generatingDocNo}><Plus aria-hidden="true" />สร้างใบรับ</Button>}
+            onConfirm={() => { resetHeader(); setTab("form"); }}
+          />
+        ) : (
+          <DocumentViewActions
+            showingForm={tab === "form"}
+            createLabel="สร้างใบรับ"
+            disabled={saving || generatingDocNo}
+            onCreate={() => setTab("form")}
+            onHistory={() => setTab("history")}
+          />
+        )}
       />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList aria-label="มุมมองใบรับวัตถุดิบและวัสดุ">
-          <TabsTrigger value="form" disabled={saving || generatingDocNo}>กรอกใบรับ</TabsTrigger>
-          <TabsTrigger value="history" disabled={saving || generatingDocNo}>ประวัติใบรับ</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form">
+      <div>
+
+        {tab === "form" && (<div>
       <fieldset disabled={saving || generatingDocNo} className="min-w-0 space-y-5">
       <SectionCard
         title="ส่วนหัวเอกสาร"
@@ -646,11 +658,11 @@ export function ReceivingHeaderWorkspace() {
         </Button>
       </div>
       </fieldset>
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
+        </div>)}
+        {tab === "history" && (<div className="mt-4">
           <ReceivingHistory onOpen={openSavedDocument} />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <Dialog
         open={!!preview}
         onOpenChange={(open) => {

@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
@@ -96,12 +97,12 @@ export const salesHubColumns: Column<ProductionOrder>[] = [
     key: "actions",
     label: "จัดการ",
     render: (r) => (
-      <Button variant="ghost" size="sm" asChild>
+      <RowActionMenu readOnly><RowActionItem asChild>
         <Link href={`/production-orders/${r.id}`} aria-label={`ดู ${r.number}`}>
           ดูรายละเอียด
           <ArrowUpRight />
         </Link>
-      </Button>
+      </RowActionItem></RowActionMenu>
     ),
   },
 ];
@@ -151,7 +152,7 @@ export function ProductionOrderList() {
       <PageHeader
         title="คำสั่งการผลิต"
         description="รายการคำสั่งการผลิตจาก Sales Hub และ Datalink"
-        actions={<>{process.env.NODE_ENV === "development" && <Button disabled={busy} onClick={() => setCreating(true)}>เพิ่มคำสั่ง Local</Button>}<RefreshButton onClick={refresh} /></>}
+        actions={<>{process.env.NODE_ENV === "development" && <Button variant="outline" disabled={busy} onClick={() => setCreating(true)}>เพิ่มคำสั่ง Local</Button>}<RefreshButton onClick={refresh} /></>}
       />
       {creating && <ProductionOrderEditor onClose={() => setCreating(false)} />}
       {error && <p role="alert" className="text-danger">{error}</p>}
@@ -177,7 +178,7 @@ export function ProductionOrderList() {
           </TabsList>
         </Tabs>
       </div>
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={rows.slice(
           (currentPage - 1) * filters.pageSize,

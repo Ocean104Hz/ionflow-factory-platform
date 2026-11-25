@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
 import { useBranding } from "@/src/components/factory/branding-provider";
 import { buildPackagingPrintHtml } from "./packaging-print";
 import type { PackagingReport } from "./packaging-domain";
-export function PackagingPrintPreview({ report }: { report: PackagingReport }) {
+export function PackagingPrintPreview({ report, trigger }: { report: PackagingReport; trigger?: ReactNode }) {
   const { branding } = useBranding(),
     frame = useRef<HTMLIFrameElement>(null);
   const html = useMemo(
@@ -33,9 +33,9 @@ export function PackagingPrintPreview({ report }: { report: PackagingReport }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        {trigger ?? (<Button type="button" variant="outline" size="sm">
           พรีวิวพิมพ์
-        </Button>
+        </Button>)}
       </DialogTrigger>
       <DialogContent variant="preview">
         <DialogHeader className="pr-8">

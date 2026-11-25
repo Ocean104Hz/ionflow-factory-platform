@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Search, SlidersHorizontal } from "lucide-react";
@@ -121,15 +122,10 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
       key: "view",
       label: "ดูรายละเอียด",
       render: (entry) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`ดูรายละเอียด ${entry.id}`}
-          onClick={() => setSelected(entry)}
-        >
+        <RowActionMenu readOnly><RowActionItem aria-label={`ดูรายละเอียด ${entry.id}`} onClick={() => setSelected(entry)}>
           <Eye aria-hidden="true" />
           ดู
-        </Button>
+        </RowActionItem></RowActionMenu>
       ),
     },
   ];
@@ -311,7 +307,7 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
           />
         </div>
       </div>
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={rows.slice(
           (page - 1) * Number(pageSize),
@@ -377,7 +373,7 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
               <section className="space-y-3">
                 <h2 className="text-sm font-semibold">ข้อมูลก่อน–หลังแก้ไข</h2>
                 {selected.changes.length ? (
-                  <FactoryDataTable
+                  <FactoryDataTable variant="history"
                     minWidth={520}
                     rows={selected.changes}
                     rowKey={(change) => change.field}

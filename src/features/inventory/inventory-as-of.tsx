@@ -131,7 +131,7 @@ export function InventoryAsOf({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
-              <FactoryDataTable
+              <FactoryDataTable variant="history"
                 columns={columns}
                 rows={historicalRow?.balances ?? []}
                 rowKey={(balance) => balance.id}

@@ -3,19 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
 
-import {
+import { DocumentViewActions,
     PageHeader,
     StatusBadge,
 } from "@/src/components/factory/patterns";
 
 import { Button } from "@/src/components/ui/button";
 
-import {
-    Tabs,
-    TabsList,
-    TabsTrigger,
-    TabsContent,
-} from "@/src/components/ui/tabs";
 
 import {
     AlertDialog,
@@ -100,7 +94,7 @@ async function fetchRecord(id: string): Promise<MaterialIssueRecord> {
 }
 
 export function MaterialIssueWorkspace() {
-    const [tab, setTab] = useState("form");
+    const [tab, setTab] = useState("history");
 
     const [records, setRecords] = useState<
         MaterialIssueRecord[]
@@ -607,34 +601,11 @@ export function MaterialIssueWorkspace() {
             {/* Page Header */}
             <PageHeader
                 title="ใบเบิกจ่ายวัสดุ"
-                actions={
-                    <StatusBadge tone="info">
-                        {connected
-                            ? "เชื่อมต่อฐานข้อมูลแล้ว"
-                            : "ยังไม่เชื่อมต่อฐานข้อมูล"}
-                    </StatusBadge>
-                }
+                actions={<><StatusBadge tone="info">{connected ? "เชื่อมต่อฐานข้อมูลแล้ว" : "ยังไม่เชื่อมต่อฐานข้อมูล"}</StatusBadge><DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบเบิกจ่ายวัสดุ" disabled={saving} onCreate={requestNewDocument} onHistory={() => setTab("history")} /></>}
             />
 
-            {/* Tabs */}
-            <Tabs
-                value={tab}
-                onValueChange={(value) => {
-                    if (!savingRef.current) setTab(value);
-                }}
-                className="min-w-0"
-            >
-                <div className="max-w-full overflow-x-auto">
-                    <TabsList aria-label="มุมมองใบเบิกจ่ายวัสดุ">
-                        <TabsTrigger value="form">
-                            สร้างใบเบิกจ่ายวัสดุ
-                        </TabsTrigger>
+            <div className="min-w-0">
 
-                        <TabsTrigger value="history">
-                            ประวัติใบเบิกจ่ายวัสดุ
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
 
                 {/* Messages */}
                 {message && (
@@ -659,10 +630,7 @@ export function MaterialIssueWorkspace() {
             Tab: Form
         ========================== */}
 
-                <TabsContent
-                    value="form"
-                    className="mt-3 min-w-0"
-                >
+                {tab === "form" && (<div className="mt-3 min-w-0">
                     <div className="space-y-5">
 
                         {editingRecord && (
@@ -730,24 +698,21 @@ export function MaterialIssueWorkspace() {
                             </Button>
                         </div>
                     </div>
-                </TabsContent>
+                </div>)}
 
                 {/* ==========================
             Tab: History
         ========================== */}
 
-                <TabsContent
-                    value="history"
-                    className="mt-3 min-w-0"
-                >
+                {tab === "history" && (<div className="mt-3 min-w-0">
                     <MaterialIssueHistory
                         records={records}
                         onView={handleViewRecord}
                         onEdit={handleEditRecord}
                         onDelete={handleDeleteRecord}
                     />
-                </TabsContent>
-            </Tabs>
+                </div>)}
+            </div>
 
             {/* Confirm Unsaved Changes */}
             <AlertDialog

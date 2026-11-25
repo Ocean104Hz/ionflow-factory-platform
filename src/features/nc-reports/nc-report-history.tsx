@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState, type ReactNode } from "react";
 import { Eye, Pencil, Printer, Trash2 } from "lucide-react";
 import {
@@ -13,11 +14,6 @@ import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/src/components/ui/tooltip";
 import { ncDecisions, type NCReport } from "./nc-report-types";
 import {
   emptyNCFilters,
@@ -47,21 +43,7 @@ export function NCReportHistory({
     paged = paginateNC(rows, page, size),
     filterError = ncFilterError(filters);
   function action(label: string, icon: ReactNode, click: () => void) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={label}
-            onClick={click}
-          >
-            {icon}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
-    );
+    return <RowActionItem onClick={click}>{icon}{label}</RowActionItem>;
   }
   return (
     <div className="min-w-0 space-y-4">
@@ -159,7 +141,7 @@ export function NCReportHistory({
           description="กลับไปที่สร้างใบ NC เพื่อบันทึกเอกสาร"
         />
       ) : (
-        <FactoryDataTable
+        <FactoryDataTable variant="history"
           rows={paged.rows}
           rowKey={(r) => r.id}
           minWidth={1050}
@@ -227,7 +209,7 @@ export function NCReportHistory({
               key: "actions",
               label: "จัดการ",
               render: (r) => (
-                <div className="flex gap-1">
+                <RowActionMenu containsDialog>
                   {action(`ดูรายละเอียด ${r.doc_no}`, <Eye />, () => onView(r))}
                   {action(`แก้ไข ${r.doc_no}`, <Pencil />, () => onEdit(r))}
                   {action(`พรีวิวพิมพ์ ${r.doc_no}`, <Printer />, () =>
@@ -237,19 +219,13 @@ export function NCReportHistory({
                     title={`ลบ ${r.doc_no}?`}
                     description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
                     trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`ลบ ${r.doc_no}`}
-                        className="text-danger"
-                        title={`ลบ ${r.doc_no}`}
-                      >
+                      <RowActionItem aria-label={`ลบ ${r.doc_no}`} title={`ลบ ${r.doc_no}`} className="w-full justify-start text-destructive">
                         <Trash2 />
-                      </Button>
+                       ลบ</RowActionItem>
                     }
                     onConfirm={() => onDelete(r)}
                   />
-                </div>
+                </RowActionMenu>
               ),
             },
           ]}

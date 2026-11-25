@@ -1,9 +1,10 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Plus, Search } from "lucide-react";
-import {
+import { DocumentViewActions,
   FactoryDataTable,
   PageHeader,
   SectionCard,
@@ -22,12 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
 import { inventoryStatuses } from "@/src/features/inventory/inventory-domain";
 import { ledgerContext } from "@/src/features/inventory/inventory-ledger-data";
@@ -70,7 +65,7 @@ export function ProductionReceiptsWorkspace() {
   const [receipt, setReceipt] = useState<ProductionReceipt | null>(null);
   const [errors, setErrors] = useState<ProductionFlowErrors>({});
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [view, setView] = useState<ProductionReceipt | null>(null);
   const [historySearch, setHistorySearch] = useState("");
 
@@ -162,7 +157,16 @@ export function ProductionReceiptsWorkspace() {
         title="ใบรับยอดผลิต V2"
         description="Production Receipt · จัดทำใบรับยอดผลิตตามกระบวนการ iCON"
         actions={
-          <StatusBadge tone="warning">ยืนยันแล้วลง Stock Ledger</StatusBadge>
+          <>
+            <StatusBadge tone="warning">ยืนยันแล้วลง Stock Ledger</StatusBadge>
+            <DocumentViewActions
+              showingForm={tab === "form"}
+              createLabel="สร้างใบรับยอดผลิต"
+              confirmCreate={!!receipt && JSON.stringify(flow.receipts.find(({ id }) => id === receipt.id)) !== JSON.stringify(receipt)}
+              onCreate={() => { setReceipt(null); setErrors({}); setMessage(""); setTab("form"); }}
+              onHistory={() => setTab("history")}
+            />
+          </>
         }
       />
 
@@ -172,20 +176,10 @@ export function ProductionReceiptsWorkspace() {
         </p>
       )}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList
-          aria-label="มุมมองใบรับยอดผลิต"
-          className="mx-auto grid h-11 w-full max-w-lg grid-cols-2 rounded-full p-1"
-        >
-          <TabsTrigger value="form" className="h-9 rounded-full px-4">
-            สร้างใบรับยอดผลิต
-          </TabsTrigger>
-          <TabsTrigger value="history" className="h-9 rounded-full px-4">
-            ประวัติใบรับยอดผลิต
-          </TabsTrigger>
-        </TabsList>
+      <div>
 
-        <TabsContent value="form" className="space-y-5">
+
+        {tab === "form" && (<div className="space-y-5">
           {receipt && (
             <SectionCard
               title="รายงานการผลิตต้นทาง"
@@ -550,9 +544,9 @@ export function ProductionReceiptsWorkspace() {
               </section>
             </form>
           )}
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history">
+        {tab === "history" && (<div>
           <SectionCard
             title="ประวัติใบรับยอดผลิต"
             subtitle="แสดงข้อมูลสถานที่และคลังจริงของ Factory · เอกสารที่ยืนยันแล้วแก้ไขไม่ได้"
@@ -607,7 +601,7 @@ export function ProductionReceiptsWorkspace() {
             <p role="status" className="text-xs text-muted-foreground">
               พบ {filteredReceipts.length.toLocaleString("th-TH")} รายการ
             </p>
-            <FactoryDataTable
+            <FactoryDataTable variant="history"
               rows={filteredReceipts}
               rowKey={(row) => row.id}
               minWidth={1120}
@@ -674,37 +668,27 @@ export function ProductionReceiptsWorkspace() {
                   key: "actions",
                   label: "จัดการ",
                   render: (row) => (
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`ดู ${row.documentNumber}`}
-                        onClick={() => setView(row)}
-                      >
+                    <RowActionMenu>
+                      <RowActionItem aria-label={`ดู ${row.documentNumber}`} onClick={() => setView(row)}>
                         <Eye aria-hidden="true" />
-                      </Button>
+                       ดูรายละเอียด</RowActionItem>
                       {row.status === "DRAFT" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`แก้ไข ${row.documentNumber}`}
-                          onClick={() => {
+                        <RowActionItem aria-label={`แก้ไข ${row.documentNumber}`} onClick={() => {
                             setReceipt(structuredClone(row));
                             setErrors({});
                             setTab("form");
-                          }}
-                        >
+                          }}>
                           <Pencil aria-hidden="true" />
-                        </Button>
+                         แก้ไข</RowActionItem>
                       )}
-                    </div>
+                    </RowActionMenu>
                   ),
                 },
               ]}
             />
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
 
       <ProductionReceiptDialog receipt={view} onClose={() => setView(null)} />
     </div>

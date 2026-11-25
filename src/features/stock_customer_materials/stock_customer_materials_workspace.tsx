@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
@@ -612,7 +613,14 @@ export function StockCustomerMaterialsWorkspace() {
       <PageHeader
         title="วัสดุคงเหลือลูกค้า"
         description="จัดการวัสดุของลูกค้า ยอดสรุป รับ-จ่ายรายวัน และตรวจนับ แยกตามงวดข้อมูล"
-        actions={<Badge variant="outline">ฐานข้อมูล</Badge>}
+        actions={<><Badge variant="outline">ฐานข้อมูล</Badge> {sheet && (<Button variant="outline"
+            type="button"
+            disabled={readOnly || !sheet}
+            onClick={openCreate}
+            className="w-full xl:w-auto"
+          >
+            <Plus className="size-4" aria-hidden="true" /> เพิ่มวัสดุ
+          </Button>)}</>}
       />
 
       {loadError && (
@@ -775,14 +783,7 @@ export function StockCustomerMaterialsWorkspace() {
               />
             </div>
           </div>
-          <Button
-            type="button"
-            disabled={readOnly || !sheet}
-            onClick={openCreate}
-            className="w-full xl:w-auto"
-          >
-            <Plus className="size-4" aria-hidden="true" /> เพิ่มวัสดุ
-          </Button>
+
         </div>
 
         <div className="rounded-xl border border-border bg-card">
@@ -872,7 +873,7 @@ export function StockCustomerMaterialsWorkspace() {
                         {displayValue(row.remark)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center justify-center gap-1">
+                        <RowActionMenu>
                           <Button
                             type="button"
                             variant="outline"
@@ -886,44 +887,19 @@ export function StockCustomerMaterialsWorkspace() {
                           >
                             <Eye className="size-4" aria-hidden="true" />
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={readOnly}
-                            aria-label={`แก้ไข ${name}`}
-                            title="แก้ไขวัสดุ"
-                            onClick={() => openMaterialEditor(row)}
-                          >
+                          <RowActionItem type="button" disabled={readOnly} aria-label={`แก้ไข ${name}`} title="แก้ไขวัสดุ" onClick={() => openMaterialEditor(row)}>
                             <Pencil className="size-4" aria-hidden="true" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={readOnly}
-                            aria-label={`ตรวจนับ ${name}`}
-                            title="บันทึกตรวจนับ"
-                            onClick={() => openCountEditor(row)}
-                          >
+                          แก้ไขวัสดุ</RowActionItem>
+                          <RowActionItem type="button" disabled={readOnly} aria-label={`ตรวจนับ ${name}`} title="บันทึกตรวจนับ" onClick={() => openCountEditor(row)}>
                             <ClipboardCheck
                               className="size-4"
                               aria-hidden="true"
                             />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={readOnly}
-                            aria-label={`ลบ ${name}`}
-                            title="ลบวัสดุ"
-                            className="text-destructive"
-                            onClick={() => openDelete(row)}
-                          >
+                          บันทึกตรวจนับ</RowActionItem>
+                          <RowActionItem type="button" disabled={readOnly} aria-label={`ลบ ${name}`} title="ลบวัสดุ" onClick={() => openDelete(row)} className="w-full justify-start text-destructive">
                             <Trash2 className="size-4" aria-hidden="true" />
-                          </Button>
-                        </div>
+                          ลบวัสดุ</RowActionItem>
+                        </RowActionMenu>
                       </TableCell>
                     </TableRow>
                   );

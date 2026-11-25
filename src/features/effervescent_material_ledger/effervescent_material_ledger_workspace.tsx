@@ -2,7 +2,7 @@
 
 import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use-organic-documents";
 import { useRef, useState } from "react";
-import { FilePlus2, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 
 import {
   AlertDialog,
@@ -24,8 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/src/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
-import { PageHeader } from "@/src/components/factory/patterns";
+import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 
 import {
   createBlankEffervescentMaterialLedgerSheet,
@@ -51,7 +50,7 @@ export function EffervescentMaterialLedgerWorkspace() {
     JSON.stringify(createBlankEffervescentMaterialLedgerSheet(INITIAL_DOCUMENT_KEY)),
   );
 
-  const [tab, setTab] = useState<TabKey>("form");
+  const [tab, setTab] = useState<TabKey>("history");
   const [message, setMessage] = useState("");
   const [messageError, setMessageError] = useState(false);
   const [pendingSheet, setPendingSheet] = useState<EffervescentMaterialLedgerSheet | null>(null);
@@ -211,25 +210,11 @@ export function EffervescentMaterialLedgerWorkspace() {
       <PageHeader
         title="บันทึกการรับ - จ่าย วัตถุดิบเม็ดฟู่"
         description="แบบบันทึกวัตถุดิบเม็ดฟู่ตามเอกสาร FR-P2-36/Rev.00"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างแบบบันทึกใหม่" disabled={busy || loading || !!loadError} onCreate={handleNew} onHistory={() => setTab("history")} />}
       />
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value === "history" ? "history" : "form")}
-        className="min-w-0"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="max-w-full overflow-x-auto">
-            <TabsList aria-label="เมนูบันทึกและประวัติวัตถุดิบเม็ดฟู่">
-              <TabsTrigger value="form">กรอกข้อมูล</TabsTrigger>
-              <TabsTrigger value="history">ดูประวัติ</TabsTrigger>
-            </TabsList>
-          </div>
-          <Button type="button" variant="outline" onClick={handleNew}>
-            <FilePlus2 className="size-4" aria-hidden="true" />
-            สร้างแบบบันทึกใหม่
-          </Button>
-        </div>
+      <div className="min-w-0">
+
 
         {message && (
           <p role={messageError ? "alert" : "status"} className={messageError ? "text-sm text-destructive" : "text-sm text-primary"}>
@@ -237,7 +222,7 @@ export function EffervescentMaterialLedgerWorkspace() {
           </p>
         )}
 
-        <TabsContent value="form" className="mt-3 min-w-0 space-y-4">
+        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
           {draft.id && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
               กำลังแก้ไขเอกสาร <span className="break-all font-semibold">{draft.id}</span>
@@ -254,9 +239,9 @@ export function EffervescentMaterialLedgerWorkspace() {
               onReset={handleNew}
             />
           </fieldset>
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history" className="mt-3 min-w-0">
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <EffervescentMaterialLedgerHistory
             records={records}
             onView={handleView}
@@ -264,8 +249,8 @@ export function EffervescentMaterialLedgerWorkspace() {
             onPrint={handlePrintPreview}
             onDelete={(sheet) => setDeleteSheet(sheet)}
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
 
       <EffervescentMaterialLedgerDetail
         sheet={activeDetailSheet}

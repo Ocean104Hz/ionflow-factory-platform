@@ -714,7 +714,19 @@ export function StockRemainingMaterialsFfWorkspace() {
       <PageHeader
         title="วัสดุคงเหลือ FF"
         description="รายการวัสดุและบรรจุภัณฑ์ตามรูปแบบไฟล์ วัสดุคงเหลือFF-2569.xlsx"
-        actions={<Badge variant="outline">ฐานข้อมูลจริง</Badge>}
+        actions={<><Badge variant="outline">ฐานข้อมูลจริง</Badge> {draft && (<Button
+            type="button"
+            variant="outline"
+            disabled={readOnly}
+            onClick={() => {
+              if (!readOnly && !loadLock.current && !saveLock.current) {
+                setIsCreateOpen(true);
+              }
+            }}
+          >
+            <PackagePlus className="size-4" aria-hidden="true" />
+            เพิ่มวัสดุ
+          </Button>)}</>}
       />
 
       <fieldset disabled={busy} className="min-w-0">
@@ -786,19 +798,7 @@ export function StockRemainingMaterialsFfWorkspace() {
             <RotateCcw className="size-4" aria-hidden="true" />
             โหลดข้อมูลใหม่
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={readOnly}
-            onClick={() => {
-              if (!readOnly && !loadLock.current && !saveLock.current) {
-                setIsCreateOpen(true);
-              }
-            }}
-          >
-            <PackagePlus className="size-4" aria-hidden="true" />
-            เพิ่มวัสดุ
-          </Button>
+
           <Button
             type="button"
             variant="outline"

@@ -1,15 +1,10 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState, useRef } from "react";
 import { Eye, Pencil, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +24,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import {
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   FactoryDataTable,
@@ -54,7 +49,7 @@ export function OrganicWorkspace() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<OrganicReport>("qc_organic_fertilizer");
   const [row, setRow] = useState(() => blankReport());
   const [baseline, setBaseline] = useState(() => JSON.stringify(blankReport()));
-  const [tab, setTab] = useState("form"),
+  const [tab, setTab] = useState("history"),
     [errors, setErrors] = useState<Errors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<(() => void) | null>(null);
@@ -150,42 +145,27 @@ export function OrganicWorkspace() {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={`ดู ${r.doc_no}`}
-            onClick={() => setOpened({ row: r, print: false })}
-          >
+        <RowActionMenu containsDialog>
+          <RowActionItem aria-label={`ดู ${r.doc_no}`} onClick={() => setOpened({ row: r, print: false })}>
             <Eye aria-hidden="true" />
             ดู
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={`แก้ไข ${r.doc_no}`}
-            onClick={() => guarded(() => openEditor(r))}
-          >
+          </RowActionItem>
+          <RowActionItem aria-label={`แก้ไข ${r.doc_no}`} onClick={() => guarded(() => openEditor(r))}>
             <Pencil aria-hidden="true" />
             แก้ไข
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={`พรีวิวพิมพ์ ${r.doc_no}`}
-            onClick={() => setOpened({ row: r, print: true })}
-          >
+          </RowActionItem>
+          <RowActionItem aria-label={`พรีวิวพิมพ์ ${r.doc_no}`} onClick={() => setOpened({ row: r, print: true })}>
             <Printer aria-hidden="true" />
             พรีวิวพิมพ์
-          </Button>
+          </RowActionItem>
           <ConfirmDialog
             title="ลบรายงาน?"
             description={`${r.doc_no} จะถูกลบจากรายการในหน้านี้${row.id === r.id && dirty ? " และละทิ้งแบบฟอร์มที่แก้ไขค้างอยู่" : ""}`}
             trigger={
-              <Button variant="outline" size="sm" aria-label={`ลบ ${r.doc_no}`}>
+              <RowActionItem aria-label={`ลบ ${r.doc_no}`}>
                 <Trash2 aria-hidden="true" />
                 ลบ
-              </Button>
+              </RowActionItem>
             }
             onConfirm={async () => {
               try { await remove(r.id); }
@@ -197,7 +177,7 @@ export function OrganicWorkspace() {
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
-        </div>
+        </RowActionMenu>
       ),
     },
   ];
@@ -206,6 +186,7 @@ export function OrganicWorkspace() {
       <PageHeader
         title="ตรวจคุณภาพปุ๋ยอินทรีย์เคมี"
         description="บันทึกและติดตามผลการตรวจสอบคุณภาพระหว่างกระบวนการผลิต"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจสอบ" disabled={busy || loading || !!loadError} onCreate={() => guarded(() => openEditor(blankReport(row.profile)))} onHistory={() => setTab("history")} />}
       />
       {message && (
         <p
@@ -218,12 +199,9 @@ export function OrganicWorkspace() {
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList aria-label="มุมมองตรวจคุณภาพปุ๋ยอินทรีย์เคมี">
-          <TabsTrigger value="form">บันทึกการตรวจสอบ</TabsTrigger>
-          <TabsTrigger value="history">ประวัติการตรวจสอบ</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="min-w-0 space-y-4">
+      <div className="min-w-0">
+
+        {tab === "form" && (<div className="min-w-0 space-y-4">
           <div ref={errorRef} tabIndex={-1} className="outline-none">
             {Object.keys(errors).length > 0 && (
               <div
@@ -272,8 +250,8 @@ export function OrganicWorkspace() {
               <Button type="submit">บันทึกเอกสาร</Button>
             </div>
           </form>
-        </TabsContent>
-        <TabsContent value="history" className="min-w-0 space-y-4">
+        </div>)}
+        {tab === "history" && (<div className="min-w-0 space-y-4">
           <SectionCard
             title="ประวัติการตรวจสอบ"
             subtitle={`พบ ${filtered.length} จาก ${records.length} รายงาน`}
@@ -366,7 +344,7 @@ export function OrganicWorkspace() {
               }}
             />
           </div>
-          <FactoryDataTable
+          <FactoryDataTable variant="history"
             columns={columns}
             rows={filtered.slice(
               (current - 1) * Number(size),
@@ -383,8 +361,8 @@ export function OrganicWorkspace() {
               />
             }
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
       <AlertDialog
         open={!!pending}

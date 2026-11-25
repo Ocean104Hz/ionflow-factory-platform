@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import {
   Plus,
@@ -199,26 +200,16 @@ export function BOMList() {
       key: "actions",
       label: "จัดการ",
       render: (m) => (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label={`ดู ${m.code}`}
-            onClick={() => setPanel({ type: "master", id: m.id })}
-          >
+        <RowActionMenu>
+          <RowActionItem aria-label={`ดู ${m.code}`} onClick={() => setPanel({ type: "master", id: m.id })}>
             <Eye />
             ดู
-          </Button>
-          {!m.id.startsWith("settings-") && <Button
-            size="sm"
-            variant="outline"
-            aria-label={`แก้ไข ${m.code}`}
-            onClick={() => setPanel({ type: "masterEdit", id: m.id })}
-          >
+          </RowActionItem>
+          {!m.id.startsWith("settings-") && <RowActionItem aria-label={`แก้ไข ${m.code}`} onClick={() => setPanel({ type: "masterEdit", id: m.id })}>
             <Pencil />
             แก้ไข
-          </Button>}
-        </div>
+          </RowActionItem>}
+        </RowActionMenu>
       ),
     },
   ];
@@ -314,7 +305,7 @@ export function BOMList() {
               <Upload />
               ดูตัวอย่างนำเข้า Excel
             </Button>
-            <Button disabled={loading || Boolean(error)} onClick={() => setPanel({ type: "masterEdit" })}>
+            <Button variant="outline" disabled={loading || Boolean(error)} onClick={() => setPanel({ type: "masterEdit" })}>
               <Plus />
               เพิ่มข้อมูลสินค้า
             </Button>
@@ -469,7 +460,7 @@ export function BOMList() {
           พบ {total} จาก {state.masters.length} รายการ{message ? ` · ${message}` : ""}
         </p>
       </div>
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={rows}
         rowKey={(m) => m.id}

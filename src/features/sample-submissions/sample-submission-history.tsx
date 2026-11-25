@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -122,7 +123,7 @@ export function SampleSubmissionHistory({
           description="สร้างเอกสารได้จากแท็บสร้างใบส่งตัวอย่าง"
         />
       ) : (
-        <FactoryDataTable
+        <FactoryDataTable variant="history"
           rows={paged.rows}
           rowKey={(r) => r.id}
           minWidth={1000}
@@ -170,31 +171,27 @@ export function SampleSubmissionHistory({
               key: "actions",
               label: "จัดการ",
               render: (r) => (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onView(r)}>
+                <RowActionMenu containsDialog>
+                  <RowActionItem onClick={() => onView(r)}>
                     ดูรายละเอียด
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => onEdit(r)}>
+                  </RowActionItem>
+                  <RowActionItem onClick={() => onEdit(r)}>
                     แก้ไข
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onPrint(r)}
-                  >
+                  </RowActionItem>
+                  <RowActionItem onClick={() => onPrint(r)}>
                     พรีวิวพิมพ์
-                  </Button>
+                  </RowActionItem>
                   <ConfirmDialog
                     title={`ลบ ${r.doc_no}?`}
                     description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
                     trigger={
-                      <Button size="sm" variant="ghost" className="text-danger">
+                      <RowActionItem className="w-full justify-start text-destructive">
                         ลบ
-                      </Button>
+                      </RowActionItem>
                     }
                     onConfirm={() => onDelete(r)}
                   />
-                </div>
+                </RowActionMenu>
               ),
             },
           ]}

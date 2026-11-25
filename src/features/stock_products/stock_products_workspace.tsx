@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
@@ -664,22 +665,16 @@ function StockProductsDailyView({
                       {originalCell(record?.[column.field] ?? "")}
                     </TableCell>
                   ))}
-                  <TableCell className="text-center">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={readOnly}
-                      onClick={() => onEdit(date)}
-                    >
+                  <TableCell className="text-center"><RowActionMenu>
+                    <RowActionItem type="button" disabled={readOnly} onClick={() => onEdit(date)}>
                       {record ? (
                         <Pencil aria-hidden="true" />
                       ) : (
                         <Plus aria-hidden="true" />
                       )}
                       {record ? "แก้ไข" : "บันทึก"}
-                    </Button>
-                  </TableCell>
+                    </RowActionItem>
+                  </RowActionMenu></TableCell>
                 </TableRow>
               );
             })}
@@ -1132,7 +1127,21 @@ export function StockProductsWorkspace() {
       <PageHeader
         title={COPY.title}
         description={COPY.desc}
-        actions={<Badge variant="outline">{COPY.storage}</Badge>}
+        actions={<><Badge variant="outline">{COPY.storage}</Badge> {activeView === "STOCK" ? (<Button variant="outline"
+                  type="button"
+                  disabled={readOnly}
+                  onClick={openCreateProduct}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  เพิ่มสินค้า
+                </Button>) : (<Button variant="outline"
+                  type="button"
+                  disabled={readOnly}
+                  onClick={openCreateSo}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  เพิ่มรายการ SO
+                </Button>)}</>}
       />
 
       {loadState.loading && (
@@ -1285,14 +1294,7 @@ export function StockProductsWorkspace() {
                   {stock.rows.length.toLocaleString("th-TH")}{" "}
                   {COPY.productCount}
                 </Badge>
-                <Button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={openCreateProduct}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  เพิ่มสินค้า
-                </Button>
+
               </div>
             </div>
           </div>
@@ -1383,31 +1385,14 @@ export function StockProductsWorkspace() {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              disabled={readOnly}
-                              title="แก้ไขสินค้า"
-                              aria-label={`แก้ไข ${row.item.name}`}
-                              onClick={() => openEditProduct(row)}
-                            >
+                          <RowActionMenu>
+                            <RowActionItem type="button" disabled={readOnly} title="แก้ไขสินค้า" aria-label={`แก้ไข ${row.item.name}`} onClick={() => openEditProduct(row)}>
                               <Pencil className="size-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              disabled={readOnly}
-                              title="ลบสินค้า"
-                              aria-label={`ลบสินค้า ${row.item.name}`}
-                              className="text-danger"
-                              onClick={() => openDeleteProduct(row)}
-                            >
+                            แก้ไขสินค้า</RowActionItem>
+                            <RowActionItem type="button" disabled={readOnly} title="ลบสินค้า" aria-label={`ลบสินค้า ${row.item.name}`} onClick={() => openDeleteProduct(row)} className="w-full justify-start text-destructive">
                               <Trash2 className="size-4" aria-hidden="true" />
-                            </Button>
-                          </div>
+                            ลบสินค้า</RowActionItem>
+                          </RowActionMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1467,14 +1452,7 @@ export function StockProductsWorkspace() {
                 <Badge variant="outline">
                   {soRows.length.toLocaleString("th-TH")} {COPY.soCount}
                 </Badge>
-                <Button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={openCreateSo}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  เพิ่มรายการ SO
-                </Button>
+
               </div>
             </div>
             <div className="max-w-full overflow-x-auto border-t border-border">

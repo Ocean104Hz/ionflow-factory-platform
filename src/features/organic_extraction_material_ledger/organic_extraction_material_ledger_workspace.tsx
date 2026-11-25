@@ -14,13 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
-import { PageHeader } from "@/src/components/factory/patterns";
+import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 
 import {
   ORGANIC_EXTRACTION_MATERIAL_LEDGER_TITLE,
@@ -50,7 +44,7 @@ export function OrganicExtractionMaterialLedgerWorkspace() {
   const [baseline, setBaseline] = useState(
     () => JSON.stringify(blankOrganicExtractionMaterialLedgerSheet()),
   );
-  const [tab, setTab] = useState<TabKey>("form");
+  const [tab, setTab] = useState<TabKey>("history");
   const [errors, setErrors] = useState<OrganicExtractionMaterialLedgerErrors>({});
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<MessageKind>("success");
@@ -173,26 +167,11 @@ export function OrganicExtractionMaterialLedgerWorkspace() {
       <PageHeader
         title={ORGANIC_EXTRACTION_MATERIAL_LEDGER_TITLE}
         description="บันทึกยอดยกมา รับเข้า จ่ายใช้ผลิต ปรับค่า และยอดคงเหลือวัตถุดิบต้มสกัด"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={handleNew}>
-              สร้างเอกสารใหม่
-            </Button>
-          </div>
-        }
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างเอกสารใหม่" onCreate={handleNew} onHistory={() => setTab("history")} />}
       />
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value === "history" ? "history" : "form")}
-        className="min-w-0"
-      >
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="เมนูบันทึกการรับ-จ่ายวัตถุดิบต้มสกัด">
-            <TabsTrigger value="form">กรอกข้อมูล</TabsTrigger>
-            <TabsTrigger value="history">ดูประวัติ</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="min-w-0">
+
 
         {message && (
           <p
@@ -207,7 +186,7 @@ export function OrganicExtractionMaterialLedgerWorkspace() {
           </p>
         )}
 
-        <TabsContent value="form" className="mt-3 min-w-0 space-y-4">
+        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
           {isEditing && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
               <p className="min-w-0 wrap-break-word text-sm text-foreground">
@@ -253,9 +232,9 @@ export function OrganicExtractionMaterialLedgerWorkspace() {
               onReset={handleNew}
             />
           </fieldset>
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history" className="mt-3 min-w-0">
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <OrganicExtractionMaterialLedgerHistory
             records={records}
             onEdit={handleEdit}
@@ -265,8 +244,8 @@ export function OrganicExtractionMaterialLedgerWorkspace() {
               setDeleteSheet(sheet)
             }
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
 
       <AlertDialog
         open={pendingSheet !== null}

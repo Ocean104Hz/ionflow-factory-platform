@@ -582,7 +582,20 @@ export function StockWipWorkspace() {
       <PageHeader
         title="Stock WIP FF"
         description="สต็อกสินค้าระหว่างการผลิตจากไฟล์ Stock WIP FF 2569.xlsx"
-        actions={<Badge variant="outline">DATABASE</Badge>}
+        actions={<><Badge variant="outline">DATABASE</Badge> {draft && (<Button
+            type="button"
+            variant="outline"
+            onClick={openCreateForm}
+            disabled={!canEdit || draft.period.view !== "MONTH"}
+            title={
+              draft.period.view === "YEAR"
+                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
+                : "เพิ่มรายการ WIP"
+            }
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            เพิ่มรายการ WIP
+          </Button>)}</>}
       />
 
       <fieldset disabled={isBusy} className="min-w-0 border-0 p-0">
@@ -636,20 +649,7 @@ export function StockWipWorkspace() {
             <RefreshCw className="size-4" aria-hidden="true" />
             โหลดข้อมูลใหม่
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={openCreateForm}
-            disabled={!canEdit || draft.period.view !== "MONTH"}
-            title={
-              draft.period.view === "YEAR"
-                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
-                : "เพิ่มรายการ WIP"
-            }
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            เพิ่มรายการ WIP
-          </Button>
+
           <Button
             type="button"
             variant="outline"

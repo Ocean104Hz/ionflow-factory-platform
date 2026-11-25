@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Inbox,
   AlertCircle,
   RefreshCw,
   Search,
+  Columns3,
+  RotateCcw,
+  Plus,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "./confirm-dialog";
 import { Badge } from "../ui/badge";
 import {
   Breadcrumb,
@@ -20,6 +24,14 @@ import {
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import {
   Empty,
@@ -121,6 +133,45 @@ export function BackButton({ href }: { href: string }) {
       </Link>
     </Button>
   );
+}
+export function DocumentViewActions({
+  showingForm,
+  createLabel,
+  disabled,
+  confirmCreate = false,
+  onCreate,
+  onHistory,
+}: {
+  showingForm: boolean;
+  createLabel: string;
+  disabled?: boolean;
+  confirmCreate?: boolean;
+  onCreate: () => void;
+  onHistory: () => void;
+}) {
+  if (showingForm) {
+    return (
+      <Button type="button" variant="outline" disabled={disabled} onClick={onHistory}>
+        <ArrowLeft aria-hidden="true" />
+        กลับประวัติ
+      </Button>
+    );
+  }
+  const createButton = (
+    <Button type="button" variant="outline" disabled={disabled} onClick={confirmCreate ? undefined : onCreate}>
+      <Plus aria-hidden="true" />
+      {createLabel}
+    </Button>
+  );
+  return confirmCreate ? (
+    <ConfirmDialog
+      live
+      title="สร้างเอกสารใหม่?"
+      description="ข้อมูลที่แก้ไขและยังไม่บันทึกในฟอร์มปัจจุบันจะถูกแทนที่"
+      trigger={createButton}
+      onConfirm={onCreate}
+    />
+  ) : createButton;
 }
 export function RefreshButton({ onClick }: { onClick?: () => void }) {
   const [message, setMessage] = useState("");
@@ -291,6 +342,17 @@ export interface Column<T> {
   render: (row: T, index: number) => ReactNode;
   numeric?: boolean;
 }
+
+function tableHeaderWidths(handle: HTMLButtonElement) {
+  const headers = handle.closest("tr")?.querySelectorAll<HTMLTableCellElement>("[data-column-key]");
+  return Object.fromEntries(
+    Array.from(headers ?? [], (header) => [
+      header.dataset.columnKey!,
+      Math.round(header.getBoundingClientRect().width),
+    ]),
+  );
+}
+
 export function FactoryDataTable<T>({
   columns,
   rows,
@@ -299,6 +361,8 @@ export function FactoryDataTable<T>({
   state = "normal",
   retry,
   minWidth = 1000,
+  variant = "default",
+  emptyMessage,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -307,64 +371,155 @@ export function FactoryDataTable<T>({
   state?: "normal" | "loading" | "error";
   retry?: () => void;
   minWidth?: number;
+  variant?: "default" | "history";
+  emptyMessage?: string;
 }) {
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [widths, setWidths] = useState<Record<string, number> | null>(null);
+  const drag = useRef<{ start: number; widths: Record<string, number> } | null>(null);
+  const isHistory = variant === "history";
+  const visible = isHistory ? columns.filter(({ key }) => !hidden.includes(key)) : columns;
+  const visibleColumns = visible.length ? visible : columns;
+  const fitWidth = Math.ceil(minWidth / Math.max(1, columns.length));
+  const customWidth = widths
+    ? visibleColumns.reduce((total, column) => total + (widths[column.key] ?? fitWidth), 0)
+    : undefined;
+  const resize = (original: Record<string, number>, key: string, delta: number) => {
+    const width = original[key] ?? fitWidth;
+    setWidths((previous) => ({
+      ...previous,
+      ...original,
+      [key]: Math.max(56, Math.min(Math.max(650, width), width + delta)),
+    }));
+  };
+
   return (
-    <div className="factory-table overflow-hidden rounded-xl border bg-surface">
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="ตารางข้อมูล เลื่อนแนวนอนเพื่อดูทุกคอลัมน์"
-        className="overflow-x-auto"
+    <div className="factory-table min-w-0 overflow-hidden rounded-xl border bg-surface" data-variant={variant}>
+      {isHistory && (
+        <div className="flex flex-wrap gap-2 border-b px-4 py-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm"><Columns3 aria-hidden="true" />คอลัมน์</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-[min(24rem,60dvh)] overflow-y-auto">
+              <DropdownMenuItem disabled={!hidden.length} onSelect={() => setHidden([])}>
+                แสดงทุกคอลัมน์
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {columns.map((column) => {
+                const checked = visibleColumns.includes(column);
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.key}
+                    checked={checked}
+                    disabled={Boolean(column.header) || column.key === "actions" || column.label === "จัดการ" || (checked && visibleColumns.length === 1)}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={(next) => setHidden((keys) => next ? keys.filter((key) => key !== column.key) : [...keys, column.key])}
+                  >
+                    {column.label}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="sm" disabled={!widths} onClick={() => setWidths(null)}>
+            <RotateCcw aria-hidden="true" />รีเซ็ตความกว้าง
+          </Button>
+        </div>
+      )}
+      <Table
+        containerProps={{
+          tabIndex: 0,
+          role: "region",
+          "aria-label": "ตารางข้อมูล เลื่อนแนวนอนเพื่อดูทุกคอลัมน์",
+          className: "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+        }}
+        style={customWidth === undefined
+          ? { minWidth: isHistory ? Math.min(minWidth, fitWidth * visibleColumns.length) : minWidth }
+          : { width: customWidth, minWidth: customWidth, tableLayout: "fixed" }}
       >
-        <Table style={{ minWidth }}>
-          <TableHeader className="bg-surface-muted">
-            <TableRow>
-              {columns.map((c) => (
-                <TableHead
-                  key={c.key}
-                  className={cn(
-                    "h-10 px-4 text-xs font-medium whitespace-nowrap",
-                    c.numeric && "text-right",
-                  )}
-                >
-                  {c.header ?? c.label}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {state === "normal" && rows.length > 0 ? (
-              rows.map((row, index) => (
-                <TableRow key={rowKey(row)} className="hover:bg-surface-muted">
-                  {columns.map((c) => (
-                    <TableCell
-                      key={c.key}
-                      className={cn(
-                        "px-4 py-2.5 align-middle",
-                        c.numeric && "text-right tabular-nums",
-                      )}
-                    >
-                      {c.render(row, index)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length}>
-                  {state === "loading" ? (
-                    <LoadingState />
-                  ) : state === "error" ? (
-                    <ErrorState retry={retry} />
-                  ) : (
-                    <EmptyState />
-                  )}
-                </TableCell>
+        {widths && (
+          <colgroup>
+            {visibleColumns.map((column) => <col key={column.key} style={{ width: widths[column.key] ?? fitWidth }} />)}
+          </colgroup>
+        )}
+        <TableHeader className="bg-surface-muted">
+          <TableRow>
+            {visibleColumns.map((c) => (
+              <TableHead
+                key={c.key}
+                scope="col"
+                data-column-key={c.key}
+                className={cn(
+                  "h-10 px-4 text-xs font-medium whitespace-nowrap",
+                  isHistory && "relative pr-6",
+                  c.numeric && "text-right",
+                )}
+              >
+                {isHistory && !c.header
+                  ? <span className="block truncate" title={c.label}>{c.label}</span>
+                  : c.header ?? c.label}
+                {isHistory && (
+                  <button
+                    type="button"
+                    aria-label={`ปรับความกว้างคอลัมน์ ${c.label}`}
+                    title="ลากหรือใช้ปุ่มลูกศรซ้ายและขวาเพื่อปรับความกว้าง"
+                    className="factory-column-resize"
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return;
+                      drag.current = { start: event.clientX, widths: tableHeaderWidths(event.currentTarget) };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      if (drag.current && event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        resize(drag.current.widths, c.key, event.clientX - drag.current.start);
+                      }
+                    }}
+                    onLostPointerCapture={() => { drag.current = null; }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                      event.preventDefault();
+                      resize(tableHeaderWidths(event.currentTarget), c.key, event.key === "ArrowLeft" ? -16 : 16);
+                    }}
+                  />
+                )}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {state === "normal" && rows.length > 0 ? (
+            rows.map((row, index) => (
+              <TableRow key={rowKey(row)} className="hover:bg-surface-muted">
+                {visibleColumns.map((c) => (
+                  <TableCell
+                    key={c.key}
+                    className={cn(
+                      "px-4 py-2.5 align-middle",
+                      isHistory && "whitespace-normal [overflow-wrap:anywhere]",
+                      c.numeric && "text-right tabular-nums",
+                    )}
+                  >
+                    {c.render(row, index)}
+                  </TableCell>
+                ))}
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={visibleColumns.length}>
+                {state === "loading" ? (
+                  <LoadingState />
+                ) : state === "error" ? (
+                  <ErrorState retry={retry} />
+                ) : (
+                  <EmptyState title={emptyMessage} />
+                )}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
       {pagination}
     </div>
   );

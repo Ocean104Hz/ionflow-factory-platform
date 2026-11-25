@@ -5,12 +5,6 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/src/components/ui/button";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
 
 import {
   AlertDialog,
@@ -23,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 
-import {
+import { DocumentViewActions,
   PageHeader,
 } from "@/src/components/factory/patterns";
 
@@ -73,7 +67,7 @@ export function QcProductWeightCheckWorkspace() {
 
   /* ---------------- UI state ---------------- */
 
-  const [tab, setTab] = useState<TabKey>("form");
+  const [tab, setTab] = useState<TabKey>("history");
 
   const [errors, setErrors] =
     useState<QcWeightErrors>({});
@@ -253,33 +247,14 @@ export function QcProductWeightCheckWorkspace() {
       <PageHeader
         title="ใบบันทึกการตรวจเช็ค QC น้ำหนักของผลิตภัณฑ์"
         description="บันทึกผลการตรวจสอบน้ำหนักผลิตภัณฑ์ตามรอบการตรวจ"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจเช็ค" disabled={busy || loading || !!loadError} onCreate={handleNew} onHistory={() => setTab("history")} />}
       />
-
-      {/* Tabs */}
 
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          setTab(
-            value === "history" ? "history" : "form",
-          )
-        }
-        className="min-w-0"
-      >
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="เมนูตรวจเช็ค QC น้ำหนัก">
-            <TabsTrigger value="form">
-              กรอกข้อมูล
-            </TabsTrigger>
+      <div className="min-w-0">
 
-            <TabsTrigger value="history">
-              ดูประวัติ
-            </TabsTrigger>
-          </TabsList>
-        </div>
 
         {/* Status Message */}
 
@@ -294,10 +269,7 @@ export function QcProductWeightCheckWorkspace() {
 
         {/* Form Tab */}
 
-        <TabsContent
-          value="form"
-          className="mt-3 min-w-0 space-y-4"
-        >
+        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
           {isEditing && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
               <div className="min-w-0 text-sm text-foreground">
@@ -358,14 +330,11 @@ export function QcProductWeightCheckWorkspace() {
             onSave={handleSave}
             onReset={handleNew}
           />
-        </TabsContent>
+        </div>)}
 
         {/* History Tab */}
 
-        <TabsContent
-          value="history"
-          className="mt-3 min-w-0"
-        >
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <QcProductWeightCheckHistory
             records={records}
             onEdit={handleEdit}
@@ -375,8 +344,8 @@ export function QcProductWeightCheckWorkspace() {
               setDocumentToDelete(document)
             }
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
 
       {/* Confirm Unsaved Changes */}

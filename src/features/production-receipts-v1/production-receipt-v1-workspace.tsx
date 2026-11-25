@@ -1,24 +1,14 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useId, useState, type HTMLInputTypeAttribute } from "react";
-import {
-  AlertCircle,
-  ClipboardList,
-  FileText,
-  History,
-} from "lucide-react";
-import { FactoryDataTable, SectionCard, SelectField } from "@/src/components/factory/patterns";
+import { AlertCircle, ClipboardList, FileText } from "lucide-react";
+import { DocumentViewActions, PageHeader, FactoryDataTable, SectionCard, SelectField } from "@/src/components/factory/patterns";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { useSettingsPostgres } from "@/src/components/factory/use-settings-postgres";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
 import {
   newReceiptDocumentV1,
@@ -66,7 +56,7 @@ function Field({
 }
 
 export function ProductionReceiptV1Workspace() {
-  const [tab, setTab] = useState<"form" | "history">("form");
+  const [tab, setTab] = useState<"form" | "history">("history");
   const [doc, setDoc] = useState<ReceiptDocumentV1>(newReceiptDocumentV1);
   const [orderId, setOrderId] = useState("none");
   const [saving, setSaving] = useState(false);
@@ -156,45 +146,15 @@ export function ProductionReceiptV1Workspace() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-10">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            ใบรับยอดผลิต V1
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Production Receipt · รูปแบบเอกสาร iTECH
-          </p>
-        </div>
-      </div>
+      <PageHeader title="ใบรับยอดผลิต V1" description="Production Receipt · รูปแบบเอกสาร iTECH" actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบรับยอดผลิต" disabled={loading || saving} onCreate={() => setTab("form")} onHistory={() => setTab("history")} />} />
       {notice && <p role="status">{notice}</p>}
       {saveError && <p role="alert" className="text-danger">{saveError}</p>}
       {error && <div><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as "form" | "history")}
-        className="space-y-5"
-      >
-        <div className="flex justify-center">
-          <TabsList className="h-auto w-full max-w-xl rounded-full border border-border bg-card p-1 shadow-sm">
-            <TabsTrigger
-              value="form"
-              className="h-11 flex-1 gap-2 rounded-full px-4 text-sm"
-            >
-              <ClipboardList aria-hidden="true" className="size-4" />
-              สร้างใบรับยอดผลิต
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="h-11 flex-1 gap-2 rounded-full px-4 text-sm"
-            >
-              <History aria-hidden="true" className="size-4" />
-              ประวัติใบรับยอดผลิต
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="space-y-5">
 
-        <TabsContent value="form" className="space-y-5">
+
+        {tab === "form" && (<div className="space-y-5">
           <SectionCard title="ใบรับยอดผลิต">
             <div className="grid gap-4 md:grid-cols-3">
               <Field
@@ -387,22 +347,22 @@ export function ProductionReceiptV1Workspace() {
               {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </div>
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history">
+        {tab === "history" && (<div>
           <SectionCard title="ประวัติใบรับยอดผลิต V1">
-            <FactoryDataTable rows={data?.documents ?? []} rowKey={(row) => row.id} state={loading ? "loading" : "normal"} minWidth={720}
+            <FactoryDataTable variant="history" rows={data?.documents ?? []} rowKey={(row) => row.id} state={loading ? "loading" : "normal"} minWidth={720}
               columns={[
                 { key: "number", label: "เลขที่เอกสาร", render: (row) => row.documentNumber },
                 { key: "date", label: "วันที่", render: (row) => row.documentDate },
                 { key: "location", label: "สถานที่", render: (row) => row.location },
                 { key: "order", label: "ใบสั่งผลิต", render: (row) => row.productionOrderNumber },
-                { key: "action", label: "จัดการ", render: (row) => <Button variant="outline" size="sm" onClick={() => setView(row)}>ดูรายละเอียด</Button> },
+                { key: "action", label: "จัดการ", render: (row) => <RowActionMenu readOnly><RowActionItem onClick={() => setView(row)}>ดูรายละเอียด</RowActionItem></RowActionMenu> },
               ]}
             />
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <Dialog open={view !== null} onOpenChange={(open) => { if (!open) setView(null); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader><DialogTitle>{view?.documentNumber}</DialogTitle>

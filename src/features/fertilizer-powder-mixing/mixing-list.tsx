@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import {
   Plus,
@@ -33,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/src/components/ui/alert-dialog";
 import {
-  PageHeader,
+  DocumentViewActions, PageHeader,
   FactoryDataTable,
   Pagination,
   SelectField,
@@ -108,7 +109,7 @@ export function MixingList() {
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [filterError, setFilterError] = useState("");
-  const [activeTab, setActiveTab] = useState<"form" | "history">("form");
+  const [activeTab, setActiveTab] = useState<"form" | "history">("history");
   const [editor, setEditor] = useState<MixingReport | null>(() => newReport(records));
   const [editorKey, setEditorKey] = useState(0);
   const [dirty, setDirty] = useState(false);
@@ -269,46 +270,22 @@ export function MixingList() {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 hover:bg-primary/5 hover:text-primary"
-            aria-label={`ดู ${r.doc_no}`}
-            onClick={() => setPanel({ mode: "view", id: r.id })}
-          >
+        <RowActionMenu containsDialog>
+          <RowActionItem aria-label={`ดู ${r.doc_no}`} onClick={() => setPanel({ mode: "view", id: r.id })}>
             <Eye aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 hover:bg-primary/5 hover:text-primary"
-            aria-label={`แก้ไข ${r.doc_no}`}
-            disabled={blocked}
-            onClick={() => startEditor(r)}
-          >
+           ดูรายละเอียด</RowActionItem>
+          <RowActionItem aria-label={`แก้ไข ${r.doc_no}`} disabled={blocked} onClick={() => startEditor(r)}>
             <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 hover:bg-primary/5 hover:text-primary"
-            aria-label={`คัดลอก ${r.doc_no}`}
-            disabled={blocked}
-            onClick={() => copyRow(r)}
-          >
+           แก้ไข</RowActionItem>
+          <RowActionItem aria-label={`คัดลอก ${r.doc_no}`} disabled={blocked} onClick={() => copyRow(r)}>
             <Copy aria-hidden="true" />
-          </Button>
+           คัดลอก</RowActionItem>
           <MixingPrintPreview
             rows={[r]}
             trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`พรีวิวพิมพ์ ${r.doc_no}`}
-              >
+              <RowActionItem aria-label={`พรีวิวพิมพ์ ${r.doc_no}`}>
                 <Printer aria-hidden="true" />
-              </Button>
+               พรีวิวพิมพ์</RowActionItem>
             }
           />
           <ConfirmDialog
@@ -316,15 +293,9 @@ export function MixingList() {
             description="ลบเฉพาะรายงานนี้ ไม่กระทบสต็อกหรือสูตร BOM"
             disabled={blocked}
             trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-9 text-danger hover:bg-danger/10 hover:text-danger"
-                aria-label={`ลบ ${r.doc_no}`}
-                disabled={blocked}
-              >
+              <RowActionItem aria-label={`ลบ ${r.doc_no}`} disabled={blocked} className="w-full justify-start text-destructive">
                 <Trash2 aria-hidden="true" />
-              </Button>
+               ลบ</RowActionItem>
             }
             onConfirm={() =>
               act(async () => {
@@ -338,25 +309,13 @@ export function MixingList() {
               }, "ลบรายงานแล้ว")
             }
           />
-        </div>
+        </RowActionMenu>
       ),
     },
   ];
   return (
     <div className="space-y-5">
-      <PageHeader title="รายงานผสมปุ๋ยผง" description={error ? `โหลดข้อมูลไม่สำเร็จ: ${error} · กรุณารีโหลดหน้า` : loading ? "กำลังโหลดข้อมูลจาก API" : "รายงานผสมปุ๋ยผง · บันทึกผ่าน API"} />
-      <div className="flex justify-center py-1">
-        <div role="group" aria-label="หน้ารายงานผสมปุ๋ยผง" className="inline-flex w-full max-w-xl rounded-full border border-border bg-card p-1 shadow-sm">
-          <button type="button" disabled={busy} aria-pressed={activeTab === "form"} onClick={openFormTab}
-            className={`flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${activeTab === "form" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted"}`}>
-            แบบฟอร์มรายงานผสม
-          </button>
-          <button type="button" disabled={busy} aria-pressed={activeTab === "history"} onClick={() => { if (!busy) setActiveTab("history"); }}
-            className={`flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${activeTab === "history" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted"}`}>
-            ประวัติรายงานผสม
-          </button>
-        </div>
-      </div>
+      <PageHeader title="รายงานผสมปุ๋ยผง" description={error ? `โหลดข้อมูลไม่สำเร็จ: ${error} · กรุณารีโหลดหน้า` : loading ? "กำลังโหลดข้อมูลจาก API" : "รายงานผสมปุ๋ยผง · บันทึกผ่าน API"} actions={<DocumentViewActions showingForm={activeTab === "form"} createLabel="สร้างรายงานผสม" disabled={busy} onCreate={openFormTab} onHistory={() => setActiveTab("history")} />} />
       {editor && (
         <div className={activeTab === "form" ? "space-y-3" : "hidden"}>
           {editor.id && (
@@ -493,7 +452,7 @@ export function MixingList() {
         {error || (loading ? "กำลังโหลดข้อมูล" : busy ? "กำลังดำเนินการ" : message || "ข้อมูลรายงานจาก API")}
       </p>
       <div className="[&_.factory-table_thead]:bg-primary! [&_.factory-table_thead_tr]:bg-primary! [&_.factory-table_thead_th]:text-primary-foreground! [&_.factory-table_td]:py-2!">
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={visible}
         columns={columns}
         rowKey={(r) => r.id}

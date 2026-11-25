@@ -4,12 +4,6 @@ import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use
 import { useRef, useState } from "react";
 
 import { Button } from "@/src/components/ui/button";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
 
 import {
   AlertDialog,
@@ -22,7 +16,7 @@ import {
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
 
-import {
+import { DocumentViewActions,
   PageHeader,
 } from "@/src/components/factory/patterns";
 
@@ -68,7 +62,7 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
   /* ---------------- UI state ---------------- */
 
-  const [tab, setTab] = useState<TabKey>("form");
+  const [tab, setTab] = useState<TabKey>("history");
 
   const [errors, setErrors] =
     useState<OrganicRawMaterialErrors>({});
@@ -246,30 +240,11 @@ export function OrganicRawMaterialReceivingWorkspace() {
       <PageHeader
         title={ORGANIC_RAW_MATERIAL_FORM_TITLE}
         description="ตรวจรับและบันทึกวัตถุดิบประจำวัน"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจรับ" disabled={busy} onCreate={handleNew} onHistory={() => setTab("history")} />}
       />
 
-      {/* Tabs */}
+      <div className="min-w-0">
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          setTab(
-            value === "history" ? "history" : "form",
-          )
-        }
-        className="min-w-0"
-      >
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="เมนูใบตรวจรับวัตถุดิบ">
-            <TabsTrigger value="form">
-              กรอกข้อมูล
-            </TabsTrigger>
-
-            <TabsTrigger value="history">
-              ดูประวัติ
-            </TabsTrigger>
-          </TabsList>
-        </div>
 
         {/* Message */}
 
@@ -284,10 +259,7 @@ export function OrganicRawMaterialReceivingWorkspace() {
 
         {/* Form Tab */}
 
-        <TabsContent
-          value="form"
-          className="mt-3 min-w-0 space-y-4"
-        >
+        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
           {isEditing && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
               <div className="text-sm text-foreground">
@@ -346,14 +318,11 @@ export function OrganicRawMaterialReceivingWorkspace() {
               onReset={handleNew}
             />
           </fieldset>
-        </TabsContent>
+        </div>)}
 
         {/* History Tab */}
 
-        <TabsContent
-          value="history"
-          className="mt-3 min-w-0"
-        >
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <OrganicRawMaterialReceivingHistory
             records={records}
             onEdit={handleEdit}
@@ -363,8 +332,8 @@ export function OrganicRawMaterialReceivingWorkspace() {
               setDeleteSheet(sheet)
             }
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
 
       {/* Confirm Unsaved Changes */}
 

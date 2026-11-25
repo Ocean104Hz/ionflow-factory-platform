@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useEffect, useId, useRef, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -77,7 +78,7 @@ export function MasterSettings({
     Math.max(1, Math.ceil(filtered.length / 10)),
   );
   const isEditing = draft ? rows.some((row) => row.id === draft.id) : false;
-  function openEditor(opener: HTMLButtonElement, row?: MasterSettingRow) {
+  function openEditor(opener: HTMLButtonElement | null, row?: MasterSettingRow) {
     editorOpener.current = opener;
     setDraft(
       row
@@ -135,23 +136,15 @@ export function MasterSettings({
       key: "actions",
       label: "จัดการ",
       render: (row) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-label={`แก้ไข ${row.code}`}
-            onClick={(event) => openEditor(event.currentTarget, row)}
-          >
+        <RowActionMenu containsDialog label={`จัดการ ${row.code}`} triggerId={`${id}-manage-${row.id}`}>
+          <RowActionItem type="button" aria-label={`แก้ไข ${row.code}`} onClick={() => {
+            const opener = document.getElementById(`${id}-manage-${row.id}`);
+            openEditor(opener instanceof HTMLButtonElement ? opener : null, row);
+          }}>
             <Pencil aria-hidden="true" />
             แก้ไข
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-label={`${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code}`}
-            onClick={async () => {
+          </RowActionItem>
+          <RowActionItem type="button" aria-label={`${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code}`} onClick={async () => {
               try {
                 await save({ ...row, active: !row.active });
               } catch (e) {
@@ -166,24 +159,17 @@ export function MasterSettings({
               setMessage(
                 `${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code} แล้ว (PostgreSQL)`,
               );
-            }}
-          >
+            }}>
             {row.active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
-          </Button>
+          {`${row.active ? "ปิด" : "เปิด"}ใช้งาน ${row.code}`}</RowActionItem>
           <ConfirmDialog
             title={`ลบ${title}`}
             description={`ลบ ${row.code} · ${row.name} ได้เฉพาะเมื่อไม่ถูกอ้างอิง หากใช้แล้วให้ปิดใช้งานแทน`}
             trigger={
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="text-danger"
-                aria-label={`ลบ ${row.code}`}
-              >
+              <RowActionItem type="button" aria-label={`ลบ ${row.code}`} className="w-full justify-start text-destructive">
                 <Trash2 aria-hidden="true" />
                 ลบ
-              </Button>
+              </RowActionItem>
             }
             onConfirm={async () => {
               try {
@@ -198,7 +184,7 @@ export function MasterSettings({
               setMessage(`ลบ ${row.code} แล้ว (PostgreSQL)`);
             }}
           />
-        </div>
+        </RowActionMenu>
       ),
     },
   ];
@@ -216,7 +202,7 @@ export function MasterSettings({
         title={`ตั้งค่า${title}`}
         subtitle={`จัดการรหัส ชื่อ ความสัมพันธ์ และสถานะ${title}สำหรับงานภายใน`}
         action={
-          <Button type="button" onClick={(event) => openEditor(event.currentTarget)}>
+          <Button type="button" variant="outline" onClick={(event) => openEditor(event.currentTarget)}>
             <Plus aria-hidden="true" />
             สร้าง{title}
           </Button>

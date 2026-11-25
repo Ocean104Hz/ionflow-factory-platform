@@ -1,18 +1,9 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import {
-  AlertCircle,
-  FileSpreadsheet,
-  FileText,
-  History,
-  Link2,
-  LockKeyhole,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, FileSpreadsheet, Link2, LockKeyhole, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { Checkbox } from "@/src/components/ui/checkbox";
 import {
   Dialog,
@@ -40,14 +31,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
-import { Pagination } from "@/src/components/factory/patterns";
+import { DocumentViewActions, PageHeader, FactoryDataTable, Pagination } from "@/src/components/factory/patterns";
 import { useBOM } from "../bom/bom-provider";
 import { productionRequest, useProductionV1Data } from "../production-flow/production-v1-client";
 import type { ProductionOrderV1 } from "./types";
@@ -172,7 +157,7 @@ function DocumentSection({
 }
 
 export function ProductProductionOrdersV1Workspace() {
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
   const [formula, setFormula] = useState("");
@@ -266,30 +251,14 @@ export function ProductProductionOrdersV1Workspace() {
 
   return (
     <div className="min-w-0 pb-10 text-[#1e3868]">
+      <PageHeader title="ใบสั่งผลิตสินค้า V1" description="จัดทำและติดตามใบสั่งผลิตสินค้า" actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบสั่งผลิต" disabled={loading || saving} onCreate={() => setTab("form")} onHistory={() => setTab("history")} />} />
       {notice && <p role="status" className="mb-4 text-sm">{notice}</p>}
       {saveError && <p role="alert" className="mb-4 text-sm text-danger">{saveError}</p>}
       {error && <div className="mb-4 flex items-center gap-2"><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
-      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <div className="flex justify-center">
-          <TabsList className="h-auto w-full max-w-xl rounded-full border border-gray-200 bg-white p-1 shadow-sm">
-            <TabsTrigger
-              value="form"
-              className="flex-1 gap-2 rounded-full px-6 py-2 text-xs transition-all md:text-sm data-[state=active]:scale-[1.02] data-[state=active]:bg-[#84CAED] data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              <FileText className="size-4" aria-hidden="true" />
-              สร้างใบสั่งผลิต
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="flex-1 gap-2 rounded-full px-6 py-2 text-xs transition-all md:text-sm data-[state=active]:scale-[1.02] data-[state=active]:bg-[#84CAED] data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              <History className="size-4" aria-hidden="true" />
-              ประวัติใบสั่งผลิต
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="space-y-4">
 
-        <TabsContent value="form" className="space-y-4">
+
+        {tab === "form" && (<div className="space-y-4">
           <DocumentSection
             title="ใบสั่งงาน"
             subtitle="ข้อมูลหัวเอกสารและแผนการผลิต"
@@ -518,9 +487,9 @@ export function ProductProductionOrdersV1Workspace() {
               {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </div>
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history">
+        {tab === "history" && (<div>
           <DocumentSection
             title="ข้อมูลที่บันทึก"
             subtitle="รายการจากใบสั่งผลิต V1 ที่บันทึกแล้ว"
@@ -556,48 +525,47 @@ export function ProductProductionOrdersV1Workspace() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-xl border">
-              <Table className="min-w-[1780px]">
-                <TableHeader className="bg-[#84CAED] text-white">
-                  <TableRow className="hover:bg-[#84CAED]">
-                    {historyColumns.map((column, index) => (
-                      <TableHead
-                        key={column}
-                        className={`${index === 0 || index >= 5 ? "text-center" : ""} text-white`}
-                      >
-                        {index === 0 ? (
-                          <span className="flex items-center gap-3">
-                            <Checkbox disabled aria-label="เลือกทั้งหมด" />
-                            {column}
-                          </span>
-                        ) : column}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize)).map((order, index) => {
-                    const actual = data?.produced[order.id] ?? 0;
-                    return <TableRow key={order.id}>
-                      {[(currentPage - 1) * Number(pageSize) + index + 1, order.documentNumber, order.location, order.date,
-                        order.sheet.lines[0].productName, order.amount, actual.toFixed(3), Math.max(0, Number(order.amount) - actual).toFixed(3),
-                        order.rows.filter((row) => row.date).map((row) => row.date).join(", ") || "—", order.note || "—",
-                        order.signers.preparedBy, order.signers.qaOfficer, order.signers.productionOfficer, order.signers.manager].map((value, column) => <TableCell key={column}>{value}</TableCell>)}
-                      <TableCell><Button variant="outline" size="sm" onClick={() => setView(order)}>ดูรายละเอียด</Button></TableCell>
-                    </TableRow>;
-                  })}
-                  {!filtered.length && <TableRow>
-                    <TableCell colSpan={historyColumns.length} className="h-28 text-center text-muted-foreground">
-                      {loading ? "กำลังโหลด…" : "ไม่พบข้อมูลตามเงื่อนไข"}
-                    </TableCell>
-                  </TableRow>}
-                </TableBody>
-              </Table>
-            </div>
-            <Pagination page={currentPage} pageSize={Number(pageSize)} total={filtered.length} onChange={setPage} />
+            <FactoryDataTable
+              variant="history"
+              minWidth={1780}
+              rows={filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize)).map((order, index) => {
+                const actual = data?.produced[order.id] ?? 0;
+                return {
+                  order,
+                  values: [
+                    (currentPage - 1) * Number(pageSize) + index + 1, order.documentNumber,
+                    order.location, order.date, order.sheet.lines[0].productName, order.amount,
+                    actual.toFixed(3), Math.max(0, Number(order.amount) - actual).toFixed(3),
+                    order.rows.filter((row) => row.date).map((row) => row.date).join(", ") || "—",
+                    order.note || "—", order.signers.preparedBy, order.signers.qaOfficer,
+                    order.signers.productionOfficer, order.signers.manager,
+                  ],
+                };
+              })}
+              rowKey={({ order }) => order.id}
+              state={loading && !filtered.length ? "loading" : "normal"}
+              emptyMessage="ไม่พบข้อมูลตามเงื่อนไข"
+              columns={historyColumns.map((label, index) => ({
+                key: label,
+                label,
+                numeric: index >= 5 && index <= 7,
+                header: index === 0 ? (
+                  <span className="flex items-center gap-3">
+                    <Checkbox disabled aria-label="เลือกทั้งหมด" />
+                    {label}
+                  </span>
+                ) : undefined,
+                render: ({ order, values }) => index < values.length ? values[index] : (
+                  <RowActionMenu readOnly label={`จัดการ ${order.documentNumber}`}>
+                    <RowActionItem onClick={() => setView(order)}>ดูรายละเอียด</RowActionItem>
+                  </RowActionMenu>
+                ),
+              }))}
+              pagination={<Pagination page={currentPage} pageSize={Number(pageSize)} total={filtered.length} onChange={setPage} />}
+            />
           </DocumentSection>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <Dialog open={view !== null} onOpenChange={(open) => { if (!open) setView(null); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader><DialogTitle>{view?.documentNumber}</DialogTitle>

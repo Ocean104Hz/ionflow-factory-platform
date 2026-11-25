@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { Eye } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -136,15 +137,10 @@ export function InventoryTable({
       key: "action",
       label: "รายละเอียด",
       render: ({ item }) => (
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label={`รายละเอียด ${item.code}`}
-          onClick={() => onView(item.id)}
-        >
+        <RowActionMenu readOnly><RowActionItem aria-label={`รายละเอียด ${item.code}`} onClick={() => onView(item.id)}>
           <Eye aria-hidden="true" />
           ดู
-        </Button>
+        </RowActionItem></RowActionMenu>
       ),
     },
   ];

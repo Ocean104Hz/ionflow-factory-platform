@@ -328,7 +328,8 @@ test("status palette, horizontal table overflow, and dialog safety are shared", 
   const patterns = read("src/components/factory/patterns.tsx");
   for (const tone of ["neutral", "info", "warning", "success", "destructive"])
     assert.ok(patterns.includes(`${tone}:`));
-  assert.match(patterns, /overflow-x-auto/);
+  assert.match(read("src/components/ui/table.tsx"), /overflow-x-auto/);
+  assert.match(patterns, /"aria-label": "ตารางข้อมูล เลื่อนแนวนอนเพื่อดูทุกคอลัมน์"/);
   const dialog = read("src/components/factory/confirm-dialog.tsx");
   assert.match(dialog, /DialogTitle/);
   assert.match(dialog, /DialogDescription/);

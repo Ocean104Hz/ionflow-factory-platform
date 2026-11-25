@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useId, useState } from "react";
 import { Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
@@ -144,7 +145,7 @@ function EventDetail({
             หนึ่งเหตุการณ์รวม {event.postings.length} postings · โอนและเปลี่ยน
             QC แสดงต้นทาง/ปลายทางในเอกสารเดียว ไม่มีการทำรายการจริง
           </p>
-          <FactoryDataTable
+          <FactoryDataTable variant="history"
             columns={columns}
             rows={[...event.postings]}
             rowKey={(posting) => posting.id}
@@ -321,15 +322,10 @@ export function InventoryHistory({
       key: "actions",
       label: "รายละเอียด",
       render: (event) => (
-        <Button
-          size="sm"
-          variant="outline"
-          aria-label={`ดูเหตุการณ์ ${event.documentNo}`}
-          onClick={() => setSelected(event)}
-        >
+        <RowActionMenu readOnly><RowActionItem aria-label={`ดูเหตุการณ์ ${event.documentNo}`} onClick={() => setSelected(event)}>
           <Eye aria-hidden="true" />
           ดู
-        </Button>
+        </RowActionItem></RowActionMenu>
       ),
     },
   ];
@@ -490,7 +486,7 @@ export function InventoryHistory({
           />
         </div>
       </div>
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={paged.rows}
         rowKey={(event) => event.id}

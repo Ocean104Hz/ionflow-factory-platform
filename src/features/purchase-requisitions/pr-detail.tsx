@@ -260,7 +260,7 @@ export function PRDetail({
                   {event.note ? ` · ${event.note}` : ""}
                 </p>
                 {event.changes.length > 0 && (
-                  <FactoryDataTable
+                  <FactoryDataTable variant="history"
                     rows={event.changes}
                     rowKey={(change) => change.field}
                     minWidth={600}

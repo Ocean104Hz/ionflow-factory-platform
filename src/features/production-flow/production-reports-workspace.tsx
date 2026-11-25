@@ -1,9 +1,10 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Plus } from "lucide-react";
-import {
+import { DocumentViewActions,
   FactoryDataTable,
   PageHeader,
   SectionCard,
@@ -13,7 +14,6 @@ import {
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Textarea } from "@/src/components/ui/textarea";
 import { productionRequest, useProductionV1Data } from "./production-v1-client";
 import { ProductionReportDialog } from "./production-report-document";
@@ -28,7 +28,7 @@ export function ProductionReportsWorkspace() {
   const [report, setReport] = useState<ProductionReport | null>(null);
   const [errors, setErrors] = useState<ProductionFlowErrors>({});
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [view, setView] = useState<ProductionReport | null>(null);
   const sourceOptions = flow.formulaSheets.flatMap((sheet) =>
     sheet.lines
@@ -121,16 +121,23 @@ export function ProductionReportsWorkspace() {
       <PageHeader
         title="รายงานการผลิต"
         description="บันทึกผลผลิตจริงจากใบสั่งผลิต V1 และสูตร BOM ที่บันทึกไว้"
+        actions={
+          <DocumentViewActions
+            showingForm={tab === "form"}
+            createLabel="สร้างรายงาน"
+            disabled={saving || loading || !!error}
+            confirmCreate={!!report && JSON.stringify(flow.reports.find(({ id }) => id === report.id)) !== JSON.stringify(report)}
+            onCreate={() => { setReport(null); setErrors({}); setMessage(""); setTab("form"); }}
+            onHistory={() => setTab("history")}
+          />
+        }
       />
       {loading && <p role="status">กำลังโหลดรายงาน…</p>}
       {error && <div><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
       {message && <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">{message}</p>}
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList aria-label="มุมมองรายงานการผลิต">
-          <TabsTrigger value="form">บันทึกรายงาน</TabsTrigger>
-          <TabsTrigger value="history">ประวัติรายงาน</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="space-y-5">
+      <div>
+
+        {tab === "form" && (<div className="space-y-5">
           <SectionCard
             title="เอกสารต้นทาง"
             subtitle="เลือกใบสั่งผลิต V1 ที่บันทึกแล้ว ระบบจะใช้สูตร BOM ที่บันทึกไว้ในใบนั้น"
@@ -264,10 +271,10 @@ export function ProductionReportsWorkspace() {
               </div>
             </form>
           )}
-        </TabsContent>
-        <TabsContent value="history">
+        </div>)}
+        {tab === "history" && (<div>
           <SectionCard title="ประวัติรายงานการผลิต" subtitle="รายงานที่มีใบรับยอดยืนยันแล้วจะถูกล็อกไม่ให้แก้ไข">
-            <FactoryDataTable
+            <FactoryDataTable variant="history"
               rows={flow.reports}
               rowKey={(row) => row.id}
               minWidth={850}
@@ -290,19 +297,19 @@ export function ProductionReportsWorkspace() {
                   key: "actions",
                   label: "จัดการ",
                   render: (row) => (
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" aria-label={`ดู ${row.documentNumber}`} onClick={() => setView(row)}><Eye /></Button>
+                    <RowActionMenu>
+                      <RowActionItem aria-label={`ดู ${row.documentNumber}`} onClick={() => setView(row)}><Eye /> ดูรายละเอียด</RowActionItem>
                       {!(row.status === "RECORDED" && data?.lockedOrderIds.includes(row.orderId)) && (
-                        <Button variant="ghost" size="icon" aria-label={`แก้ไข ${row.documentNumber}`} onClick={() => { setReport(structuredClone(row)); setErrors({}); setTab("form"); }}><Pencil /></Button>
+                        <RowActionItem aria-label={`แก้ไข ${row.documentNumber}`} onClick={() => { setReport(structuredClone(row)); setErrors({}); setTab("form"); }}><Pencil /> แก้ไข</RowActionItem>
                       )}
-                    </div>
+                    </RowActionMenu>
                   ),
                 },
               ]}
             />
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <ProductionReportDialog
         report={view}
         sheet={flow.formulaSheets.find((row) => row.id === view?.formulaSheetId) ?? null}

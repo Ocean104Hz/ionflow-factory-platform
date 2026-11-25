@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -161,7 +162,7 @@ export function QualityHistory({
           {error}
         </p>
       )}
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paged.rows}
         rowKey={(r) => r.id}
         minWidth={1200}
@@ -232,16 +233,16 @@ export function QualityHistory({
             key: "actions",
             label: "จัดการ",
             render: (r) => (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => onEdit(r)}>
+              <RowActionMenu containsDialog>
+                <RowActionItem onClick={() => onEdit(r)}>
                   แก้ไข
-                </Button>
-                <QualityPrintPreview row={r} />
+                </RowActionItem>
+                <QualityPrintPreview row={r} trigger={<RowActionItem>พรีวิวพิมพ์</RowActionItem>} />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-danger" disabled={busy || !loaded}>
+                    <RowActionItem disabled={busy || !loaded} className="w-full justify-start text-destructive">
                       ลบ
-                    </Button>
+                    </RowActionItem>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="bg-surface">
                     <AlertDialogHeader>
@@ -257,7 +258,7 @@ export function QualityHistory({
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-              </div>
+              </RowActionMenu>
             ),
           },
         ]}

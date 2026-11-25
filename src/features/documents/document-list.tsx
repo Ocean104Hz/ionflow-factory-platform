@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import Link from "next/link";
 import { useState } from "react";
@@ -129,12 +130,12 @@ export function DocumentList({ kind }: { kind: "delivery" | "invoice" }) {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <Button size="sm" variant="ghost" asChild>
+        <RowActionMenu readOnly><RowActionItem asChild>
           <Link href={`${route}/${r.id}`} aria-label={`ดู ${r.number}`}>
             ดูรายละเอียด
             <ArrowUpRight />
           </Link>
-        </Button>
+        </RowActionItem></RowActionMenu>
       ),
     },
   ];
@@ -182,7 +183,7 @@ export function DocumentList({ kind }: { kind: "delivery" | "invoice" }) {
           setPage(1);
         }}
       />
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={rows.slice(
           (page - 1) * filters.pageSize,

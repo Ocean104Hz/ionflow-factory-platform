@@ -1,7 +1,7 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState, useEffect, useId, useRef } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import { useMasterData } from "@/src/features/master-data/master-provider";
 import { MasterSelect } from "@/src/features/master-data/master-select";
 import {
@@ -29,7 +29,7 @@ import {
   TableCell,
 } from "@/src/components/ui/table";
 import { Card, CardContent } from "@/src/components/ui/card";
-import {
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   FactoryDataTable,
@@ -128,7 +128,7 @@ async function persistInspection(row: Inspection, version?: string): Promise<Ins
 
 export function RawMaterialInspections() {
   const masters = useMasterData();
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [newInspection, setNewInspection] = useState<Inspection>(() => blankInspection());
   const [formVersion, setFormVersion] = useState(0);
   const [editingRecord, setEditingRecord] = useState<InspectionRecord | null>(null);
@@ -429,34 +429,17 @@ export function RawMaterialInspections() {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <div className="flex items-center gap-1">
+        <RowActionMenu containsDialog>
 
           {/* ดูรายละเอียด */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9 hover:bg-primary/5 hover:text-primary"
-            title="ดูรายละเอียด"
-            aria-label="ดูรายละเอียด"
-            onClick={() => setOpened({ row: r, mode: "view" })}
-          >
+          <RowActionItem type="button" title="ดูรายละเอียด" aria-label="ดูรายละเอียด" onClick={() => setOpened({ row: r, mode: "view" })}>
             <Eye className="size-4" />
-          </Button>
+           ดูรายละเอียด</RowActionItem>
 
           {/* แก้ไข */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9 hover:bg-primary/5 hover:text-primary"
-            title="แก้ไข"
-            aria-label="แก้ไข"
-            disabled={savingDocument || deleting}
-            onClick={() => void handleEditRecord(r)}
-          >
+          <RowActionItem type="button" title="แก้ไข" aria-label="แก้ไข" disabled={savingDocument || deleting} onClick={() => void handleEditRecord(r)}>
             <Pencil className="size-4" />
-          </Button>
+           แก้ไข</RowActionItem>
 
           {/* พิมพ์เอกสาร */}
           <InspectionPrintPreview
@@ -467,17 +450,9 @@ export function RawMaterialInspections() {
           {/* ลบเอกสาร */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9 hover:bg-destructive/5 hover:text-destructive"
-                title="ลบเอกสาร"
-                aria-label="ลบเอกสาร"
-                disabled={deleting || savingDocument}
-              >
+              <RowActionItem type="button" title="ลบเอกสาร" aria-label="ลบเอกสาร" disabled={deleting || savingDocument} className="w-full justify-start text-destructive">
                 <Trash2 className="size-4" />
-              </Button>
+               ลบเอกสาร</RowActionItem>
             </AlertDialogTrigger>
 
             <AlertDialogContent className="bg-surface">
@@ -508,7 +483,7 @@ export function RawMaterialInspections() {
             </AlertDialogContent>
           </AlertDialog>
 
-        </div>
+        </RowActionMenu>
       ),
     },
   ];
@@ -517,20 +492,16 @@ export function RawMaterialInspections() {
       <PageHeader
         title="ใบตรวจสอบคุณภาพวัตถุดิบ"
         description="บันทึกผลตรวจรับวัตถุดิบและติดตามคุณภาพราย Lot"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจสอบ" disabled={loadState !== "ready" || savingDocument} onCreate={requestNewDocument} onHistory={() => setTab("history")} />}
       />
       {loadState !== "ready" && (
         <p role={loadState === "error" ? "alert" : "status"} className="text-sm text-muted-foreground">
           {loadState === "loading" ? "กำลังโหลดข้อมูลใบตรวจสอบ..." : `${loadError} กรุณาโหลดหน้าใหม่`}
         </p>
       )}
-      <Tabs value={tab} onValueChange={(value) => { if (!saveLock.current && !deletingRef.current) setTab(value); }} className="min-w-0">
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="มุมมองใบตรวจสอบคุณภาพวัตถุดิบ">
-            <TabsTrigger value="form">สร้างใบตรวจสอบ</TabsTrigger>
-            <TabsTrigger value="history">ประวัติใบตรวจสอบ</TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="form" forceMount className="mt-3 min-w-0 data-[state=inactive]:hidden">
+      <div className="min-w-0">
+
+        <div className="mt-3 min-w-0" hidden={tab !== "form"}>
           {editingRecord && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
               <p className="text-sm text-primary">
@@ -570,8 +541,8 @@ export function RawMaterialInspections() {
               setTab("history");
             }}
           />
-        </TabsContent>
-        <TabsContent value="history" className="mt-3 min-w-0 space-y-5">
+        </div>
+        {tab === "history" && (<div className="mt-3 min-w-0 space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
             {["รอตรวจสอบ", "ผ่าน", "ไม่ผ่าน"].map((status) => (
               <Card key={status} className="py-4">
@@ -664,7 +635,7 @@ export function RawMaterialInspections() {
           <p role="status" className="text-sm text-muted-foreground">
             {message}
           </p>
-          <FactoryDataTable
+          <FactoryDataTable variant="history"
             columns={columns}
             rows={rows}
             rowKey={(r) => r.id}
@@ -694,8 +665,8 @@ export function RawMaterialInspections() {
               </div>
             }
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <AlertDialog
         open={pendingAction !== null}
         onOpenChange={(open) => { if (!open) setPendingAction(null); }}

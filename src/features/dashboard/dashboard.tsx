@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -103,14 +104,14 @@ export function Dashboard() {
       key: "actions",
       label: "จัดการ",
       render: (r) => (
-        <Button variant="ghost" size="icon" asChild>
+        <RowActionMenu readOnly><RowActionItem asChild>
           <Link
             href={`/production-orders/${r.id}`}
             aria-label={`ดู ${r.number}`}
           >
             <ArrowUpRight />
           </Link>
-        </Button>
+        </RowActionItem></RowActionMenu>
       ),
     },
   ];

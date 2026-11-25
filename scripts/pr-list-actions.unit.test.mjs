@@ -62,7 +62,7 @@ test("PR row menu reuses existing commands and opens dialogs after the menu clos
 
   for (const token of [
     "DropdownMenu",
-    "MoreHorizontal",
+    '<Pencil aria-hidden="true" />',
     "ดูรายละเอียด",
     "คัดลอกเป็นฉบับร่าง",
     "พรีวิว / พิมพ์",

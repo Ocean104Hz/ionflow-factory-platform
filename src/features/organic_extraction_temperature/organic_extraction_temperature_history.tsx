@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Eye, Pencil, Printer, Search, Trash2 } from "lucide-react";
 
@@ -250,7 +251,7 @@ export function OrganicExtractionTemperatureHistory({
         </div>
       </div>
 
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paginated.items}
         rowKey={(sheet) => sheet.id}
         minWidth={1210}
@@ -329,49 +330,24 @@ export function OrganicExtractionTemperatureHistory({
               } รหัส ${sheet.id}`;
 
               return (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`ดู${documentLabel}`}
-                    onClick={() => onView(sheet)}
-                  >
+                <RowActionMenu>
+                  <RowActionItem type="button" aria-label={`ดู${documentLabel}`} onClick={() => onView(sheet)}>
                     <Eye className="size-4" aria-hidden="true" />
                     ดู
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`พรีวิว${documentLabel}`}
-                    onClick={() => onPrint(sheet)}
-                  >
+                  </RowActionItem>
+                  <RowActionItem type="button" aria-label={`พรีวิว${documentLabel}`} onClick={() => onPrint(sheet)}>
                     <Printer className="size-4" aria-hidden="true" />
                     พรีวิว
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`แก้ไข${documentLabel}`}
-                    onClick={() => onEdit(sheet)}
-                  >
+                  </RowActionItem>
+                  <RowActionItem type="button" aria-label={`แก้ไข${documentLabel}`} onClick={() => onEdit(sheet)}>
                     <Pencil className="size-4" aria-hidden="true" />
                     แก้ไข
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-danger hover:text-danger"
-                    aria-label={`ลบ${documentLabel}`}
-                    onClick={() => onDelete(sheet)}
-                  >
+                  </RowActionItem>
+                  <RowActionItem type="button" aria-label={`ลบ${documentLabel}`} onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
                     <Trash2 className="size-4" aria-hidden="true" />
                     ลบ
-                  </Button>
-                </div>
+                  </RowActionItem>
+                </RowActionMenu>
               );
             },
           },

@@ -1,9 +1,10 @@
 
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useMemo, useState } from "react";
 import { Plus, Trash2, Upload, PackageSearch, Link2 } from "lucide-react";
-import {
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   FactoryDataTable,
@@ -14,9 +15,6 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Checkbox } from "@/src/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
-import {
-  Tabs, TabsContent, TabsList, TabsTrigger,
-} from "@/src/components/ui/tabs";
 
 import { PackagingLoadStatus, usePackagingData } from "../packaging-reports/packaging-client";
 import { thaiDate } from "../packaging-reports/packaging-domain";
@@ -51,7 +49,7 @@ export function PackingSummaryWorkspace() {
   const [reportIds, setReportIds] = useState<string[]>([]);
   const [editing, setEditing] = useState<PackingSummary | null>(null);
   const [view, setView] = useState<PackingSummary | null>(null);
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [notice, setNotice] = useState("");
   const [saveError, setSaveError] = useState("");
   const [selectReports, setSelectReports] = useState(false);
@@ -139,29 +137,14 @@ export function PackingSummaryWorkspace() {
       <PageHeader
         title="ใบแจ้งสั่งแพ็คสินค้า"
         description="บันทึกรายการสินค้าและผูกรายงานการบรรจุ iTech ได้ตามต้องการ"
-        actions={<Button type="button" disabled={busy} onClick={() => open(null)}><Plus /> สร้างใบแจ้งสั่งแพ็ค</Button>}
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบแจ้งสั่งแพ็ค" disabled={busy} onCreate={() => open(null)} onHistory={() => setTab("history")} />}
       />
       <PackagingLoadStatus loading={loading} error={error} retry={source.retry} />
       {notice && <p role="status" className="text-sm text-primary">{notice}</p>}
-      <Tabs value={tab} onValueChange={setTab} className="space-y-5">
-        <TabsList
-          className="mx-auto grid h-11 w-full max-w-xl grid-cols-2 rounded-full p-1"
-        >
-          <TabsTrigger
-            value="form"
-            className="h-9 rounded-full px-4"
-          >
-            แบบฟอร์มใบแจ้งสั่งแพ็ค
-          </TabsTrigger>
-          <TabsTrigger
-            value="history"
-            className="h-9 rounded-full px-4"
-          >
-            ประวัติใบแจ้งสั่งแพ็ค
-          </TabsTrigger>
-        </TabsList>
+      <div className="space-y-5">
 
-        <TabsContent value="form" className="space-y-5">
+
+        {tab === "form" && (<div className="space-y-5">
           <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
           <fieldset disabled={busy} className="min-w-0 space-y-5">
           <SectionCard
@@ -457,9 +440,9 @@ export function PackingSummaryWorkspace() {
           </div>
           </fieldset>
           </form>
-        </TabsContent>
+        </div>)}
 
-        <TabsContent value="history">
+        {tab === "history" && (<div>
           <SectionCard
             title="ข้อมูลที่บันทึก"
             subtitle="ประวัติใบแจ้งสั่งแพ็คสินค้า"
@@ -476,7 +459,7 @@ export function PackingSummaryWorkspace() {
                 <Input type="date" aria-label="ถึงวันที่" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
               </div>
 
-              {!loading && !error && <FactoryDataTable
+              {!loading && !error && <FactoryDataTable variant="history"
                 rows={filtered.slice((activePage - 1) * pageSize, activePage * pageSize)}
                 rowKey={(record) => record.id}
                 minWidth={760}
@@ -487,18 +470,18 @@ export function PackingSummaryWorkspace() {
                   { key: "items", label: "รายการสินค้า", render: (record) => record.items.length },
                   { key: "reports", label: "รายงานอ้างอิง", render: (record) => record.reportIds.map(nameFor).join(", ") || "—" },
                   { key: "actions", label: "จัดการ", render: (record) => (
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setView(record)}>ดูรายละเอียด</Button>
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => open(record)}>แก้ไข</Button>
-                    </div>
+                    <RowActionMenu>
+                      <RowActionItem onClick={() => setView(record)}>ดูรายละเอียด</RowActionItem>
+                      <RowActionItem disabled={busy} onClick={() => open(record)}>แก้ไข</RowActionItem>
+                    </RowActionMenu>
                   ) },
                 ]}
                 pagination={<Pagination page={activePage} pageSize={pageSize} total={filtered.length} onChange={setPage} />}
               />}
             </div>
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <Dialog open={selectReports} onOpenChange={setSelectReports}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>

@@ -1,7 +1,8 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
-import { Beaker, Eye, Pencil, Printer, Plus, Trash2 } from "lucide-react";
-import {
+import { Beaker, Eye, Pencil, Printer, Trash2 } from "lucide-react";
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   StatusBadge,
@@ -13,12 +14,6 @@ import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -50,7 +45,7 @@ export function BulkProductionWorkspace() {
   const [baseline, setBaseline] = useState(() =>
     JSON.stringify(blankBulkOrder()),
   );
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [errors, setErrors] = useState<BulkErrors>({});
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<BulkOrder | null>(null);
@@ -113,27 +108,16 @@ export function BulkProductionWorkspace() {
       <PageHeader
         title="ใบสั่งผลิตสินค้า V2"
         description="จัดทำแผนการผลิตและออกใบสูตร ก่อนบันทึกผลจริงในรายงานการผลิต"
-        actions={
-          <>
-            <StatusBadge tone="info">UI MOCK · Bulk ภายใน</StatusBadge>
-            <Button onClick={() => request(blankBulkOrder())}>
-              <Plus />
-              สร้างใบสั่งผลิตใหม่
-            </Button>
-          </>
-        }
+        actions={<><StatusBadge tone="info">UI MOCK · Bulk ภายใน</StatusBadge><DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบสั่งผลิตใหม่" onCreate={() => request(blankBulkOrder())} onHistory={() => setTab("history")} /></>}
       />
       {message && (
         <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">
           {message}
         </p>
       )}
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList aria-label="มุมมองใบสั่งผลิต">
-          <TabsTrigger value="form">บันทึกใบสั่งผลิต</TabsTrigger>
-          <TabsTrigger value="history">ประวัติใบสั่งผลิต</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="min-w-0">
+      <div className="min-w-0">
+
+        {tab === "form" && (<div className="min-w-0">
           <BulkProductionForm
             doc={doc}
             errors={errors}
@@ -141,8 +125,8 @@ export function BulkProductionWorkspace() {
             onSave={save}
             onCancel={() => request(blankBulkOrder())}
           />
-        </TabsContent>
-        <TabsContent value="history" className="min-w-0">
+        </div>)}
+        {tab === "history" && (<div className="min-w-0">
           <SectionCard
             title="ประวัติใบสั่งผลิต"
             subtitle="สถานะเป็นป้ายความคืบหน้าจำลอง ไม่ใช่การอนุมัติหรือสถานะจาก Sales Hub"
@@ -204,7 +188,7 @@ export function BulkProductionWorkspace() {
                 }))}
               />
             </div>
-            <FactoryDataTable
+            <FactoryDataTable variant="history"
               rows={filtered.slice(
                 (safePage - 1) * pageSize,
                 safePage * pageSize,
@@ -277,66 +261,36 @@ export function BulkProductionWorkspace() {
                   key: "actions",
                   label: "จัดการ",
                   render: (r) => (
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="ออกหรือดูใบสูตรผลิต"
-                        aria-label={`ออกหรือดูใบสูตรผลิต ${r.header.docNo}`}
-                        onClick={() => issueFormula(r.id)}
-                      >
+                    <RowActionMenu containsDialog>
+                      <RowActionItem title="ออกหรือดูใบสูตรผลิต" aria-label={`ออกหรือดูใบสูตรผลิต ${r.header.docNo}`} onClick={() => issueFormula(r.id)}>
                         <Beaker />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="ดูรายละเอียด"
-                        aria-label={`ดูรายละเอียด ${r.header.docNo}`}
-                        onClick={() => setView({ id: r.id, print: false })}
-                      >
+                       ออกหรือดูใบสูตรผลิต</RowActionItem>
+                      <RowActionItem title="ดูรายละเอียด" aria-label={`ดูรายละเอียด ${r.header.docNo}`} onClick={() => setView({ id: r.id, print: false })}>
                         <Eye />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title={
+                       ดูรายละเอียด</RowActionItem>
+                      <RowActionItem title={
                           flow.formulaSheets.some((sheet) => sheet.orderId === r.id)
                             ? "ออกใบสูตรแล้ว จึงล็อกการแก้ไข"
                             : "แก้ไข"
-                        }
-                        aria-label={`แก้ไข ${r.header.docNo}`}
-                        disabled={flow.formulaSheets.some(
+                        } aria-label={`แก้ไข ${r.header.docNo}`} disabled={flow.formulaSheets.some(
                           (sheet) => sheet.orderId === r.id,
-                        )}
-                        onClick={() => request(r)}
-                      >
+                        )} onClick={() => request(r)}>
                         <Pencil />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="พรีวิวเอกสาร / พิมพ์"
-                        aria-label={`พรีวิว ${r.header.docNo}`}
-                        onClick={() => setView({ id: r.id, print: true })}
-                      >
+                       แก้ไข</RowActionItem>
+                      <RowActionItem title="พรีวิวเอกสาร / พิมพ์" aria-label={`พรีวิว ${r.header.docNo}`} onClick={() => setView({ id: r.id, print: true })}>
                         <Printer />
-                      </Button>
+                       พรีวิวเอกสาร / พิมพ์</RowActionItem>
                       <ConfirmDialog
                         title="ลบใบสั่งผลิตตัวอย่าง?"
                         description={`ลบ ${r.header.docNo} เฉพาะข้อมูลจำลองในหน้านี้`}
                         onConfirm={() => remove(r.id)}
                         trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="ลบ"
-                            aria-label={`ลบ ${r.header.docNo}`}
-                          >
+                          <RowActionItem title="ลบ" aria-label={`ลบ ${r.header.docNo}`}>
                             <Trash2 />
-                          </Button>
+                           ลบ</RowActionItem>
                         }
                       />
-                    </div>
+                    </RowActionMenu>
                   ),
                 },
               ]}
@@ -353,8 +307,8 @@ export function BulkProductionWorkspace() {
               สถานะการผลิตคำนวณจากรายงานการผลิต ไม่ใช้ช่องผลผลิตเดิมในใบสั่งผลิต
             </p>
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <p className="text-xs text-muted-foreground">
         ข้อมูลในหน้านี้รีเซ็ตเมื่อรีโหลด · ใบสูตรอ่าน BOM แบบ snapshot และไม่เปลี่ยน Inventory
       </p>

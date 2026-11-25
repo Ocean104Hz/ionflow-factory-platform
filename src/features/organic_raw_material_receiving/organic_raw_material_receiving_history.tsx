@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Eye, Pencil, Printer, Search, Trash2 } from "lucide-react";
 
@@ -223,7 +224,7 @@ export function OrganicRawMaterialReceivingHistory({
         </div>
       </div>
 
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paginated.items}
         rowKey={(sheet) => sheet.id}
         minWidth={1080}
@@ -299,49 +300,24 @@ export function OrganicRawMaterialReceivingHistory({
               const date =
                 formatOrganicMaterialDate(sheet.document_date) || sheet.document_date;
               return (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`${text.viewDocument} ${date}`}
-                    onClick={() => onView(sheet)}
-                  >
+                <RowActionMenu>
+                  <RowActionItem type="button" aria-label={`${text.viewDocument} ${date}`} onClick={() => onView(sheet)}>
                     <Eye className="size-4" aria-hidden="true" />
                     {text.view}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`${text.printDocument} ${date}`}
-                    onClick={() => onPrint(sheet)}
-                  >
+                   ดูรายละเอียด</RowActionItem>
+                  <RowActionItem type="button" aria-label={`${text.printDocument} ${date}`} onClick={() => onPrint(sheet)}>
                     <Printer className="size-4" aria-hidden="true" />
                     {text.print}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-label={`${text.editDocument} ${date}`}
-                    onClick={() => onEdit(sheet)}
-                  >
+                   พรีวิวพิมพ์</RowActionItem>
+                  <RowActionItem type="button" aria-label={`${text.editDocument} ${date}`} onClick={() => onEdit(sheet)}>
                     <Pencil className="size-4" aria-hidden="true" />
                     {text.edit}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`${text.deleteDocument} ${date}`}
-                    className="text-danger hover:text-danger"
-                    onClick={() => onDelete(sheet)}
-                  >
+                   แก้ไข</RowActionItem>
+                  <RowActionItem type="button" aria-label={`${text.deleteDocument} ${date}`} onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
                     <Trash2 className="size-4" aria-hidden="true" />
                     {text.delete}
-                  </Button>
-                </div>
+                   ลบ</RowActionItem>
+                </RowActionMenu>
               );
             },
           },

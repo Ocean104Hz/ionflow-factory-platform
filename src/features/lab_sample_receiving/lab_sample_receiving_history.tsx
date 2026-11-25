@@ -1,6 +1,7 @@
 
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 
 import {
@@ -302,7 +303,7 @@ export function LabSampleReceivingHistory({
 
       {/* History Table */}
 
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paginated.items}
         rowKey={(sheet) => sheet.id}
         minWidth={1200}
@@ -409,68 +410,47 @@ export function LabSampleReceivingHistory({
             key: "actions",
             label: "จัดการ",
             render: (sheet) => (
-              <div className="flex flex-wrap items-center gap-2">
+              <RowActionMenu>
                 {/* View */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onView(sheet)}
-                >
+                <RowActionItem type="button" onClick={() => onView(sheet)}>
                   <Eye
                     className="size-4"
                     aria-hidden="true"
                   />
                   ดู
-                </Button>
+                </RowActionItem>
 
                 {/* Print */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onPrint(sheet)}
-                >
+                <RowActionItem type="button" onClick={() => onPrint(sheet)}>
                   <Printer
                     className="size-4"
                     aria-hidden="true"
                   />
                   พิมพ์
-                </Button>
+                </RowActionItem>
 
                 {/* Edit */}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(sheet)}
-                >
+                <RowActionItem type="button" onClick={() => onEdit(sheet)}>
                   <Pencil
                     className="size-4"
                     aria-hidden="true"
                   />
                   แก้ไข
-                </Button>
+                </RowActionItem>
 
                 {/* Delete */}
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger hover:text-danger"
-                  onClick={() => onDelete(sheet)}
-                >
+                <RowActionItem type="button" onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
                   <Trash2
                     className="size-4"
                     aria-hidden="true"
                   />
                   ลบ
-                </Button>
-              </div>
+                </RowActionItem>
+              </RowActionMenu>
             ),
           },
         ]}

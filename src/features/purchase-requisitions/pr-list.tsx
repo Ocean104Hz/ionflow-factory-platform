@@ -4,7 +4,6 @@ import {
   Copy,
   FilePlus2,
   SlidersHorizontal,
-  MoreHorizontal,
   Eye,
   Pencil,
   Printer,
@@ -242,7 +241,7 @@ export function PRList() {
               size="icon"
               aria-label={`จัดการ ${pr.number}`}
             >
-              <MoreHorizontal aria-hidden="true" />
+              <Pencil aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
 
@@ -347,7 +346,7 @@ export function PRList() {
         title="ใบขอซื้อ (PR)"
         description="จัดทำและติดตามใบขอซื้อของโรงงาน"
         actions={
-          <Button onClick={() => setDocument({ mode: "new" })}>
+          <Button variant="outline" onClick={() => setDocument({ mode: "new" })}>
             <FilePlus2 aria-hidden="true" />
             สร้าง PR
           </Button>
@@ -515,7 +514,7 @@ export function PRList() {
           </p>
         </CardContent>
       </Card>
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={visible}
         rowKey={(pr) => pr.id}

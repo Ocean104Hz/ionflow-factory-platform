@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import {
   Tabs,
@@ -27,7 +26,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import {
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   InfoGrid,
@@ -51,7 +50,7 @@ import { useProductionQuality } from "./production-quality-provider";
 export function ProductionQualityWorkspace() {
   const { records, refresh, loaded, busy, loadError } = useProductionQuality();
   useEffect(() => { void refresh(); }, [refresh]);
-  const [tab, setTab] = useState("form"),
+  const [tab, setTab] = useState("history"),
     [row, setRow] = useState<Inspection>(blankInspection),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankInspection()));
   const [pending, setPending] = useState<Inspection | null>(null),
@@ -74,22 +73,17 @@ export function ProductionQualityWorkspace() {
       <PageHeader
         title="ตรวจสอบคุณภาพการผลิต"
         description={loadError ? `โหลดข้อมูลไม่สำเร็จ: ${loadError} · กรุณารีเฟรชหน้า` : !loaded ? "กำลังโหลดข้อมูลจากฐานข้อมูล" : "บันทึกผลตรวจตามช่วงเวลา ติดตามประวัติ และสรุปผลรายปี · ไม่อนุมัติคุณภาพหรือเปลี่ยนสต็อก"}
-        // actions={
-        //   <Button disabled={busy || !loaded} onClick={() => requestForm(blankInspection())}>
-        //     <Plus />
-        //     สร้างเอกสารใหม่
-        //   </Button>
-        // }
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจสอบ" disabled={busy || !loaded} onCreate={() => requestForm(blankInspection())} onHistory={() => setTab("history")} />}
       />
       <Tabs value={tab} onValueChange={(next) => { if (!busy && loaded) setTab(next); }} className="min-w-0">
         <div className="max-w-full overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="form">แบบฟอร์มตรวจสอบ</TabsTrigger>
+
             <TabsTrigger value="history">ประวัติการตรวจสอบ</TabsTrigger>
             <TabsTrigger value="yearly">สรุปรายปี</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="form" className="mt-5 min-w-0">
+        {tab === "form" && (<div className="mt-5 min-w-0">
           {loaded && row.id && !records.some((r) => r.id === row.id) ? (
             <SectionCard title="เอกสารนี้ถูกลบแล้ว">
               <Button onClick={() => openForm(blankInspection())}>
@@ -106,7 +100,7 @@ export function ProductionQualityWorkspace() {
               }}
             />
           )}
-        </TabsContent>
+        </div>)}
         <TabsContent value="history" className="mt-5 min-w-0">
           <QualityHistory
             onEdit={requestForm}

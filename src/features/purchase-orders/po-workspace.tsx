@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Copy, Eye, MoreHorizontal, Pencil, Plus, Printer, RotateCcw } from "lucide-react";
+import { Copy, Eye, Pencil, Plus, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
@@ -121,7 +121,7 @@ function PurchaseOrdersContent({ initialPr }: { initialPr: string }) {
   let proposedNumber = "";
   if (editor && department !== "none") { try { proposedNumber = previewPoNo(editor.doc.po_date,department,records); } catch {} }
   return <div className="min-w-0 space-y-5">
-    <PageHeader title="PO · ใบสั่งซื้อ" description="จัดทำและติดตามใบสั่งซื้อของโรงงาน" actions={<><Button onClick={()=>open({...blankPo(localDay()),items:[blankItem(crypto.randomUUID())]},"create")}><Plus aria-hidden="true" />สร้างใบสั่งซื้อ</Button></>} />
+    <PageHeader title="PO · ใบสั่งซื้อ" description="จัดทำและติดตามใบสั่งซื้อของโรงงาน" actions={<><Button variant="outline" onClick={()=>open({...blankPo(localDay()),items:[blankItem(crypto.randomUUID())]},"create")}><Plus aria-hidden="true" />สร้างใบสั่งซื้อ</Button></>} />
     {message && <p role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">{message}</p>}
     <SectionCard title="ติดตามใบสั่งซื้อ">
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-[1fr_160px_auto]">
@@ -135,7 +135,7 @@ function PurchaseOrdersContent({ initialPr }: { initialPr: string }) {
         <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!selection.length} onClick={()=>setPreview(selected)}><Printer aria-hidden="true" />พรีวิวที่เลือก</Button><Button variant="outline" disabled title="ยังไม่เชื่อม Excel ใน UI phase">นำเข้า / ส่งออก Excel · ยังไม่เชื่อม</Button></div>
       </div>
       {!!selection.length && <div className="mb-4 flex flex-wrap gap-2">{(Object.keys(actionLabels) as PoAction[]).filter((action)=>selection.every((r)=>permittedActions(r.status).includes(action))).map((action)=><Button key={action} size="sm" variant="outline" onClick={()=>requestAction(selected,action)}>{actionLabels[action]}ที่เลือก</Button>)}</div>}
-      <FactoryDataTable rows={visible} rowKey={(r)=>r.id} minWidth={1150} columns={[
+      <FactoryDataTable variant="history" rows={visible} rowKey={(r)=>r.id} minWidth={1150} columns={[
         {key:"select",label:"เลือก",render:(r)=><Checkbox aria-label={`เลือก ${r.po_no}`} checked={selected.includes(r.id)} onCheckedChange={(checked)=>setSelected(checked===true?[...selected.filter((id)=>id!==r.id),r.id]:selected.filter((id)=>id!==r.id))} />},
         {key:"date",label:"วันที่เอกสาร",render:(r)=>r.po_date},
         {key:"number",label:"เลขที่ PO",render:(r)=><Button variant="link" className="h-auto p-0" onClick={()=>open(r,"view")}>{r.po_no}</Button>},
@@ -145,7 +145,7 @@ function PurchaseOrdersContent({ initialPr }: { initialPr: string }) {
         {key:"total",label:"ยอดรวม",numeric:true,render:(r)=>`${money(poTotals(r).total)} ${r.currency_code}`},
         {key:"status",label:"สถานะ",render:(r)=><StatusBadge tone={r.status==="approved"||r.status==="received"?"success":r.status==="pending_approval"?"warning":"neutral"}>{poStatuses[r.status]}</StatusBadge>},
         {key:"delivery",label:"กำหนดส่ง",render:(r)=>r.expected_delivery_date||"—"},
-        {key:"manage",label:"จัดการ",render:(r)=><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`จัดการ ${r.po_no}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>open(r,"view")}><Eye aria-hidden="true" />ดูรายละเอียด</DropdownMenuItem><DropdownMenuItem onSelect={()=>copy(r)}><Copy aria-hidden="true" />คัดลอกเป็นเอกสารใหม่</DropdownMenuItem>{["draft","rejected"].includes(r.status)&&<DropdownMenuItem onSelect={()=>open(r,"edit")}><Pencil aria-hidden="true" />แก้ไข</DropdownMenuItem>}<DropdownMenuItem onSelect={()=>setPreview([r.id])}><Printer aria-hidden="true" />พรีวิว / พิมพ์</DropdownMenuItem>{permittedActions(r.status).map((action)=><DropdownMenuItem key={action} onSelect={()=>requestAction([r.id],action)}>{actionLabels[action]}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>},
+        {key:"manage",label:"จัดการ",render:(r)=><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`จัดการ ${r.po_no}`}><Pencil aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>open(r,"view")}><Eye aria-hidden="true" />ดูรายละเอียด</DropdownMenuItem><DropdownMenuItem onSelect={()=>copy(r)}><Copy aria-hidden="true" />คัดลอกเป็นเอกสารใหม่</DropdownMenuItem>{["draft","rejected"].includes(r.status)&&<DropdownMenuItem onSelect={()=>open(r,"edit")}><Pencil aria-hidden="true" />แก้ไข</DropdownMenuItem>}<DropdownMenuItem onSelect={()=>setPreview([r.id])}><Printer aria-hidden="true" />พรีวิว / พิมพ์</DropdownMenuItem>{permittedActions(r.status).map((action)=><DropdownMenuItem key={action} onSelect={()=>requestAction([r.id],action)}>{actionLabels[action]}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>},
       ]} pagination={<Pagination page={safePage} pageSize={pageSize} total={filtered.length} onChange={setPage} />} />
     </SectionCard>
     <Dialog open={!!editor} onOpenChange={(open)=>{if(!open)closeEditor();}}><DialogContent className="flex max-h-[94dvh] w-[96vw] flex-col sm:max-w-6xl"><DialogHeader><DialogTitle>{editor?.mode==="view"?"รายละเอียดใบสั่งซื้อ":editor?.mode==="edit"?"แก้ไขใบสั่งซื้อ":"สร้างใบสั่งซื้อ"}</DialogTitle><DialogDescription>บันทึกใบสั่งซื้อและข้อมูลอ้างอิงของโรงงาน</DialogDescription></DialogHeader><div className="min-h-0 overflow-y-auto pr-1">{editor&&<PoForm doc={editor.doc} errors={errors} readOnly={editor.mode==="view"} onChange={(doc)=>setEditor({...editor,doc})} onSave={(submit) => void save(submit)} onCancel={closeEditor} onPick={(kind,rowId)=>setPicker({kind,rowId})} onNumber={()=>setNumberOpen(true)} />}</div></DialogContent></Dialog>

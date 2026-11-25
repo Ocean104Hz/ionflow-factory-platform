@@ -780,7 +780,20 @@ export function StockRmWorkspace() {
       <PageHeader
         title="Stock RM FF"
         description="สต็อกวัตถุดิบตามรูปแบบไฟล์ Stock RM FF 2569.xlsx"
-        actions={<Badge variant="outline">ฐานข้อมูลจริง</Badge>}
+        actions={<><Badge variant="outline">ฐานข้อมูลจริง</Badge> {draft && (<Button
+            type="button"
+            variant="outline"
+            onClick={openCreateForm}
+            disabled={readOnly || dialogOpen || draft.period.view !== "MONTH"}
+            title={
+              draft.period.view === "YEAR"
+                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มวัตถุดิบ"
+                : "เพิ่มรายการวัตถุดิบ"
+            }
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            เพิ่มวัตถุดิบ
+          </Button>)}</>}
       />
 
       <fieldset disabled={busy || dialogOpen} className="min-w-0">
@@ -858,20 +871,7 @@ export function StockRmWorkspace() {
             <RotateCcw className="size-4" aria-hidden="true" />
             โหลดข้อมูลใหม่
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={openCreateForm}
-            disabled={readOnly || dialogOpen || draft.period.view !== "MONTH"}
-            title={
-              draft.period.view === "YEAR"
-                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มวัตถุดิบ"
-                : "เพิ่มรายการวัตถุดิบ"
-            }
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            เพิ่มวัตถุดิบ
-          </Button>
+
           <Button
             type="button"
             variant="outline"

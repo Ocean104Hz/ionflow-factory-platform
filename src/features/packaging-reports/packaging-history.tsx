@@ -1,4 +1,5 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -127,7 +128,7 @@ export function PackagingHistory({
           {error}
         </p>
       )}
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paged.rows}
         rowKey={(r) => r.id}
         minWidth={1050}
@@ -187,19 +188,19 @@ export function PackagingHistory({
             key: "actions",
             label: "จัดการ",
             render: (r) => (
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={busy} onClick={() => onEdit(r)}>
+              <RowActionMenu containsDialog>
+                <RowActionItem disabled={busy} onClick={() => onEdit(r)}>
                   แก้ไข
-                </Button>
-                <PackagingPrintPreview report={r} />
+                </RowActionItem>
+                <PackagingPrintPreview report={r} trigger={<RowActionItem>พรีวิวพิมพ์</RowActionItem>} />
                 <ConfirmDialog
                   live
                   title="ลบรายงานนี้?"
                   description="รายงานนี้จะถูกนำออกจากประวัติ"
                   trigger={
-                    <Button variant="ghost" size="sm" disabled={busy} className="text-danger">
+                    <RowActionItem disabled={busy} className="w-full justify-start text-destructive">
                       ลบ
-                    </Button>
+                    </RowActionItem>
                   }
                   onConfirm={async () => {
                     try {
@@ -210,7 +211,7 @@ export function PackagingHistory({
                     }
                   }}
                 />
-              </div>
+              </RowActionMenu>
             ),
           },
         ]}

@@ -1,5 +1,7 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "./row-action-menu";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -380,18 +382,14 @@ export function UserSettings({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-haspopup="dialog"
-                        aria-label={`แก้ไขผู้ใช้ ${item.displayName}`}
-                        onClick={(event) =>
-                          openUserDialog(event.currentTarget, item)
-                        }
-                      >
-                        แก้ไข
-                      </Button>
+                      <RowActionMenu label={`จัดการผู้ใช้ ${item.displayName}`} triggerId={`manage-user-${item.id}`}>
+                        <RowActionItem onClick={() => {
+                          const opener = document.getElementById(`manage-user-${item.id}`);
+                          openUserDialog(opener instanceof HTMLButtonElement ? opener : null, item);
+                        }}>
+                          แก้ไขผู้ใช้
+                        </RowActionItem>
+                      </RowActionMenu>
                     </TableCell>
                   </TableRow>
                 ))}

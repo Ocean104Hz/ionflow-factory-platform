@@ -1,13 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Plus } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +20,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import {
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   InfoGrid,
@@ -48,7 +41,7 @@ import { usePackaging } from "./packaging-provider";
 import { PackagingLoadStatus } from "./packaging-client";
 export function PackagingWorkspace() {
   const { records, loading, error, retry, busy } = usePackaging();
-  const [tab, setTab] = useState("form"),
+  const [tab, setTab] = useState("history"),
     [editorSession, setEditorSession] = useState(0),
     [report, setReport] = useState(newReport),
     [baseline, setBaseline] = useState(() => JSON.stringify(newReport())),
@@ -72,20 +65,12 @@ export function PackagingWorkspace() {
       <PageHeader
         title="ใบรายงานการบรรจุปุ๋ยอินทรีย์"
         description="บันทึกผลตรวจบรรจุ Load Cell และเทียบเครื่องชั่ง"
-        actions={
-          <Button disabled={busy} onClick={() => request(newReport())}>
-            <Plus />
-            สร้างรายงานใหม่
-          </Button>
-        }
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างรายงานใหม่" disabled={busy || loading || !!error} onCreate={() => request(newReport())} onHistory={() => setTab("history")} />}
       />
       <PackagingLoadStatus loading={loading} error={error} retry={retry} />
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList>
-          <TabsTrigger value="form">แบบฟอร์มรายงาน</TabsTrigger>
-          <TabsTrigger value="history">ประวัติรายงาน</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="mt-5 min-w-0">
+      <div className="min-w-0">
+
+        {tab === "form" && (<div className="mt-5 min-w-0">
           {report.id && !records.some((r) => r.id === report.id) ? (
             <SectionCard title="รายงานนี้ถูกลบแล้ว">
               <Button onClick={() => open(newReport())}>
@@ -103,11 +88,11 @@ export function PackagingWorkspace() {
               }}
             />
           )}
-        </TabsContent>
-        <TabsContent value="history" className="mt-5 min-w-0">
+        </div>)}
+        {tab === "history" && (<div className="mt-5 min-w-0">
           <PackagingHistory onEdit={request} onView={(r) => setViewId(r.id)} />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       <AlertDialog
         open={pending !== null}
         onOpenChange={(v) => {

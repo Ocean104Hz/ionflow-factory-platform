@@ -2,12 +2,6 @@
 import { useRef, useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
-import {
   AlertDialog,
   AlertDialogContent,
   AlertDialogHeader,
@@ -17,7 +11,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import { PageHeader } from "@/src/components/factory/patterns";
+import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import {
   blankLog,
@@ -34,7 +28,7 @@ export function SubmissionLogWorkspace() {
   const
     [row, setRow] = useState(blankLog),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankLog()));
-  const [tab, setTab] = useState("form"),
+  const [tab, setTab] = useState("history"),
     [errors, setErrors] = useState<LogErrors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<SubmissionLog | null>(null),
@@ -75,21 +69,17 @@ export function SubmissionLogWorkspace() {
       <PageHeader
         title="แบบบันทึกการนำส่งตัวอย่างวิเคราะห์ (สำหรับลูกค้า)"
         description="บันทึกข้อมูลการนำส่งตัวอย่างเพื่อตรวจวิเคราะห์"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างแบบบันทึก" disabled={busy || loading || !!loadError} onCreate={() => request(blankLog())} onHistory={() => setTab("history")} />}
       />
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="มุมมองแบบบันทึกการส่งตัวอย่าง">
-            <TabsTrigger value="form">สร้างแบบบันทึก</TabsTrigger>
-            <TabsTrigger value="history">ประวัติแบบบันทึก</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="min-w-0">
+
         <p role="status" className="text-sm text-primary">
           {message}
         </p>
-        <TabsContent value="form" className="mt-3 min-w-0">
+        {tab === "form" && (<div className="mt-3 min-w-0">
           <form
             noValidate
             className="space-y-4"
@@ -147,8 +137,8 @@ export function SubmissionLogWorkspace() {
               <Button type="submit">บันทึกเอกสาร</Button>
             </div>
           </form>
-        </TabsContent>
-        <TabsContent value="history" className="mt-3 min-w-0">
+        </div>)}
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <SubmissionLogHistory
             records={records}
             onEdit={request}
@@ -165,8 +155,8 @@ export function SubmissionLogWorkspace() {
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
       <AlertDialog
         open={!!pending}

@@ -1,5 +1,6 @@
 "use client";
 
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 import { Eye, Pencil, Printer, Search, Trash2 } from "lucide-react";
 
@@ -297,7 +298,7 @@ export function EffervescentMaterialLedgerHistory({
         </div>
       </div>
 
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         rows={paginatedRows}
         rowKey={(sheet) => sheet.id}
         minWidth={1160}
@@ -377,30 +378,24 @@ export function EffervescentMaterialLedgerHistory({
             key: "actions",
             label: "จัดการ",
             render: (sheet) => (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => onView(sheet)}>
+              <RowActionMenu>
+                <RowActionItem type="button" onClick={() => onView(sheet)}>
                   <Eye className="size-4" aria-hidden="true" />
                   ดู
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(sheet)}>
+                </RowActionItem>
+                <RowActionItem type="button" onClick={() => onEdit(sheet)}>
                   <Pencil className="size-4" aria-hidden="true" />
                   แก้ไข
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => onPrint(sheet)}>
+                </RowActionItem>
+                <RowActionItem type="button" onClick={() => onPrint(sheet)}>
                   <Printer className="size-4" aria-hidden="true" />
                   พิมพ์
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger hover:text-danger"
-                  onClick={() => onDelete(sheet)}
-                >
+                </RowActionItem>
+                <RowActionItem type="button" onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
                   <Trash2 className="size-4" aria-hidden="true" />
                   ลบ
-                </Button>
-              </div>
+                </RowActionItem>
+              </RowActionMenu>
             ),
           },
         ]}

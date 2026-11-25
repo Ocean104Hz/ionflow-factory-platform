@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { FactoryDataTable, Pagination, RefreshButton, type Column } from "@/src/components/factory/patterns";
 import { warehouseRequest } from "@/src/features/inventory/warehouse-client";
@@ -50,12 +50,14 @@ export function ReceivingHistory({ onOpen }: { onOpen: (document: SavedReceiving
       key: "action",
       label: "จัดการ",
       render: (row) => (
-        <ConfirmDialog
-          title="เปิดใบรับเดิมเพื่อแก้ไข?"
-          description="ข้อมูลที่ยังไม่บันทึกในแบบฟอร์มปัจจุบันจะถูกแทนที่"
-          onConfirm={() => onOpen(row)}
-          trigger={<Button type="button" variant="outline" size="sm" aria-label={`เปิดใบรับ ${row.header.documentNo}`}>เปิดใบรับ</Button>}
-        />
+        <RowActionMenu containsDialog label={`จัดการ ${row.header.documentNo}`}>
+          <ConfirmDialog
+            title="เปิดใบรับเดิมเพื่อแก้ไข?"
+            description="ข้อมูลที่ยังไม่บันทึกในแบบฟอร์มปัจจุบันจะถูกแทนที่"
+            onConfirm={() => onOpen(row)}
+            trigger={<RowActionItem>เปิดใบรับเพื่อแก้ไข</RowActionItem>}
+          />
+        </RowActionMenu>
       ),
     },
   ];
@@ -75,7 +77,7 @@ export function ReceivingHistory({ onOpen }: { onOpen: (document: SavedReceiving
         <RefreshButton onClick={refresh} />
       </div>
       {result.error && <p role="alert" className="text-destructive">{result.error}</p>}
-      <FactoryDataTable
+      <FactoryDataTable variant="history"
         columns={columns}
         rows={filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
         rowKey={(row) => row.header.documentNo}

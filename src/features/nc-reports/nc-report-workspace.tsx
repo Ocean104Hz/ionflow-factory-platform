@@ -1,12 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PageHeader } from "@/src/components/factory/patterns";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
+import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -32,7 +26,7 @@ export function NCReportWorkspace() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<NCReport>("nc_reports");
   const [report, setReport] = useState(blankNC),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankNC()));
-  const [tab, setTab] = useState("form"),
+  const [tab, setTab] = useState("history"),
     [errors, setErrors] = useState<NCErrors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<NCReport | null>(null),
@@ -73,19 +67,17 @@ export function NCReportWorkspace() {
       <PageHeader
         title="ใบ NC"
         description="บันทึกและติดตามรายงานข้อบกพร่องของสินค้าและกระบวนการผลิต"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบ NC" disabled={busy || loading || !!loadError} onCreate={() => request(blankNC())} onHistory={() => setTab("history")} />}
       />
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList aria-label="มุมมองใบ NC">
-          <TabsTrigger value="form">สร้างใบ NC</TabsTrigger>
-          <TabsTrigger value="history">ประวัติใบ NC</TabsTrigger>
-        </TabsList>
+      <div className="min-w-0">
+
         <p role="status" className="text-sm text-primary">
           {message}
         </p>
-        <TabsContent value="form" className="mt-3 min-w-0">
+        {tab === "form" && (<div className="mt-3 min-w-0">
           <NCReportForm
             report={report}
             errors={errors}
@@ -97,8 +89,8 @@ export function NCReportWorkspace() {
             onReset={() => request(blankNC())}
             onCancel={() => request(blankNC())}
           />
-        </TabsContent>
-        <TabsContent value="history" className="mt-3 min-w-0">
+        </div>)}
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <NCReportHistory
             records={records}
             onEdit={request}
@@ -116,8 +108,8 @@ export function NCReportWorkspace() {
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
       <AlertDialog
         open={!!pending}

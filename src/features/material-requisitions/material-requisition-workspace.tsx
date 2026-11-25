@@ -1,7 +1,8 @@
 "use client";
+import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useEffect, useRef, useState } from "react";
-import { Eye, Pencil, Printer, Plus, Trash2 } from "lucide-react";
-import {
+import { Eye, Pencil, Printer, Trash2 } from "lucide-react";
+import { DocumentViewActions,
   PageHeader,
   SectionCard,
   SelectField,
@@ -12,12 +13,6 @@ import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -68,7 +63,7 @@ export function MaterialRequisitionWorkspace() {
   const [baseline, setBaseline] = useState(() =>
     JSON.stringify(blankRequisition()),
   );
-  const [tab, setTab] = useState("form");
+  const [tab, setTab] = useState("history");
   const [errors, setErrors] = useState<Errors>({});
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState<Requisition | null>(null);
@@ -132,14 +127,7 @@ export function MaterialRequisitionWorkspace() {
       <PageHeader
         title="เบิกวัสดุ/วัตถุดิบ"
         description="จัดการเอกสารเบิกวัสดุ วัตถุดิบ และวัตถุดิบระหว่างการผลิต"
-        actions={
-          <>
-            <Button disabled={busy} onClick={() => request(blankRequisition(row.profile))}>
-              <Plus />
-              สร้างใบเบิกใหม่
-            </Button>
-          </>
-        }
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบเบิกใหม่" disabled={busy || loading || !!loadError} onCreate={() => request(blankRequisition(row.profile))} onHistory={() => setTab("history")} />}
       />
       {message && (
         <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">
@@ -149,12 +137,9 @@ export function MaterialRequisitionWorkspace() {
       {loading && <p role="status">กำลังโหลดใบเบิก…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้า</p>}
       <fieldset disabled={loading || !!loadError || busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <TabsList aria-label="มุมมองใบเบิก">
-          <TabsTrigger value="form">บันทึกใบเบิก</TabsTrigger>
-          <TabsTrigger value="history">ประวัติใบเบิก</TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="min-w-0">
+      <div className="min-w-0">
+
+        {tab === "form" && (<div className="min-w-0">
           <MaterialRequisitionForm
             row={row}
             errors={errors}
@@ -163,8 +148,8 @@ export function MaterialRequisitionWorkspace() {
             onSave={save}
             onReset={() => request(blankRequisition(row.profile))}
           />
-        </TabsContent>
-        <TabsContent value="history" className="min-w-0 space-y-5">
+        </div>)}
+        {tab === "history" && (<div className="min-w-0 space-y-5">
           <SectionCard
             title="ประวัติใบเบิก"
             subtitle="เอกสารเบิกวัสดุและวัตถุดิบที่บันทึกไว้"
@@ -240,7 +225,7 @@ export function MaterialRequisitionWorkspace() {
                 }))}
               />
             </div>
-            <FactoryDataTable
+            <FactoryDataTable variant="history"
               rows={filtered.slice(
                 (currentPage - 1) * pageSize,
                 currentPage * pageSize,
@@ -291,50 +276,27 @@ export function MaterialRequisitionWorkspace() {
                   key: "actions",
                   label: "จัดการ",
                   render: (r) => (
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`ดูรายละเอียด ${r.doc_no}`}
-                        title="ดูรายละเอียด"
-                        onClick={() => setView({ id: r.id, print: false })}
-                      >
+                    <RowActionMenu containsDialog>
+                      <RowActionItem aria-label={`ดูรายละเอียด ${r.doc_no}`} title="ดูรายละเอียด" onClick={() => setView({ id: r.id, print: false })}>
                         <Eye />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`แก้ไข ${r.doc_no}`}
-                        title="แก้ไข"
-                        onClick={() => request(r)}
-                      >
+                       ดูรายละเอียด</RowActionItem>
+                      <RowActionItem aria-label={`แก้ไข ${r.doc_no}`} title="แก้ไข" onClick={() => request(r)}>
                         <Pencil />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`พรีวิว ${r.doc_no}`}
-                        title="พรีวิวเอกสาร"
-                        onClick={() => setView({ id: r.id, print: true })}
-                      >
+                       แก้ไข</RowActionItem>
+                      <RowActionItem aria-label={`พรีวิว ${r.doc_no}`} title="พรีวิวเอกสาร" onClick={() => setView({ id: r.id, print: true })}>
                         <Printer />
-                      </Button>
+                       พรีวิวเอกสาร</RowActionItem>
                       <ConfirmDialog
                         title="ลบใบเบิก?"
                         description={`ลบ ${r.doc_no} ออกจากข้อมูลในหน้านี้เท่านั้น`}
                         onConfirm={() => remove(r)}
                         trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`ลบ ${r.doc_no}`}
-                            title="ลบ"
-                          >
+                          <RowActionItem aria-label={`ลบ ${r.doc_no}`} title="ลบ">
                             <Trash2 />
-                          </Button>
+                           ลบ</RowActionItem>
                         }
                       />
-                    </div>
+                    </RowActionMenu>
                   ),
                 },
               ]}
@@ -348,8 +310,8 @@ export function MaterialRequisitionWorkspace() {
               }
             />
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
       <p className="text-xs text-muted-foreground">
         Excel import/export ไม่อยู่ในระยะนี้ · ใบเบิกนี้แยกจาก Formula BOM

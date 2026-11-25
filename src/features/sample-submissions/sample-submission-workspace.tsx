@@ -1,12 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PageHeader } from "@/src/components/factory/patterns";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/src/components/ui/tabs";
+import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -35,7 +29,7 @@ export function SampleSubmissionWorkspace() {
   const [baseline, setBaseline] = useState(() =>
       JSON.stringify(newSubmission()),
     ),
-    [tab, setTab] = useState("form"),
+    [tab, setTab] = useState("history"),
     [errors, setErrors] = useState<SampleErrors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<SampleSubmission | null>(null),
@@ -72,21 +66,17 @@ export function SampleSubmissionWorkspace() {
       <PageHeader
         title="ใบส่งตัวอย่าง"
         description="จัดการตัวอย่างที่นำส่งวิเคราะห์และบันทึกผลรายตัวอย่าง"
+        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบส่งตัวอย่าง" disabled={busy || loading || !!loadError} onCreate={() => request(newSubmission())} onHistory={() => setTab("history")} />}
       />
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-        <div className="max-w-full overflow-x-auto">
-          <TabsList aria-label="มุมมองใบส่งตัวอย่าง">
-            <TabsTrigger value="form">สร้างใบส่งตัวอย่าง</TabsTrigger>
-            <TabsTrigger value="history">ประวัติใบส่งตัวอย่าง</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="min-w-0">
+
         <p role="status" className="text-sm text-primary">
           {message}
         </p>
-        <TabsContent value="form" className="mt-3 min-w-0">
+        {tab === "form" && (<div className="mt-3 min-w-0">
           <SampleSubmissionForm
             report={report}
             errors={errors}
@@ -97,8 +87,8 @@ export function SampleSubmissionWorkspace() {
             onSave={save}
             onReset={() => request(newSubmission())}
           />
-        </TabsContent>
-        <TabsContent value="history" className="mt-3 min-w-0">
+        </div>)}
+        {tab === "history" && (<div className="mt-3 min-w-0">
           <SampleSubmissionHistory
             records={records}
             onEdit={request}
@@ -115,8 +105,8 @@ export function SampleSubmissionWorkspace() {
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
-        </TabsContent>
-      </Tabs>
+        </div>)}
+      </div>
       </fieldset>
       <AlertDialog
         open={!!pending}
