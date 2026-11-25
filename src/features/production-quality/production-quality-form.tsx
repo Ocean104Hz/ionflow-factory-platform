@@ -213,7 +213,7 @@ export function QualityForm({
   onChange: (row: Inspection) => void;
   onSaved: (row: Inspection) => void;
 }) {
-  const { records, save } = useProductionQuality();
+  const { records, save, busy, loaded } = useProductionQuality();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [profileChange, setProfileChange] = useState<ProfileId | null>(null);
@@ -222,7 +222,8 @@ export function QualityForm({
     setMessage("");
     onChange({ ...row, ...value });
   };
-  function submit(status: Inspection["recordStatus"]) {
+  async function submit(status: Inspection["recordStatus"]) {
+    if (busy || !loaded) return;
     const candidate = { ...row, recordStatus: status };
     const nextErrors = validateInspection(candidate, records);
     setErrors(nextErrors);
@@ -231,10 +232,10 @@ export function QualityForm({
       return;
     }
     try {
-      const saved = save(candidate);
+      const saved = await save(candidate);
       onSaved(saved);
       setMessage(
-        `บันทึก${status === "DRAFT" ? "แบบร่าง" : "ผลตรวจ"}ใน demo session แล้ว`,
+        `บันทึก${status === "DRAFT" ? "แบบร่าง" : "ผลตรวจ"}แล้ว`,
       );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
@@ -243,10 +244,11 @@ export function QualityForm({
   const notes = warnings(row);
   return (
     <form
+      inert={busy}
       className="min-w-0 space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(row.recordStatus);
+        void submit(row.recordStatus);
       }}
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -519,7 +521,7 @@ export function QualityForm({
       <QualityCalculations row={row} onChange={onChange} errors={errors} />
       <SectionCard
         title="ข้อมูลผู้ลงชื่อ"
-        subtitle="ข้อมูลสาธิต ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์ และไม่ใช่การอนุมัติ"
+        subtitle="ชื่อผู้ลงนาม ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์ และไม่ใช่การอนุมัติ"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {row.signers.map((s, i) => (
@@ -568,11 +570,11 @@ export function QualityForm({
           {message}
         </p>
         {row.recordStatus === "DRAFT" && (
-          <Button type="submit" variant="outline">
+          <Button type="submit" variant="outline" disabled={busy || !loaded}>
             บันทึกแบบร่าง
           </Button>
         )}
-        <Button type="button" onClick={() => submit("RECORDED")}>
+        <Button type="button" disabled={busy || !loaded} onClick={() => void submit("RECORDED")}>
           {row.recordStatus === "RECORDED" ? "บันทึกการแก้ไข" : "บันทึกผลตรวจ"}
         </Button>
       </div>

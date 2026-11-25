@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -49,7 +49,8 @@ import { QualityPrintPreview } from "./production-quality-print-preview";
 import { useProductionQuality } from "./production-quality-provider";
 
 export function ProductionQualityWorkspace() {
-  const { records } = useProductionQuality();
+  const { records, refresh, loaded, busy, loadError } = useProductionQuality();
+  useEffect(() => { void refresh(); }, [refresh]);
   const [tab, setTab] = useState("form"),
     [row, setRow] = useState<Inspection>(blankInspection),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankInspection()));
@@ -64,6 +65,7 @@ export function ProductionQualityWorkspace() {
     setViewId(null);
   }
   function requestForm(next: Inspection) {
+    if (busy || !loaded) return;
     if (dirty) setPending(next);
     else openForm(next);
   }
@@ -71,15 +73,15 @@ export function ProductionQualityWorkspace() {
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="ตรวจสอบคุณภาพการผลิต"
-        description="บันทึกผลตรวจตามช่วงเวลา ติดตามประวัติ และสรุปผลรายปี · Mock เท่านั้น ไม่อนุมัติคุณภาพหรือเปลี่ยนสต็อก"
+        description={loadError ? `โหลดข้อมูลไม่สำเร็จ: ${loadError} · กรุณารีเฟรชหน้า` : !loaded ? "กำลังโหลดข้อมูลจากฐานข้อมูล" : "บันทึกผลตรวจตามช่วงเวลา ติดตามประวัติ และสรุปผลรายปี · ไม่อนุมัติคุณภาพหรือเปลี่ยนสต็อก"}
         actions={
-          <Button onClick={() => requestForm(blankInspection())}>
+          <Button disabled={busy || !loaded} onClick={() => requestForm(blankInspection())}>
             <Plus />
             สร้างเอกสารใหม่
           </Button>
         }
       />
-      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+      <Tabs value={tab} onValueChange={(next) => { if (!busy && loaded) setTab(next); }} className="min-w-0">
         <div className="max-w-full overflow-x-auto">
           <TabsList>
             <TabsTrigger value="form">แบบฟอร์มตรวจสอบ</TabsTrigger>
@@ -88,7 +90,7 @@ export function ProductionQualityWorkspace() {
           </TabsList>
         </div>
         <TabsContent value="form" className="mt-5 min-w-0">
-          {row.id && !records.some((r) => r.id === row.id) ? (
+          {loaded && row.id && !records.some((r) => r.id === row.id) ? (
             <SectionCard title="เอกสารนี้ถูกลบแล้ว">
               <Button onClick={() => openForm(blankInspection())}>
                 เปิดแบบฟอร์มใหม่
@@ -97,7 +99,7 @@ export function ProductionQualityWorkspace() {
           ) : (
             <QualityForm
               row={row}
-              onChange={setRow}
+              onChange={(next) => { if (!busy) setRow(next); }}
               onSaved={(saved) => {
                 setRow(saved);
                 setBaseline(JSON.stringify(saved));
@@ -108,7 +110,7 @@ export function ProductionQualityWorkspace() {
         <TabsContent value="history" className="mt-5 min-w-0">
           <QualityHistory
             onEdit={requestForm}
-            onView={(r) => setViewId(r.id)}
+            onView={(r) => { if (!busy && loaded) setViewId(r.id); }}
           />
         </TabsContent>
         <TabsContent value="yearly" className="mt-5 min-w-0">
@@ -154,7 +156,7 @@ export function ProductionQualityWorkspace() {
               รายละเอียด {viewed?.documentNumber || "เอกสารแบบร่าง"}
             </DialogTitle>
             <DialogDescription>
-              ข้อมูลสาธิต · อ่านอย่างเดียว · ไม่ใช่ใบอนุมัติคุณภาพ
+              ข้อมูลที่บันทึก · อ่านอย่างเดียว · ไม่ใช่ใบอนุมัติคุณภาพ
             </DialogDescription>
           </DialogHeader>
           {viewed && (
@@ -207,7 +209,7 @@ export function ProductionQualityWorkspace() {
                   ))}
                 </InfoGrid>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  ชื่อสาธิต ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์
+                  ชื่อผู้ลงนาม ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์
                 </p>
               </SectionCard>
               <SectionCard title="หมายเหตุและข้อมูลการบันทึก">
