@@ -57,7 +57,7 @@ function makePool(): Pool {
 }
 
 const cache = globalThis as typeof globalThis & { foliarAccessPool?: Pool };
-function pool(): Pool {
+export function getFactoryDatabasePool(): Pool {
   try {
     return (cache.foliarAccessPool ??= makePool());
   } catch {
@@ -68,7 +68,7 @@ function pool(): Pool {
 async function withClient<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   let client: PoolClient;
   try {
-    client = await pool().connect();
+    client = await getFactoryDatabasePool().connect();
   } catch {
     throw new FactoryAuthError("AUTH_UNAVAILABLE", 503);
   }

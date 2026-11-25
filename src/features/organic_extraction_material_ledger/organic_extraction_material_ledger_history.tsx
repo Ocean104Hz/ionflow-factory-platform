@@ -38,7 +38,7 @@ const labels = {
   historyTitle: "ประวัติบันทึกการรับ-จ่าย วัตถุดิบต้มสกัด",
   documentsFound: "พบ",
   of: "จาก",
-  mockDocuments: "เอกสารจำลอง",
+  mockDocuments: "เอกสาร",
   search: "ค้นหา",
   searchPlaceholder: "รหัสเอกสาร / รหัสวัตถุดิบ / ชื่อวัตถุดิบ / ผู้จัดทำ",
   fromDate: "จากวันที่เอกสาร",

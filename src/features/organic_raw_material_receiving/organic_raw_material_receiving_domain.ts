@@ -1,6 +1,5 @@
 /**
  * Domain for the organic-unit raw-material receiving / inspection sheet.
- * UI MOCK ONLY: no API calls and no database access.
  * The source paper has ten numbered entry slots, not a fixed material catalog.
  */
 
@@ -238,7 +237,7 @@ export function validateOrganicRawMaterialSheet(
   return errors;
 }
 
-/** In-memory save, matching the WIP workspace pattern. */
+/** Validates and normalizes the receiving document. */
 export function saveOrganicRawMaterialSheet(
   records: readonly OrganicRawMaterialReceivingSheet[],
   draft: OrganicRawMaterialReceivingSheet,

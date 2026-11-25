@@ -1,6 +1,5 @@
 /**
  * Domain for the organic extraction-material receipt / issue ledger.
- * UI MOCK ONLY: no API or database writes.
  *
  * Confirmed: the opening balance is entered MANUALLY for every document.
  * It is never loaded from, or automatically copied from, a prior document.

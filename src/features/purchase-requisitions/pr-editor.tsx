@@ -12,14 +12,9 @@ import {
 } from "@/src/components/factory/patterns";
 import { usePR } from "./pr-provider";
 import {
-  materialItem,
   newPR,
   newPRItem,
-  prMaterials,
   priorityLabel,
-  prSuppliers,
-  prUsers,
-  prWarehouses,
   validatePR,
   type PR,
   type PRItem,
@@ -39,10 +34,14 @@ export function PREditor({
   onCancel?: () => void;
 }) {
   const router = useRouter();
-  const { create, save } = usePR();
+  const { create, save, user } = usePR();
   const masters = useMasterData();
+  const materials = masters.state.rows.filter((row) => row.kind === "materials" && row.active);
   const [form, setForm] = useState<PR>(() =>
-    original ? structuredClone(original) : newPR(),
+    original ? structuredClone(original) : {
+      ...newPR(), requester: user.displayName,
+      masterRefs: { requester: { id: user.id, code: user.id, kind: "personnel", name: user.displayName, value: user.displayName } },
+    },
   );
   const [error, setError] = useState("");
   const embedded = Boolean(onSaved);
@@ -55,21 +54,27 @@ export function PREditor({
         item.id === id ? { ...item, ...patch } : item,
       ),
     }));
-  function persist(submit: boolean) {
+  const [saving, setSaving] = useState(false);
+  async function persist(submit: boolean) {
+    if (saving) return;
+    setSaving(true);
+    setError("");
     try {
       const issue = validatePR(form, submit);
       if (issue) throw new Error(issue);
       if (original) {
-        save(form, submit);
+        await save(form, submit);
         if (onSaved) onSaved(original.id);
         else router.push(`/pr/${original.id}`);
       } else {
-        const id = create(form, submit);
+        const id = await create(form, submit);
         if (onSaved) onSaved(id);
         else router.push(`/pr/${id}`);
       }
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "บันทึกไม่สำเร็จ");
+    } finally {
+      setSaving(false);
     }
   }
   if (original && !["draft", "rejected"].includes(original.status))
@@ -83,7 +88,7 @@ export function PREditor({
       {!embedded && (
         <PageHeader
           title={original ? `แก้ไข ${original.number}` : "สร้างใบขอซื้อ (PR)"}
-          description="ข้อมูลสาธิต · ฉบับร่างกรอกไม่ครบได้ แต่จำนวนและราคาต้องถูกต้อง"
+          description="ฉบับร่างกรอกไม่ครบได้ แต่จำนวนและราคาต้องถูกต้อง"
           parent={{ title: "ใบขอซื้อ", href: "/pr" }}
         />
       )}
@@ -119,29 +124,12 @@ export function PREditor({
               onChange={(event) => update("date", event.target.value)}
             />
           </div>
-          <MasterSelect
-            kind="personnel"
-            reference={form.masterRefs?.requester}
-            label="ผู้ขอซื้อ *"
-            value={form.requester}
-            onChange={(value, ref) => {
-              const user = masters.state.personnel.find(
-                (row) => row.id === ref?.id,
-              );
-              setForm((current) => ({
-                ...current,
-                requester: value,
-                department: user?.department ?? "",
-                masterRefs: ref
-                  ? { ...current.masterRefs, requester: ref }
-                  : current.masterRefs,
-              }));
-            }}
-          />
           <div className="grid gap-2">
-            <Label htmlFor="pr-department">ฝ่าย/แผนก</Label>
-            <Input id="pr-department" readOnly value={form.department} />
+            <Label htmlFor="pr-requester">ผู้ขอซื้อ</Label>
+            <Input id="pr-requester" value={form.requester} readOnly />
           </div>
+          <MasterSelect kind="departments" label="ฝ่าย/แผนก *" value={form.department}
+            onChange={(department) => update("department", department)} />
           <MasterSelect
             kind="warehouses"
             code
@@ -198,7 +186,7 @@ export function PREditor({
               masters.state.personnel.some(
                 (p) =>
                   p.id === id &&
-                  ["ผู้ดูแลโรงงาน", "หัวหน้าแผนก"].includes(p.role),
+                  p.role === "ผู้ดูแลโรงงาน",
               )
             }
             label="ผู้อนุมัติที่กำหนด *"
@@ -230,7 +218,7 @@ export function PREditor({
             }
             options={[
               { value: "Non-VAT", label: "Non-VAT" },
-              { value: "VAT", label: "VAT · สาธิต 7% เพิ่มจากราคาก่อนภาษี" },
+              { value: "VAT", label: "VAT · 7% เพิ่มจากราคาก่อนภาษี" },
             ]}
           />
           <div
@@ -263,7 +251,7 @@ export function PREditor({
           </div>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          * จำเป็นเมื่อส่งอนุมัติ · ตัวเลือกทั้งหมดเป็นข้อมูลหลักสาธิต
+          * จำเป็นเมื่อส่งอนุมัติ · ตัวเลือกอ้างอิงข้อมูลหลักในตั้งค่าระบบ
         </p>
       </SectionCard>
       <SectionCard
@@ -328,19 +316,24 @@ export function PREditor({
                   label={`สินค้า รายการ ${index + 1} *`}
                   value={item.code || "none"}
                   onChange={(value) => {
-                    const selected =
-                      value === "none"
-                        ? newPRItem(item.id)
-                        : materialItem(value, item.id);
-                    updateItem(item.id, {
-                      ...selected,
-                      quantity: item.quantity,
-                      remarks: item.remarks,
+                    const row = materials.find((material) => material.code === value);
+                    const unit = masters.state.rows.find((master) => master.id === row?.typeId && master.active);
+                    setForm((current) => {
+                      const refs = { ...current.masterRefs };
+                      const key = `material:${item.id}`;
+                      if (row) refs[key] = { id: row.id, kind: row.kind, code: row.code, name: row.name, value: row.code };
+                      else delete refs[key];
+                      return {
+                        ...current, masterRefs: refs,
+                        items: current.items.map((line) => line.id === item.id
+                          ? { ...line, code: row?.code ?? "", name: row?.name ?? "", unit: unit?.name ?? "" }
+                          : line),
+                      };
                     });
                   }}
                   options={[
                     { value: "none", label: "เลือกสินค้า" },
-                    ...prMaterials.map((row) => ({
+                    ...materials.map((row) => ({
                       value: row.code,
                       label: `${row.code} · ${row.name}`,
                     })),
@@ -379,15 +372,7 @@ export function PREditor({
                   value={item.unit}
                   reference={form.masterRefs?.[`unit:${item.id}`]}
                   filter={(id) => {
-                    const source = prMaterials.find(
-                      (r) => r.code === item.code,
-                    );
-                    return masters.state.rows.some(
-                      (r) =>
-                        r.id === id &&
-                        (r.name === source?.unit ||
-                          r.aliases.includes(source?.unit ?? "")),
-                    );
+                    return materials.find((row) => row.code === item.code)?.typeId === id;
                   }}
                   onChange={(unit, ref) =>
                     setForm((current) => ({
@@ -529,10 +514,10 @@ export function PREditor({
         >
           กลับโดยไม่บันทึก
         </Button>
-        <Button type="button" variant="outline" onClick={() => persist(false)}>
+        <Button type="button" variant="outline" disabled={saving} onClick={() => void persist(false)}>
           บันทึกฉบับร่าง
         </Button>
-        <Button type="button" onClick={() => persist(true)}>
+        <Button type="button" disabled={saving} onClick={() => void persist(true)}>
           ส่งอนุมัติ
         </Button>
       </div>

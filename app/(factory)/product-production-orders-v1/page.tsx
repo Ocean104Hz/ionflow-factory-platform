@@ -1,6 +1,9 @@
 import { ProductProductionOrdersV1Workspace } from
   "@/src/features/product-production-orders-v1/workspace";
 
-export default function Page() {
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+
+export default async function Page() {
+  await requireAuthenticatedFactoryModule("product_production_orders_v1");
   return <ProductProductionOrdersV1Workspace />;
 }

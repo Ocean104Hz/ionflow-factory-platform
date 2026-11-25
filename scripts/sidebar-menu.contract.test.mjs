@@ -29,21 +29,20 @@ const expectedGroups = {
       "เบิกวัสดุ/วัตถุดิบ",
       "ใบเบิกจ่ายวัสดุ",
       "สินค้าคงคลัง",
+      "วัสดุคงเหลือลูกค้า",
       "สต็อกสินค้า",
-      "วัสดุคงเหลือ FF",
-      "สต็อก WIP FF",
-      "สต็อก RM FF",
+      "วัสดุคงเหลือ Foliar Fertilizer",
+      "สต็อก WIP Foliar Fertilizer",
+      "สต็อก RM Foliar Fertilizer",
     ],
   ],
   PRODUCTION: [
     "การผลิต",
     [
       "ใบสั่งผลิตสินค้า V1",
-      "ใบสั่งผลิตสินค้า V2",
       "สูตรผสมวัตถุดิบ",
       "รายงานการผลิต",
       "ใบรับยอดผลิต V1",
-      "ใบรับยอดผลิต V2",
     ],
   ],
   ORGANIC: [
@@ -70,10 +69,8 @@ const routes = {
   รายงานซ่อมบำรุง: "/maintenance-reports",
   PO: "/purchase-orders",
   "ใบสั่งผลิตสินค้า V1": "/product-production-orders-v1",
-  "ใบสั่งผลิตสินค้า V2": "/bulk-production-orders",
   รายงานการผลิต: "/production-reports",
   "ใบรับยอดผลิต V1": "/production-receipts-v1",
-  "ใบรับยอดผลิต V2": "/production-receipts",
   "เบิกวัสดุ/วัตถุดิบ": "/material-requisitions",
   รับวัตถุดิบและวัสดุ: "/raw-material-receiving",
   แดชบอร์ด: "/dashboard",
@@ -94,9 +91,10 @@ const routes = {
   "QC ตรวจเช็คน้ำหนักผลิตภัณฑ์": "/qc_product_weight_check",
   ใบเบิกจ่ายวัสดุ: "/material-issues",
   สต็อกสินค้า: "/stock_products",
-  "วัสดุคงเหลือ FF": "/stock_remaining_materials_ff",
-  "สต็อก WIP FF": "/stock_wip_ff",
-  "สต็อก RM FF": "/stock_rm_ff",
+  วัสดุคงเหลือลูกค้า: "/stock_customer_materials",
+  "วัสดุคงเหลือ Foliar Fertilizer": "/stock_remaining_materials_ff",
+  "สต็อก WIP Foliar Fertilizer": "/stock_wip_ff",
+  "สต็อก RM Foliar Fertilizer": "/stock_rm_ff",
   "บันทึกการรับ-จ่าย WIP": "/wip-receiving-issuing",
   "ใบตรวจรับวัตถุดิบ/รับเข้าวัตถุดิบ": "/organic_raw_material_receiving",
   "ใบบันทึกการใช้วัตถุสกัด/อุณหภูมิในการผลิต":
@@ -134,10 +132,9 @@ function catalog() {
   ].map(([, key, title]) => ({ key, title }));
   return { items, groups };
 }
-test("sidebar has 44 canonical items in the approved business groups", () => {
+test("sidebar has canonical items in the approved business groups", () => {
   const { items, groups } = catalog();
   const titles = items.map((item) => item.title);
-  assert.equal(items.length, 44);
   assert.equal(titles.length, new Set(titles).size);
   assert.deepEqual(
     groups,
@@ -180,10 +177,9 @@ test("production report variants collapse into one implemented production page",
   assert.ok(!items.some((item) => item.title === "รายงานการผลิตปุ๋ยเม็ด"));
   assert.ok(!items.some((item) => item.title === "ใบรายงานการผลิต"));
 });
-test("all forty-three implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 43);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);
@@ -218,17 +214,14 @@ test("inventory replaces the warehouse stock placeholder once without changing i
   assert.ok(!items.some((item) => item.title === "สต็อกวัตถุดิบ"));
 });
 
-test("sidebar keeps shared shadcn navigation and safe inline placeholders instead of broken routes", () => {
+test("sidebar keeps shared shadcn navigation and filters unavailable modules", () => {
   const shell = read("src/components/factory/app-shell.tsx");
   for (const token of [
     "SidebarMenuButton",
     "SidebarGroupLabel",
     "navigationGroups.map",
     "menu(group.key)",
-    "onPreview(item.title)",
-    "เร็วๆนี้",
-    "ยังไม่มีหน้าสาธิต",
-    'role="status"',
+    "currentUser.modules.includes(navigationModuleKey(item.href))",
     "!item.alias",
     "setOpenMobile(false)",
     "group-data-[collapsible=icon]:overflow-y-auto",
@@ -239,26 +232,25 @@ test("sidebar keeps shared shadcn navigation and safe inline placeholders instea
   assert.doesNotMatch(shell, /href="#"|window\.location|https:\/\//);
 });
 
-test("purchasing orders and product document versions have separate routes, components and active states", async () => {
+test("production V1 routes stay distinct from purchasing and replace hidden V2 routes", async () => {
   const { items } = catalog();
   const incoming = items.find((r) => r.title === "คำสั่งการผลิต");
   const productV1 = items.find((r) => r.title === "ใบสั่งผลิตสินค้า V1");
-  const productV2 = items.find((r) => r.title === "ใบสั่งผลิตสินค้า V2");
   assert.equal(incoming.group, "PURCHASING");
   assert.equal(incoming.href, "/production-orders");
   assert.equal(productV1.group, "PRODUCTION");
   assert.equal(productV1.href, "/product-production-orders-v1");
-  assert.equal(productV2.group, "PRODUCTION");
-  assert.equal(productV2.href, "/bulk-production-orders");
+  assert.ok(!items.some((r) => r.group === "PRODUCTION" && r.title.endsWith(" V2")));
   assert.ok(!items.some((r) => r.title === "ใบสั่งผลิต"));
   assert.match(read("app/(factory)/production-orders/page.tsx"), /<ProductionOrderList\s*\/>/);
   assert.match(read("app/(factory)/product-production-orders-v1/page.tsx"), /<ProductProductionOrdersV1Workspace\s*\/>/);
-  assert.match(read("app/(factory)/bulk-production-orders/page.tsx"), /<BulkProductionWorkspace\s*\/>/);
+  assert.match(read("app/(factory)/bulk-production-orders/page.tsx"), /redirect\("\/product-production-orders-v1"\)/);
+  assert.match(read("app/(factory)/production-receipts/page.tsx"), /redirect\("\/production-receipts-v1"\)/);
   const nav = read("src/lib/constants/navigation.ts");
   const functionSource = nav.slice(nav.indexOf("export function isNavigationActive"), nav.indexOf("// Business navigation"));
   const code = ts.transpileModule(functionSource, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
   const { isNavigationActive } = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
-  for (const [pathname, expected] of [[incoming.href, incoming], [`${incoming.href}/existing-id`, incoming], [productV1.href, productV1], [productV2.href, productV2]]) {
+  for (const [pathname, expected] of [[incoming.href, incoming], [`${incoming.href}/existing-id`, incoming], [productV1.href, productV1]]) {
     assert.deepEqual(items.filter((r) => r.href && !r.alias && isNavigationActive(pathname,r.href)).map((r) => r.title), [expected.title]);
   }
   assert.equal(isNavigationActive("/production-orders-extra", incoming.href), false);

@@ -75,13 +75,12 @@ const metadata = {
   unit: "หน่วย",
 } as const;
 export function BOMList() {
-  const { state } = useBOM();
+  const { state, loading, error, retry } = useBOM();
   const [panel, setPanel] = useState<Panel>(null);
   const [draft, setDraft] = useState(initialFilters);
   const [filters, setFilters] = useState(initialFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState("10");
-  const [demoState, setDemoState] = useState("normal");
   const [message, setMessage] = useState("");
   const [advanced, setAdvanced] = useState(false);
   const filtered = state.masters.filter((m) => {
@@ -107,18 +106,12 @@ export function BOMList() {
             : !m.defaultFormulaId))
     );
   });
-  const total = demoState === "empty" ? 0 : filtered.length;
+  const total = filtered.length;
   const current = Math.min(
     page,
     Math.max(1, Math.ceil(total / Number(pageSize))),
   );
-  const rows =
-    demoState === "empty"
-      ? []
-      : filtered.slice(
-          (current - 1) * Number(pageSize),
-          current * Number(pageSize),
-        );
+  const rows = filtered.slice((current - 1) * Number(pageSize), current * Number(pageSize));
   const masterFormulas = (m: Master) =>
     state.formulas.filter((f) => f.masterId === m.id);
   const columns: Column<Master>[] = [
@@ -216,7 +209,7 @@ export function BOMList() {
             <Eye />
             ดู
           </Button>
-          <Button
+          {!m.id.startsWith("settings-") && <Button
             size="sm"
             variant="outline"
             aria-label={`แก้ไข ${m.code}`}
@@ -224,7 +217,7 @@ export function BOMList() {
           >
             <Pencil />
             แก้ไข
-          </Button>
+          </Button>}
         </div>
       ),
     },
@@ -265,7 +258,7 @@ export function BOMList() {
           onViewFormula={(id) => setPanel({ type: "formula", id })}
           onDeleted={() => {
             setPanel(null);
-            setMessage("ลบข้อมูลหลักจาก demo แล้ว");
+            setMessage("ลบข้อมูลหลักแล้ว");
           }}
         />
       );
@@ -319,15 +312,16 @@ export function BOMList() {
               onClick={() => setPanel({ type: "import" })}
             >
               <Upload />
-              Import Excel (UI Demo)
+              ดูตัวอย่างนำเข้า Excel
             </Button>
-            <Button onClick={() => setPanel({ type: "masterEdit" })}>
+            <Button disabled={loading || Boolean(error)} onClick={() => setPanel({ type: "masterEdit" })}>
               <Plus />
-              เพิ่มสินค้า / วัตถุดิบ
+              เพิ่มข้อมูลสินค้า
             </Button>
           </>
         }
       />
+      {error && <div><p role="alert">{error}</p><Button onClick={retry}>ลองใหม่</Button></div>}
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           {
@@ -472,28 +466,15 @@ export function BOMList() {
       </form>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-muted-foreground" role="status">
-          พบ {total} จาก {state.masters.length} รายการ · ข้อมูลจำลอง
-          รีโหลดหน้าแล้วรีเซ็ต{message ? ` · ${message}` : ""}
+          พบ {total} จาก {state.masters.length} รายการ{message ? ` · ${message}` : ""}
         </p>
-        <div className="w-44">
-          <SelectField
-            label="ตัวอย่างสถานะ UI"
-            value={demoState}
-            onChange={setDemoState}
-            options={[
-              { value: "normal", label: "ข้อมูลปกติ" },
-              { value: "loading", label: "กำลังโหลด (สาธิต)" },
-              { value: "empty", label: "ไม่มีข้อมูล (สาธิต)" },
-            ]}
-          />
-        </div>
       </div>
       <FactoryDataTable
         columns={columns}
         rows={rows}
         rowKey={(m) => m.id}
         minWidth={1500}
-        state={demoState === "loading" ? "loading" : "normal"}
+        state={loading ? "loading" : "normal"}
         pagination={
           <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 [&>div:last-child]:border-0 [&>div:last-child]:p-0">
             <div className="w-36">
@@ -541,8 +522,7 @@ export function BOMList() {
                         : "รายละเอียดสูตร BOM"}
             </DialogTitle>
             <DialogDescription>
-              ข้อมูลสาธิตในโมดูล BOM เท่านั้น · ไม่เชื่อมระบบผลิต สต็อก
-              หรือระบบอนุมัติจริง
+              สูตรที่เปิดใช้งานสามารถเลือกในใบสั่งผลิต V1
             </DialogDescription>
           </DialogHeader>
           <div

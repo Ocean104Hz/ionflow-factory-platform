@@ -72,7 +72,7 @@ test("PO required inputs, dates, duplicate numbers, decimal quantity and price v
     assert.ok(Object.keys(d.validatePo({...doc,[key]:value},records)).length,key);
   assert.ok(d.validatePo({...doc,po_no:" po-demo-001 "},records).po_no);
   for(const key of ["ordered_qty","unit_price"])
-    for(const value of ["","0","-1","NaN","Infinity","1.001"])
+    for(const value of ["","0","-1","NaN","Infinity",key==="ordered_qty"?"1.00001":"1.001"])
       assert.ok(Object.keys(d.validatePo({...doc,items:[{...doc.items[0],[key]:value}]},records)).length);
   assert.ok(Object.keys(d.validatePo({...doc,items:[{...doc.items[0],tax_amount:"-1"}]},records)).length);
 });
@@ -145,11 +145,11 @@ test("actual rendered form exposes original PO fields, selectors, independent it
   for(const key of [...headers,...doc.items.flatMap(r=>rowFields.map(key=>`items.${r.id}.${key}`))]) {
     const tag=[...html.matchAll(/<(?:input|textarea)\b[^>]*>/g)].map(m=>m[0]).find(t=>t.includes(`name="${key}"`));
     assert.ok(tag,key);
-    if(key==="request_ref_no") assert.match(tag,/readOnly/i,key);
+    if(/^(?:request_ref_no|supplier_(?:code|name)_snapshot|warehouse_(?:code|name)|items\..+\.(?:material_(?:code|name)_snapshot|unit))$/.test(key)) assert.match(tag,/readOnly/i,key);
     else assert.doesNotMatch(tag,/\s(?:disabled|readonly)(?:=|\s|>)/i,key);
     assert.ok(html.includes(`for="po-${key}"`),key);
   }
-  for(const label of ["สกุลเงิน","ประเภทธุรกรรม","เลือก PR","เลือกผู้ขายตัวอย่าง","เลือกคลังตัวอย่าง","สร้างเลข PO ตัวอย่าง","ยอดรวมสุทธิ"])
+  for(const label of ["สกุลเงิน","ประเภทธุรกรรม","เลือก PR","เลือกผู้ขาย","เลือกคลัง","สร้างเลข PO","ยอดรวมสุทธิ"])
     assert.ok(html.includes(label),label);
   assert.match(html,/role="alert"/);assert.match(html,/aria-invalid="true"/);
 });
@@ -161,14 +161,15 @@ test("preview retains all document/item notes, values and escapes user content",
     assert.ok(html.includes(value),value);
   assert.match(html,/&lt;script&gt;not html&lt;\/script&gt;/);
 });
-test("PO uses local state only, preserves existing route boundaries and includes discard confirmation",()=>{
+test("PO uses the authenticated purchasing provider and includes discard confirmation",()=>{
   const source=readFileSync(path.join(root,"src/features/purchase-orders/po-workspace.tsx"),"utf8");
-  assert.match(source,/useState\(demoPurchaseOrders\)/);assert.match(source,/ละทิ้งข้อมูลที่ยังไม่บันทึก/);
+  assert.match(source,/await savePO\(editor.doc, submit\)/);assert.match(source,/ละทิ้งข้อมูลที่ยังไม่บันทึก/);
   for(const name of ["po-domain.ts","po-form.tsx","po-workspace.tsx","po-preview.tsx"]) {
     const code=readFileSync(path.join(root,"src/features/purchase-orders",name),"utf8");
     assert.doesNotMatch(code,/fetch\s*\(|\/api\/|localStorage|sessionStorage|from ["'][^"']*server\//);
   }
   assert.match(readFileSync(path.join(root,"app/(factory)/purchase-orders/page.tsx"),"utf8"),/<PurchaseOrdersWorkspace/);
+  assert.match(readFileSync(path.join(root,"app/(factory)/purchase-orders/page.tsx"),"utf8"),/requireAuthenticatedFactoryModule\("purchase_orders"\)/);
 });
 test("focused TypeScript checks only the added PO source files",()=>{
   const files=["src/features/purchase-orders/po-domain.ts","src/features/purchase-orders/po-form.tsx","src/features/purchase-orders/po-preview.tsx","src/features/purchase-orders/po-workspace.tsx","app/(factory)/purchase-orders/page.tsx"].map(f=>path.join(root,f));

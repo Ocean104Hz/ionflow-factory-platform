@@ -1,9 +1,7 @@
 
 /**
- * UI MOCK ONLY
  *
  * โครงสร้างข้อมูลสำหรับแบบบันทึกการรับ - จ่าย วัตถุดิบเม็ดฟู่
- * ไม่มีการเรียก API หรือเชื่อมต่อฐานข้อมูล
  *
  * ยอดคงเหลือและปรับค่าเป็นข้อมูลอิสระ
  * ยังไม่กำหนดสูตรคำนวณหรือกติกาการเพิ่ม/ลดสต็อก
@@ -131,4 +129,47 @@ export function blankEffervescentMaterialSheet(
     created_at: "",
     updated_at: "",
   };
+}
+
+/* ---------------- material master data ---------------- */
+
+export const effervescentMaterialDefinitions:
+  readonly EffervescentMaterialDefinition[] = [
+    { no: 1, code: "WIP-PDAM-01", material_name: "ผงอะมิโน", unit: "กก." },
+    { no: 2, code: "RM-1501", material_name: "21-0-0", unit: "กก." },
+    { no: 3, code: "RM-4001", material_name: "มอนโตแดรกซ์ตริน", unit: "กก." },
+    { no: 4, code: "RM-4003", material_name: "กรดซิตริก(กรดมะนาว)", unit: "กก." },
+    { no: 5, code: "RM-4004", material_name: "โซเดียมไบคาร์บอเนต", unit: "กก." },
+    { no: 6, code: "RM-4005", material_name: "แป้งข้าวโพด", unit: "กก." },
+    { no: 7, code: "RM-4006", material_name: "แคป-โอ-ซิล", unit: "กก." },
+    { no: 8, code: "RM-4101", material_name: "สีน้ำเงิน", unit: "กก." },
+    { no: 9, code: "RM-4102", material_name: "สีม่วง", unit: "กก." },
+    { no: 10, code: "RM-4103", material_name: "สีเขียว", unit: "กก." },
+    { no: 11, code: "RM-4104", material_name: "สีเหลือง", unit: "กก." },
+    { no: 12, code: "RM-4105", material_name: "สีส้ม", unit: "กก." },
+    { no: 13, code: "RM-4106", material_name: "สีน้ำตาล", unit: "กก." },
+    { no: 14, code: "RM-4107", material_name: "สีแดง", unit: "กก." },
+  ];
+
+/* ---------------- create material rows ---------------- */
+
+export function createEffervescentMaterialLedgerRows(
+  documentKey: string,
+): EffervescentMaterialLedgerRow[] {
+  return effervescentMaterialDefinitions.map((material) =>
+    blankEffervescentMaterialRow(
+      `${documentKey}-row-${String(material.no).padStart(2, "0")}`,
+      material,
+    ),
+  );
+}
+
+/* ---------------- create blank document ---------------- */
+
+export function createBlankEffervescentMaterialLedgerSheet(
+  documentKey: string,
+): EffervescentMaterialLedgerSheet {
+  return blankEffervescentMaterialSheet(
+    createEffervescentMaterialLedgerRows(documentKey),
+  );
 }

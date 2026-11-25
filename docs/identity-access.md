@@ -11,12 +11,14 @@
 
 1. เปิด Cloud SQL Proxy ที่ `127.0.0.1:5433`
 2. คัดลอก `.env.example` เป็น `.env.local` และกรอกค่าที่ขาด
-3. ใส่ `FACTORY_DB_OWNER_PASSWORD` ชั่วคราว แล้วรัน `npm run db:migrate:access`
+3. ใส่ `FACTORY_DB_OWNER_PASSWORD` ชั่วคราว แล้วรัน `npm run db:migrate:access` ตามด้วย `npm run db:migrate:purchasing`
 4. รัน `gcloud auth application-default login` เพื่อให้ Firebase Admin SDK ใช้สิทธิ์ผู้พัฒนา
 5. ตั้ง `FACTORY_BOOTSTRAP_ADMIN_EMAIL` เป็นบัญชีที่มีอยู่และยืนยันอีเมลแล้วใน Identity Platform
 6. รัน `npm run auth:bootstrap-admin` หนึ่งครั้ง
 7. ลบ `FACTORY_DB_OWNER_PASSWORD` ออกจาก `.env.local`
 8. เปิดแอปและ Login ด้วยบัญชีดังกล่าว จากนั้นจัดการผู้ใช้และ Role ที่หน้า Settings
+
+ก่อนใช้งาน PR และ PO ให้เพิ่มฝ่าย/แผนก คลัง ผู้ขาย หน่วยนับ และทะเบียนวัตถุดิบในตั้งค่าระบบ วัตถุดิบแต่ละรายการอ้างอิงหน่วยนับที่ตั้งค่าไว้ ผู้ใช้ส่งเอกสารขออนุมัติจากโมดูลที่ได้รับสิทธิ์ ส่วนการอนุมัติทำได้โดย `factory_admin`
 
 ## ลำดับการ Login
 

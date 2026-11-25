@@ -86,13 +86,13 @@ export function BOMMasterForm({
   return (
     <form
       className="space-y-5"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         const issues = masterErrors(state, form);
         setErrors(issues);
         if (Object.keys(issues).length) return;
         try {
-          onSaved(saveMaster(form));
+          onSaved(await saveMaster(form));
         } catch (error) {
           setErrors(
             error instanceof BOMValidationError
@@ -116,7 +116,7 @@ export function BOMMasterForm({
               onChange={(type) =>
                 setForm({ ...form, type: type as Master["type"] })
               }
-              options={Object.entries(productTypes).map(([value, label]) => ({
+              options={Object.entries(productTypes).filter(([value]) => value !== "RAW_MATERIAL").map(([value, label]) => ({
                 value,
                 label,
               }))}

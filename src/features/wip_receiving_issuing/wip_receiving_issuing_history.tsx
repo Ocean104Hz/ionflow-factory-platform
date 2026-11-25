@@ -105,7 +105,7 @@ export function WipReceivingIssuingHistory({
       {/* Search and Filters */}
       <SectionCard
         title="ประวัติแบบบันทึกการรับ-จ่าย WIP"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสารจำลอง`}
+        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
         <form
           className="space-y-4"

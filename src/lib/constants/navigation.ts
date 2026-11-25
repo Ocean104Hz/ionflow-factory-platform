@@ -186,12 +186,6 @@ export const navigation: FactoryNavigationItem[] = [
     href: "/product-production-orders-v1",
     icon: Factory,
   },
-  {
-    group: "PRODUCTION",
-    title: "ใบสั่งผลิตสินค้า V2",
-    href: "/bulk-production-orders",
-    icon: Factory,
-  },
   { group: "PRODUCTION", title: "สูตรผสมวัตถุดิบ", href: "/bom", icon: Beaker },
   {
     group: "PRODUCTION",
@@ -203,12 +197,6 @@ export const navigation: FactoryNavigationItem[] = [
     group: "PRODUCTION",
     title: "ใบรับยอดผลิต V1",
     href: "/production-receipts-v1",
-    icon: ClipboardList,
-  },
-  {
-    group: "PRODUCTION",
-    title: "ใบรับยอดผลิต V2",
-    href: "/production-receipts",
     icon: ClipboardList,
   },
   {

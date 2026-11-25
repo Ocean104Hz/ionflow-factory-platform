@@ -237,7 +237,7 @@ test("PR inclusive filters, example import and unique document numbering", () =>
     "PR-20261015-0010",
   );
 });
-test("PR presentation uses shared tables, mock-only tools, linked audit and labelled amounts", () => {
+test("PR presentation uses shared tables, purchasing API, linked audit and labelled amounts", () => {
   for (const route of [
     "app/(factory)/pr/[prId]/page.tsx",
     "app/(factory)/pr/[prId]/edit/page.tsx",
@@ -263,7 +263,7 @@ test("PR presentation uses shared tables, mock-only tools, linked audit and labe
     "filterPRs",
     "quantitySummary",
     "batch",
-    "Import Excel (สาธิต)",
+    "canApprove",
     "<Checkbox",
   ])
     assert.ok(list.includes(token), token);
@@ -271,8 +271,8 @@ test("PR presentation uses shared tables, mock-only tools, linked audit and labe
     "htmlFor={`${item.id}-quantity`}",
     "htmlFor={`${item.id}-price`}",
     "validatePR(form, submit)",
-    "prMaterials",
-    "prWarehouses",
+    "materials",
+    'kind="warehouses"',
   ])
     assert.ok(editor.includes(token), token);
   assert.ok(
@@ -283,10 +283,10 @@ test("PR presentation uses shared tables, mock-only tools, linked audit and labe
     /const entries = \[\.\.\.audit, \.\.\.auditEntries\]/,
   );
   const provider = read("src/features/purchase-requisitions/pr-provider.tsx");
-  assert.ok(provider.includes('event.action === "DELETE"'));
-  assert.ok(provider.includes("นำเข้าข้อมูลตัวอย่างนี้แล้ว"));
+  assert.match(provider, /fetch\("\/api\/purchasing"/);
+  assert.match(provider, /"x-csrf-token"/);
   assert.doesNotMatch(
-    provider + list + detail + editor,
+    list + detail + editor,
     /fetch\(|localStorage|process\.env/,
   );
 });

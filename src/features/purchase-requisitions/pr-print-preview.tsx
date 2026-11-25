@@ -62,7 +62,7 @@ export function PRPrintPreview({
           <DialogDescription>
             กระดาษ A4 · {records.length} เอกสารที่เลือกหรือผลกรอง ·
             กดพิมพ์เพื่อเลือกเครื่องพิมพ์หรือบันทึก PDF ผ่านเบราว์เซอร์
-            ข้อมูลยังเป็นสาธิต
+            ข้อมูลใบขอซื้อที่บันทึกในระบบ
           </DialogDescription>
         </DialogHeader>
         <iframe

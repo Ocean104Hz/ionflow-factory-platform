@@ -1,157 +1,49 @@
 "use client";
-import {
-  createContext,
-  useContext,
-  useRef,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import { demoBOM } from "@/src/lib/mock-data/bom";
-import {
-  saveMaster,
-  saveFormula,
-  selectDefault,
-  deleteMaster,
-  deleteFormula,
-  importRows,
-  type BOMState,
-  type Master,
-  type Formula,
-  type ImportRow,
-} from "./bom-domain";
-import { useMasterData } from "@/src/features/master-data/master-provider";
-import {
-  bomFields,
-  formulaFields,
-  fieldsForSave,
-} from "@/src/features/master-data/internal-references";
-type Context = {
-  state: BOMState;
-  saveMaster: (row: Master) => string;
-  saveFormula: (row: Formula, isDefault: boolean) => string;
-  setDefault: (masterId: string, formulaId: string | null) => void;
-  removeMaster: (id: string) => void;
-  removeFormula: (id: string) => void;
-  importRows: (rows: ImportRow[]) => void;
-};
-const BOMContext = createContext<Context | null>(null);
-export function BOMProvider({ children }: { children: ReactNode }) {
-  const masters = useMasterData();
-  const [state, setState] = useState<BOMState>(() => {
-    const initial = structuredClone(demoBOM);
-    initial.masters = initial.masters.map((row) => ({
-      ...row,
-      masterRefs: masters.capture(bomFields(row), {}, true),
-    }));
-    initial.formulas = initial.formulas.map((row) => ({
-      ...row,
-      masterRefs: masters.capture(formulaFields(row), {}, true),
-    }));
-    return initial;
-  });
-  const current = useRef(state);
+
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import type { BOMState, Formula, Master } from "./bom-domain";
+import { productionRequest } from "../production-flow/production-v1-client";
+
+type Snapshot = { state: BOMState; savedId?: string };
+function useProductionBom(enabled: boolean) {
+  const [state, setState] = useState<BOMState>({ masters: [], formulas: [] });
+  const [loading, setLoading] = useState(enabled);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+  const saving = useRef(false);
   useEffect(() => {
-    for (const row of [...state.masters, ...state.formulas])
-      masters.retain(row.masterRefs ?? {});
-  }, [state]);
-  function commit(next: BOMState) {
-    current.current = next;
-    setState(next);
+    if (!enabled) return;
+    const controller = new AbortController();
+    productionRequest<Snapshot>("bom", undefined, controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setState(data.state); })
+      .catch((error) => { if (!controller.signal.aborted) setError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [enabled, reload]);
+  async function mutate(command: Record<string, unknown>) {
+    if (saving.current) throw new Error("กำลังบันทึก กรุณารอสักครู่");
+    saving.current = true;
+    try {
+      const result = await productionRequest<Snapshot>("bom", command);
+      setState(result.state);
+      return result.savedId ?? "";
+    } finally { saving.current = false; }
   }
-  return (
-    <BOMContext.Provider
-      value={{
-        state,
-        saveMaster(row) {
-          const old = current.current.masters.find((r) => r.id === row.id);
-          row = {
-            ...row,
-            masterRefs: masters.capture(
-              fieldsForSave(
-                bomFields(row),
-                old ? bomFields(old) : {},
-                old?.masterRefs,
-              ),
-              old?.masterRefs,
-            ),
-          };
-          const id = row.id || crypto.randomUUID();
-          commit(
-            saveMaster(current.current, row, id, new Date().toISOString()),
-          );
-          return id;
-        },
-        saveFormula(row, selected) {
-          const old = current.current.formulas.find((r) => r.id === row.id);
-          row = {
-            ...row,
-            masterRefs: masters.capture(
-              fieldsForSave(
-                formulaFields(row),
-                old ? formulaFields(old) : {},
-                old?.masterRefs,
-              ),
-              old?.masterRefs,
-            ),
-          };
-          const id = row.id || crypto.randomUUID();
-          commit(
-            saveFormula(
-              current.current,
-              row,
-              selected,
-              id,
-              new Date().toISOString(),
-            ),
-          );
-          return id;
-        },
-        setDefault(masterId, formulaId) {
-          commit(
-            selectDefault(
-              current.current,
-              masterId,
-              formulaId,
-              new Date().toISOString(),
-            ),
-          );
-        },
-        removeMaster(id) {
-          commit(deleteMaster(current.current, id));
-        },
-        removeFormula(id) {
-          commit(deleteFormula(current.current, id, new Date().toISOString()));
-        },
-        importRows(rows) {
-          const next = importRows(
-            current.current,
-            rows,
-            new Date().toISOString(),
-          );
-          next.masters = next.masters.map((row) =>
-            row.masterRefs
-              ? row
-              : {
-                  ...row,
-                  masterRefs: masters.capture(bomFields(row), {}, true),
-                },
-          );
-          next.formulas = next.formulas.map((row) =>
-            row.masterRefs
-              ? row
-              : {
-                  ...row,
-                  masterRefs: masters.capture(formulaFields(row), {}, true),
-                },
-          );
-          commit(next);
-        },
-      }}
-    >
-      {children}
-    </BOMContext.Provider>
-  );
+  return {
+    state, loading, error,
+    retry: () => { setLoading(true); setError(""); setReload((value) => value + 1); },
+    saveMaster: (row: Master) => mutate({ action: "master", row }),
+    saveFormula: (row: Formula, selected: boolean) => mutate({ action: "formula", row, default: selected }),
+    setDefault: (masterId: string, formulaId: string | null) => mutate({ action: "default", masterId, formulaId }),
+    removeMaster: (id: string) => mutate({ action: "delete-master", id }),
+    removeFormula: (id: string) => mutate({ action: "delete-formula", id }),
+  };
+}
+
+const BOMContext = createContext<ReturnType<typeof useProductionBom> | null>(null);
+export function BOMProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  const value = useProductionBom(enabled);
+  return <BOMContext.Provider value={value}>{children}</BOMContext.Provider>;
 }
 export function useBOM() {
   const context = useContext(BOMContext);

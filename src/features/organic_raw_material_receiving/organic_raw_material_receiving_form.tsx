@@ -81,7 +81,7 @@ const labels = {
   reset: "ล้างข้อมูล",
   cancel: "ยกเลิกการแก้ไข / เริ่มใหม่",
   blankRows: "",
-  mock: "UI MOCK เท่านั้น ข้อมูลนี้ยังไม่ถูกบันทึกลงฐานข้อมูลจริง",
+  mock: "ข้อมูลจะบันทึกเมื่อกดบันทึกเอกสาร",
 } as const;
 
 const headerClass =

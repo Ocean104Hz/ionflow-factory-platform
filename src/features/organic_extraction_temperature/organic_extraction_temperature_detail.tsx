@@ -315,7 +315,7 @@ export function OrganicExtractionTemperatureDetail({
             {print
               ? "ตัวอย่างรูปแบบเอกสารก่อนพิมพ์"
               : "แสดงข้อมูลแบบอ่านอย่างเดียว"}
-            {" · UI MOCK ไม่เชื่อมฐานข้อมูลจริง"}
+            {" · เอกสารชุดอินทรีย์"}
           </DialogDescription>
         </DialogHeader>
 

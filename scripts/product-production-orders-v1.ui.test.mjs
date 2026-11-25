@@ -37,10 +37,10 @@ test("production order V1 keeps the complete iTECH document UI scaffold", () => 
   }
 });
 
-test("production order V1 stays UI-only until its data contract is approved", () => {
+test("production order V1 writes through its API and reads its stored document history", () => {
   assert.doesNotMatch(workspace, /fetch\s*\(/);
   assert.doesNotMatch(workspace, /\/api\//);
-  assert.match(workspace, /หน้านี้เป็นโครง UI เท่านั้น/);
-  assert.match(workspace, /ใช้เลขนี้ · รอเชื่อมระบบ/);
-  assert.match(workspace, /<Button type="button" disabled className="h-10 px-6">/);
+  assert.match(workspace, /productionRequest<ProductionOrderV1>\("order"/);
+  assert.match(workspace, /useProductionV1Data<[^\n]+>\("order"\)/);
+  assert.match(workspace, /<ProductionFormulaDocument sheet=\{view.sheet\}/);
 });

@@ -58,12 +58,12 @@ import { statusTones, type Tone } from "@/src/lib/constants/status";
 import { cn } from "@/src/lib/utils";
 import { useBranding } from "./branding-provider";
 
-export function FactoryFooter({ className }: { className?: string }) {
+export function FactoryFooter({ className, live = false }: { className?: string; live?: boolean }) {
   const { branding } = useBranding();
   return (
     <footer className={cn("no-print flex flex-wrap justify-between gap-2 pt-4 text-[10px] tracking-wide text-muted-foreground", className)}>
       <span>{branding.shortName} FACTORY · UI STANDARD / 01</span>
-      <span>ข้อมูลสมมติเท่านั้น · ไม่ใช้เป็นเอกสารทางธุรกิจ</span>
+      {!live && <span>ข้อมูลสมมติเท่านั้น · ไม่ใช้เป็นเอกสารทางธุรกิจ</span>}
     </footer>
   );
 }

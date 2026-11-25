@@ -1,5 +1,5 @@
-import { ProductionReceiptsWorkspace } from "@/src/features/production-flow/production-receipts-workspace";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <ProductionReceiptsWorkspace />;
+  redirect("/production-receipts-v1");
 }

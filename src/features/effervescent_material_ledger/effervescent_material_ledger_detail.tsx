@@ -29,7 +29,6 @@ import {
 } from "./effervescent_material_ledger_domain";
 
 /**
- * UI MOCK ONLY
  *
  * หน้ารายละเอียดแบบอ่านอย่างเดียว
  * ไม่เรียก API, ไม่แก้ไขข้อมูล และไม่คำนวณยอดคงเหลือ
@@ -129,7 +128,7 @@ export function EffervescentMaterialLedgerDetail({
             รายละเอียดการรับ - จ่าย วัตถุดิบเม็ดฟู่
           </DialogTitle>
           <DialogDescription>
-            แสดงข้อมูลแบบอ่านอย่างเดียว · UI Mock ไม่เชื่อมฐานข้อมูล
+            แสดงข้อมูลแบบอ่านอย่างเดียว
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +152,7 @@ export function EffervescentMaterialLedgerDetail({
 
                 <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
                   <div className="min-w-0 space-y-1">
-                    <dt className="text-xs text-muted-foreground">รหัสเอกสาร (Mock)</dt>
+                    <dt className="text-xs text-muted-foreground">รหัสเอกสาร</dt>
                     <dd className="break-all font-medium">
                       {displayText(sheet.id)}
                     </dd>
