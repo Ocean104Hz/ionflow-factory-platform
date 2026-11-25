@@ -9,8 +9,12 @@ import {
   authErrorResponse,
 } from "@/src/server/auth/auth-http.ts";
 import { readCurrentFactoryUser } from "@/src/server/auth/server-auth.ts";
-import { findFirebaseUserByEmail } from "@/src/server/auth/firebase-admin.ts";
 import {
+  findFirebaseUserByEmail,
+  sendFirebasePasswordSetupEmail,
+} from "@/src/server/auth/firebase-admin.ts";
+import {
+  findAccessUserUid,
   listAccessAdministration,
   saveAccessRole,
   saveAccessUser,
@@ -91,6 +95,17 @@ export async function POST(request: NextRequest) {
         active: body.active === true,
         roleIds: ids(body.roleIds),
       });
+    } else if (body?.action === "sendPasswordSetup") {
+      const id = text(body.id, 19);
+      if (!/^[1-9]\d*$/.test(id) || BigInt(id) > BigInt("9223372036854775807"))
+        throw new FactoryAuthError("INVALID_REQUEST", 400);
+      const uid = await findAccessUserUid(id);
+      if (!uid) throw new FactoryAuthError("INVALID_REQUEST", 400);
+      await sendFirebasePasswordSetupEmail(uid);
+      return NextResponse.json(
+        { ok: true },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     } else if (body?.action === "saveRole") {
       const code = text(body.code, 63).toLowerCase();
       if (!/^[a-z][a-z0-9_]{1,62}$/.test(code))

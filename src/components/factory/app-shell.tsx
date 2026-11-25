@@ -48,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Separator } from "../ui/separator";
 import { useBranding } from "./branding-provider";
 import { FactoryLogo } from "./factory-logo";
+import { FactoryFooter } from "./patterns";
 import {
   navigation,
   navigationGroups,
@@ -147,6 +148,7 @@ function FactoryShell({
 }) {
   const pathname = usePathname();
   const { branding } = useBranding();
+  const isSettingsPage = pathname === "/settings";
   const current = navigation.find(
     (item) =>
       !item.alias && item.href && isNavigationActive(pathname, item.href),
@@ -172,7 +174,7 @@ function FactoryShell({
         />
         <div
           id="main-content"
-          className="factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 lg:px-4"
+          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""}`}
         >
           {previewMenu && (
             <Alert role="status">
@@ -193,10 +195,7 @@ function FactoryShell({
             </Alert>
           )}
           {children}
-          <footer className="no-print flex flex-wrap justify-between gap-2 pt-4 text-[10px] tracking-wide text-muted-foreground">
-            <span>{branding.shortName} FACTORY · UI STANDARD / 01</span>
-            <span>ข้อมูลสมมติเท่านั้น · ไม่ใช้เป็นเอกสารทางธุรกิจ</span>
-          </footer>
+          {!isSettingsPage && <FactoryFooter />}
         </div>
       </SidebarInset>
     </>
