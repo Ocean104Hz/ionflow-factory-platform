@@ -29,13 +29,16 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/src/components/ui/dialog";
-import { createStockMaterialMockSheets } from "@/src/lib/mock-data/stock_remaining_materials_ff";
 
 import {
   DEFAULT_STOCK_MATERIAL_FILTERS,
   addStockMaterialRow,
   filterStockMaterialRows,
-  saveStockMaterialSheet,
+  blankStockMaterialSheet,
+  isValidStockMaterialNumber,
+  stockMaterialSourceSheetName,
+  STOCK_MATERIAL_FF_DAILY_FIELDS,
+  STOCK_MATERIAL_FF_SUMMARY_FIELDS,
   stockMaterialRowRef,
   stockMaterialPeriodKey,
   updateStockMaterialDaily,
@@ -47,6 +50,7 @@ import {
   type StockMaterialDailyField,
   type StockMaterialFilters as StockMaterialFilterValues,
   type StockMaterialPeriod,
+  type StockMaterialRow,
   type StockMaterialRowRef,
   type StockMaterialSheet,
   type StockMaterialSummaryField,
@@ -59,13 +63,320 @@ import { StockRemainingMaterialsFfSummary } from "./stock_remaining_materials_ff
 import { StockRemainingMaterialsFfTable } from "./stock_remaining_materials_ff_table";
 
 /**
- * Remaining Materials FF: Excel-based UI MOCK ONLY.
- *
- * Every month has its own saved snapshot in React State. Edits are made to a
- * separate draft and do not affect the saved snapshot until Save is pressed.
- * Refreshing the page discards every change, including previously saved mocks.
- * No API, database, browser storage, or Excel formula recalculation is used.
+ * Remaining Materials FF: saved monthly snapshots from the database.
+ * Edits remain in a separate draft until the user saves the entire change set.
+ * Do not import mock rows or recalculate Excel values automatically.
  */
+
+const MATERIAL_API = "/api/stock/remaining-materials-ff";
+const CSRF_COOKIE = "ionflow_factory_csrf";
+const MAX_CHANGED_ROWS = 2000;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const LOAD_FAILED = "ไม่สามารถโหลดข้อมูลวัสดุคงเหลือจากฐานข้อมูลได้";
+const INVALID_RESPONSE = "รูปแบบข้อมูลจาก API ไม่ถูกต้อง";
+const UNCERTAIN_SAVE =
+  "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาตรวจสอบข้อมูลล่าสุดก่อนบันทึกซ้ำ";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+type MaterialSnapshot = { sheet: StockMaterialSheet; revision: string };
+
+class MaterialApiError extends Error {
+  constructor(
+    message: string,
+    readonly reloadRequired = false,
+  ) {
+    super(message);
+    this.name = "MaterialApiError";
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === "string" && !value.includes("\0");
+}
+
+function isNullableText(value: unknown): boolean {
+  return value === null || isText(value);
+}
+
+function exactFields(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+) {
+  return (
+    Object.keys(value).length === fields.length &&
+    fields.every((field) => Object.hasOwn(value, field))
+  );
+}
+
+function hasNumericTextFields(value: unknown, fields: readonly string[]) {
+  return (
+    isRecord(value) &&
+    exactFields(value, fields) &&
+    fields.every((field) => {
+      const cell = value[field];
+      return isText(cell) && isValidStockMaterialNumber(cell);
+    })
+  );
+}
+
+function isMaterialRow(value: unknown): value is StockMaterialRow {
+  if (!isRecord(value) || !isRecord(value.item)) return false;
+  const item = value.item;
+  const itemFields = ["source_row", "no", "category", "code", "name", "unit"];
+  if (item.client_id !== undefined) itemFields.push("client_id");
+
+  return (
+    exactFields(value, [
+      "item",
+      "summary",
+      "remark",
+      "safety_stock",
+      "daily",
+    ]) &&
+    exactFields(item, itemFields) &&
+    typeof item.source_row === "number" &&
+    Number.isSafeInteger(item.source_row) &&
+    (item.client_id === undefined
+      ? item.source_row >= 6
+      : isText(item.client_id) &&
+        UUID_PATTERN.test(item.client_id) &&
+        item.source_row === 0 &&
+        item.no === null) &&
+    (item.no === null ||
+      (typeof item.no === "number" &&
+        Number.isSafeInteger(item.no) &&
+        item.no >= 1)) &&
+    isNullableText(item.category) &&
+    isNullableText(item.code) &&
+    isText(item.name) &&
+    Boolean(item.name.trim()) &&
+    isNullableText(item.unit) &&
+    isText(value.remark) &&
+    isText(value.safety_stock) &&
+    hasNumericTextFields(value.summary, STOCK_MATERIAL_FF_SUMMARY_FIELDS) &&
+    Array.isArray(value.daily) &&
+    value.daily.length <= 31 &&
+    value.daily.every(
+      (entry: unknown) =>
+        isRecord(entry) &&
+        exactFields(entry, ["date", "values"]) &&
+        isText(entry.date) &&
+        hasNumericTextFields(entry.values, STOCK_MATERIAL_FF_DAILY_FIELDS),
+    )
+  );
+}
+
+function isSheetTimestamp(value: unknown): boolean {
+  return isText(value) && (value === "" || Number.isFinite(Date.parse(value)));
+}
+
+function isMaterialSheet(
+  value: unknown,
+  period: StockMaterialPeriod,
+): value is StockMaterialSheet {
+  return (
+    isRecord(value) &&
+    isRecord(value.period) &&
+    exactFields(value.period, ["view", "year_be", "month"]) &&
+    value.period.view === period.view &&
+    value.period.year_be === period.year_be &&
+    value.period.month === period.month &&
+    value.id === stockMaterialPeriodKey(period) &&
+    value.source_sheet_name === stockMaterialSourceSheetName(period) &&
+    isSheetTimestamp(value.created_at) &&
+    isSheetTimestamp(value.updated_at) &&
+    Array.isArray(value.rows) &&
+    value.rows.every(isMaterialRow)
+  );
+}
+
+function readApiSnapshot(
+  payload: unknown,
+  period: StockMaterialPeriod,
+  writing = false,
+): MaterialSnapshot {
+  if (
+    !isRecord(payload) ||
+    payload.ok !== true ||
+    !isText(payload.revision) ||
+    !/^[a-f0-9]{64}$/.test(payload.revision) ||
+    !isMaterialSheet(payload.sheet, period) ||
+    Object.keys(validateStockMaterialSheet(payload.sheet)).length > 0
+  ) {
+    throw new MaterialApiError(
+      writing ? UNCERTAIN_SAVE : INVALID_RESPONSE,
+      writing,
+    );
+  }
+  return { sheet: payload.sheet, revision: payload.revision };
+}
+
+function getCsrfToken(): string {
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+    const token = cookie
+      ? decodeURIComponent(cookie.slice(CSRF_COOKIE.length + 1))
+      : "";
+    if (token) return token;
+  } catch {
+    // Do not send a write request without the CSRF cookie.
+  }
+  throw new MaterialApiError("กรุณาเข้าสู่ระบบใหม่ ไม่พบ CSRF Token");
+}
+
+async function requestMaterialJson(
+  url: string,
+  init: RequestInit,
+  writing: boolean,
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new MaterialApiError(writing ? UNCERTAIN_SAVE : LOAD_FAILED, writing);
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+    const reloadRequired =
+      writing &&
+      (response.ok ||
+        response.status >= 500 ||
+        [401, 403, 404, 409].includes(response.status));
+    const message =
+      response.status === 401 || response.status === 403
+        ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน"
+        : isRecord(payload) && typeof payload.message === "string"
+          ? payload.message
+          : writing
+            ? UNCERTAIN_SAVE
+            : LOAD_FAILED;
+    throw new MaterialApiError(message, reloadRequired);
+  }
+  return payload;
+}
+
+async function loadMaterialSheet(
+  period: StockMaterialPeriod,
+  signal: AbortSignal,
+): Promise<MaterialSnapshot> {
+  const params = new URLSearchParams({
+    year_be: String(period.year_be),
+    month: String(period.month),
+  });
+  const payload = await requestMaterialJson(
+    `${MATERIAL_API}?${params}`,
+    { signal },
+    false,
+  );
+  return readApiSnapshot(payload, period);
+}
+
+// Compare only business data; do not depend on object key ordering or timestamps.
+function materialRowSignature(row: StockMaterialRow): string {
+  const { item, summary, remark, safety_stock: safetyStock, daily } = row;
+  return JSON.stringify([
+    item.source_row,
+    item.client_id ?? null,
+    item.no,
+    item.category,
+    item.code,
+    item.name,
+    item.unit,
+    STOCK_MATERIAL_FF_SUMMARY_FIELDS.map((field) => summary[field]),
+    remark,
+    safetyStock,
+    [...daily]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((entry) => [
+        entry.date,
+        STOCK_MATERIAL_FF_DAILY_FIELDS.map((field) => entry.values[field]),
+      ]),
+  ]);
+}
+
+function rowsByRef(rows: readonly StockMaterialRow[]) {
+  return new Map(
+    rows.map((row) => [stockMaterialRowRef(row), materialRowSignature(row)]),
+  );
+}
+
+function changedMaterialRows(
+  saved: StockMaterialSheet,
+  draft: StockMaterialSheet,
+) {
+  if (saved.id !== draft.id) throw new MaterialApiError("เดือนรายงานไม่ตรงกัน");
+  const previous = rowsByRef(saved.rows);
+  const current = rowsByRef(draft.rows);
+  if (
+    previous.size !== saved.rows.length ||
+    current.size !== draft.rows.length ||
+    [...previous.keys()].some((key) => !current.has(key))
+  ) {
+    throw new MaterialApiError("รายการวัสดุไม่ถูกต้อง กรุณาตรวจสอบฉบับร่าง");
+  }
+  return draft.rows.filter((row) => {
+    const key = stockMaterialRowRef(row);
+    return previous.get(key) !== current.get(key);
+  });
+}
+
+async function persistMaterialSheet(
+  saved: MaterialSnapshot,
+  draft: StockMaterialSheet,
+): Promise<MaterialSnapshot> {
+  const changes = changedMaterialRows(saved.sheet, draft);
+  if (changes.length === 0) return saved;
+  const body = JSON.stringify({
+    action: "save_sheet",
+    period: draft.period,
+    expected_revision: saved.revision,
+    changes,
+  });
+  if (
+    changes.length > MAX_CHANGED_ROWS ||
+    new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES
+  ) {
+    throw new MaterialApiError(
+      "ข้อมูลที่แก้ไขเกินขนาดที่รองรับ (2,000 แถว หรือ 4 MiB) กรุณาลดจำนวนรายการก่อนบันทึก",
+    );
+  }
+  const payload = await requestMaterialJson(
+    MATERIAL_API,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
+      body,
+    },
+    true,
+  );
+  const snapshot = readApiSnapshot(payload, draft.period, true);
+  const expected = rowsByRef(draft.rows);
+  const actual = rowsByRef(snapshot.sheet.rows);
+  if (
+    expected.size !== actual.size ||
+    [...expected].some(([key, signature]) => actual.get(key) !== signature)
+  ) {
+    throw new MaterialApiError(UNCERTAIN_SAVE, true);
+  }
+  return snapshot;
+}
 
 type WorkspaceNotice = {
   tone: "success" | "error" | "info" | "draft";
@@ -91,23 +402,20 @@ function periodLabel(period: StockMaterialPeriod): string {
 }
 
 export function StockRemainingMaterialsFfWorkspace() {
-  const [savedSheets, setSavedSheets] = useState<StockMaterialSheet[]>(
-    createStockMaterialMockSheets,
+  const [savedSnapshot, setSavedSnapshot] = useState<MaterialSnapshot | null>(
+    null,
   );
-  const [draft, setDraft] = useState<StockMaterialSheet>(() => {
-    const initialKey = stockMaterialPeriodKey(
-      DEFAULT_STOCK_MATERIAL_FILTERS.period,
-    );
-    const initialSheet = savedSheets.find((sheet) => sheet.id === initialKey);
-
-    if (!initialSheet) {
-      throw new Error(
-        `Missing initial material stock mock sheet: ${initialKey}`,
-      );
-    }
-
-    return structuredClone(initialSheet);
-  });
+  const [draft, setDraft] = useState<StockMaterialSheet>(() =>
+    blankStockMaterialSheet(DEFAULT_STOCK_MATERIAL_FILTERS.period),
+  );
+  const [loadPeriod, setLoadPeriod] = useState<StockMaterialPeriod>(() => ({
+    ...DEFAULT_STOCK_MATERIAL_FILTERS.period,
+  }));
+  const [loadState, setLoadState] = useState({ loading: true, error: "" });
+  const [refreshRequired, setRefreshRequired] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const loadLock = useRef(true);
+  const saveLock = useRef(false);
   const [filters, setFilters] = useState<StockMaterialFilterValues>(() =>
     copyFilters(DEFAULT_STOCK_MATERIAL_FILTERS),
   );
@@ -120,14 +428,25 @@ export function StockRemainingMaterialsFfWorkspace() {
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
-  const savedSheet = savedSheets.find((sheet) => sheet.id === draft.id);
+  const savedSheet = savedSnapshot?.sheet;
   const hasUnsavedChanges = useMemo(
-    () => JSON.stringify(draft.rows) !== JSON.stringify(savedSheet?.rows ?? []),
-    [draft.rows, savedSheet?.rows],
+    () =>
+      Boolean(
+        savedSheet &&
+        JSON.stringify(draft.rows) !== JSON.stringify(savedSheet.rows),
+      ),
+    [draft.rows, savedSheet],
   );
+  const busy = loadState.loading || isSaving;
+  const readOnly =
+    busy || Boolean(loadState.error) || refreshRequired || !savedSnapshot;
+  const reloadPending =
+    pendingFilters !== null &&
+    stockMaterialPeriodKey(pendingFilters.period) ===
+      stockMaterialPeriodKey(filters.period);
   const visibleRows = useMemo(() => {
     const filtered = filterStockMaterialRows(draft.rows, filters.search);
-    // Show recently created mock items first; preserve Excel row order.
+    // Show manually added materials first; preserve existing row order.
     return [
       ...filtered.filter((row) => row.item.client_id !== undefined),
       ...filtered.filter((row) => row.item.client_id === undefined),
@@ -148,27 +467,74 @@ export function StockRemainingMaterialsFfWorkspace() {
     }
   }, [errorCount]);
 
-  function openPeriod(nextFilters: StockMaterialFilterValues) {
-    const nextKey = stockMaterialPeriodKey(nextFilters.period);
-    const nextSheet = savedSheets.find((sheet) => sheet.id === nextKey);
-
-    if (!nextSheet) {
-      setNotice({
-        tone: "error",
-        text: `ไม่พบข้อมูลจำลองสำหรับ ${periodLabel(nextFilters.period)}`,
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadMaterialSheet(loadPeriod, controller.signal)
+      .then((snapshot) => {
+        if (controller.signal.aborted) return;
+        setSavedSnapshot(snapshot);
+        setDraft(structuredClone(snapshot.sheet));
+        setLoadState({ loading: false, error: "" });
+        setRefreshRequired(false);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setLoadState({
+          loading: false,
+          error:
+            error instanceof MaterialApiError ? error.message : LOAD_FAILED,
+        });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) loadLock.current = false;
       });
-      return;
-    }
+    return () => controller.abort();
+  }, [loadPeriod]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges && !isSaving) return;
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges, isSaving]);
+
+  function openPeriod(nextFilters: StockMaterialFilterValues) {
+    if (loadLock.current || saveLock.current) return;
+    loadLock.current = true;
     setFilters(copyFilters(nextFilters));
-    setDraft(structuredClone(nextSheet));
+    setDraft(blankStockMaterialSheet(nextFilters.period));
+    setSavedSnapshot(null);
+    setLoadState({ loading: true, error: "" });
+    setRefreshRequired(false);
     setSelectedDailyRowRef(null);
     setIsCreateOpen(false);
+    setPendingFilters(null);
     setErrors({});
     setNotice(null);
+    setLoadPeriod({ ...nextFilters.period });
+  }
+
+  function reloadSheet() {
+    if (
+      loadLock.current ||
+      saveLock.current ||
+      isCreateOpen ||
+      selectedDailyRow
+    )
+      return;
+    if (hasUnsavedChanges) {
+      setPendingFilters(copyFilters(filters));
+      return;
+    }
+    openPeriod(filters);
   }
 
   function handleFiltersChange(nextFilters: StockMaterialFilterValues) {
+    if (loadLock.current || saveLock.current || isCreateOpen || pendingFilters)
+      return;
     const currentKey = stockMaterialPeriodKey(filters.period);
     const nextKey = stockMaterialPeriodKey(nextFilters.period);
 
@@ -192,6 +558,7 @@ export function StockRemainingMaterialsFfWorkspace() {
     field: StockMaterialSummaryField,
     value: string,
   ) {
+    if (readOnly || loadLock.current || saveLock.current) return;
     setDraft((current) =>
       updateStockMaterialSummary(current, rowRef, field, value),
     );
@@ -200,12 +567,14 @@ export function StockRemainingMaterialsFfWorkspace() {
   }
 
   function handleRemarkChange(rowRef: StockMaterialRowRef, value: string) {
+    if (readOnly || loadLock.current || saveLock.current) return;
     setDraft((current) => updateStockMaterialRemark(current, rowRef, value));
     setErrors({});
     setNotice(null);
   }
 
   function handleSafetyStockChange(rowRef: StockMaterialRowRef, value: string) {
+    if (readOnly || loadLock.current || saveLock.current) return;
     setDraft((current) =>
       updateStockMaterialSafetyStock(current, rowRef, value),
     );
@@ -219,6 +588,7 @@ export function StockRemainingMaterialsFfWorkspace() {
     field: StockMaterialDailyField,
     value: string,
   ) {
+    if (readOnly || loadLock.current || saveLock.current) return;
     setDraft((current) =>
       updateStockMaterialDaily(current, rowRef, date, field, value),
     );
@@ -227,6 +597,7 @@ export function StockRemainingMaterialsFfWorkspace() {
   }
 
   function handleCreateMaterial(input: StockMaterialCreateInput): boolean {
+    if (readOnly || loadLock.current || saveLock.current) return false;
     try {
       // Generate an identity, not a counterfeit Excel source_row.
       const clientId = crypto.randomUUID();
@@ -253,7 +624,7 @@ export function StockRemainingMaterialsFfWorkspace() {
         text:
           `เพิ่มวัสดุ “${input.name.trim()}” ใน${periodLabel(draft.period)}แล้ว ` +
           dailyNotice +
-          "ยอดสรุปรายเดือนเริ่มเป็นช่องว่างและยังแก้ไขได้ในตารางหลัก กรุณากดบันทึกข้อมูลจำลองเพื่อเก็บไว้ใน React State",
+          "ยอดสรุปรายเดือนเริ่มเป็นช่องว่างและยังแก้ไขได้ในตารางหลัก กรุณากดบันทึกข้อมูลเพื่อจัดเก็บลงฐานข้อมูล",
       });
       return true;
     } catch {
@@ -263,6 +634,7 @@ export function StockRemainingMaterialsFfWorkspace() {
   }
 
   function handleDiscard() {
+    if (loadLock.current || saveLock.current) return;
     if (!savedSheet) {
       setNotice({
         tone: "error",
@@ -277,14 +649,25 @@ export function StockRemainingMaterialsFfWorkspace() {
     setErrors({});
     setNotice({
       tone: "info",
-      text: "ยกเลิกการแก้ไขแล้ว ข้อมูลกลับไปเป็นค่าที่บันทึกไว้ล่าสุดในหน้านี้",
+      text: "ยกเลิกการแก้ไขแล้ว ข้อมูลกลับไปเป็นฉบับล่าสุดที่โหลดจากฐานข้อมูล",
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (
+      readOnly ||
+      loadLock.current ||
+      saveLock.current ||
+      !savedSnapshot ||
+      !hasUnsavedChanges ||
+      isCreateOpen ||
+      selectedDailyRow ||
+      pendingFilters
+    )
+      return;
+
     const nextErrors = validateStockMaterialSheet(draft);
     setErrors(nextErrors);
-
     if (Object.keys(nextErrors).length > 0) {
       setNotice({
         tone: "error",
@@ -293,59 +676,84 @@ export function StockRemainingMaterialsFfWorkspace() {
       return;
     }
 
+    saveLock.current = true;
+    setIsSaving(true);
+    setNotice(null);
     try {
-      const nextSheets = saveStockMaterialSheet(
-        savedSheets,
-        draft,
-        new Date().toISOString(),
-      );
-      const nextSavedSheet = nextSheets.find((sheet) => sheet.id === draft.id);
-
-      if (!nextSavedSheet) {
-        throw new Error("The saved material stock mock sheet was not found.");
-      }
-
-      setSavedSheets(nextSheets);
-      setDraft(structuredClone(nextSavedSheet));
+      const snapshot = await persistMaterialSheet(savedSnapshot, draft);
+      setSavedSnapshot(snapshot);
+      setDraft(structuredClone(snapshot.sheet));
       setErrors({});
       setNotice({
         tone: "success",
-        text: "บันทึกข้อมูลจำลองใน React State แล้ว ข้อมูลทั้งหมดจะกลับเป็นค่าเริ่มต้นเมื่อรีเฟรชหน้าเว็บ",
+        text: "บันทึกวัสดุ ยอดสรุป และรายละเอียดรายวันลงฐานข้อมูลเรียบร้อยแล้ว",
       });
-    } catch {
+    } catch (error) {
+      if (!(error instanceof MaterialApiError) || error.reloadRequired) {
+        setRefreshRequired(true);
+      }
       setNotice({
         tone: "error",
-        text: "ไม่สามารถบันทึกข้อมูลจำลองได้ กรุณาตรวจสอบข้อมูลอีกครั้ง",
+        text:
+          error instanceof MaterialApiError ? error.message : UNCERTAIN_SAVE,
       });
+      // Keep both the draft and its original revision; never silently retry.
+    } finally {
+      saveLock.current = false;
+      setIsSaving(false);
     }
   }
 
   function confirmPeriodChange() {
-    if (!pendingFilters) {
-      return;
-    }
-
+    if (!pendingFilters || loadLock.current || saveLock.current) return;
     openPeriod(pendingFilters);
-    setPendingFilters(null);
   }
 
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="วัสดุคงเหลือ FF"
-        description="รายการวัสดุและบรรจุภัณฑ์จากไฟล์ วัสดุคงเหลือFF-2569.xlsx"
-        actions={
-          <Badge variant="outline">UI MOCK · React State เท่านั้น</Badge>
-        }
+        description="รายการวัสดุและบรรจุภัณฑ์ตามรูปแบบไฟล์ วัสดุคงเหลือFF-2569.xlsx"
+        actions={<Badge variant="outline">ฐานข้อมูลจริง</Badge>}
       />
 
-      <StockMaterialFilters
-        value={filters}
-        onChange={handleFiltersChange}
-        onReset={() =>
-          handleFiltersChange(copyFilters(DEFAULT_STOCK_MATERIAL_FILTERS))
-        }
-      />
+      <fieldset disabled={busy} className="min-w-0">
+        <StockMaterialFilters
+          value={filters}
+          onChange={handleFiltersChange}
+          onReset={() =>
+            handleFiltersChange(copyFilters(DEFAULT_STOCK_MATERIAL_FILTERS))
+          }
+        />
+      </fieldset>
+
+      {loadState.loading && (
+        <p
+          role="status"
+          className="rounded-lg border bg-card p-3 text-sm text-muted-foreground"
+        >
+          กำลังโหลดข้อมูลวัสดุจากฐานข้อมูล...
+        </p>
+      )}
+      {loadState.error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          <AlertTitle>โหลดข้อมูลไม่สำเร็จ</AlertTitle>
+          <AlertDescription>{loadState.error}</AlertDescription>
+        </Alert>
+      )}
+      {refreshRequired && (
+        <Alert variant="destructive">
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          <AlertTitle>ต้องตรวจสอบข้อมูลล่าสุด</AlertTitle>
+          <AlertDescription>
+            {hasUnsavedChanges
+              ? "ฉบับร่างยังคงอยู่ในหน้านี้ กรุณาตรวจสอบหรือจดข้อมูลที่แก้ไขก่อนกดโหลดข้อมูลใหม่ "
+              : "กรุณาโหลดข้อมูลล่าสุดจากฐานข้อมูล "}
+            ระบบจะไม่บันทึกซ้ำจนกว่าจะโหลดข้อมูลล่าสุดสำเร็จ
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
         <div className="min-w-0 space-y-1">
@@ -358,9 +766,13 @@ export function StockRemainingMaterialsFfWorkspace() {
             {draft.rows.length.toLocaleString("th-TH")} รายการ
           </p>
           <p className="text-xs text-muted-foreground">
-            {hasUnsavedChanges
-              ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
-              : "ข้อมูลตรงกับฉบับที่บันทึกไว้ในหน้านี้"}
+            {loadState.loading
+              ? "กำลังโหลดข้อมูล"
+              : loadState.error
+                ? "ยังไม่ได้รับข้อมูลจากฐานข้อมูล"
+                : hasUnsavedChanges
+                  ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
+                  : "ข้อมูลตรงกับฉบับล่าสุดที่โหลดจากฐานข้อมูล"}
           </p>
         </div>
 
@@ -368,7 +780,21 @@ export function StockRemainingMaterialsFfWorkspace() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setIsCreateOpen(true)}
+            disabled={busy || isCreateOpen || Boolean(selectedDailyRow)}
+            onClick={reloadSheet}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            โหลดข้อมูลใหม่
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={readOnly}
+            onClick={() => {
+              if (!readOnly && !loadLock.current && !saveLock.current) {
+                setIsCreateOpen(true);
+              }
+            }}
           >
             <PackagePlus className="size-4" aria-hidden="true" />
             เพิ่มวัสดุ
@@ -377,18 +803,25 @@ export function StockRemainingMaterialsFfWorkspace() {
             type="button"
             variant="outline"
             onClick={handleDiscard}
-            disabled={!hasUnsavedChanges}
+            disabled={busy || !hasUnsavedChanges}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             ยกเลิกการแก้ไข
           </Button>
           <Button
             type="button"
-            onClick={handleSave}
-            disabled={!hasUnsavedChanges}
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={
+              readOnly ||
+              !hasUnsavedChanges ||
+              isCreateOpen ||
+              Boolean(selectedDailyRow)
+            }
           >
             <Save className="size-4" aria-hidden="true" />
-            บันทึกข้อมูลจำลอง
+            {isSaving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
           </Button>
         </div>
       </div>
@@ -404,7 +837,7 @@ export function StockRemainingMaterialsFfWorkspace() {
           )}
           <AlertTitle>
             {notice.tone === "success"
-              ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
+              ? "บันทึกสำเร็จ"
               : notice.tone === "error"
                 ? "ต้องตรวจสอบข้อมูล"
                 : notice.tone === "draft"
@@ -435,6 +868,7 @@ export function StockRemainingMaterialsFfWorkspace() {
 
       <StockRemainingMaterialsFfTable
         rows={visibleRows}
+        disabled={readOnly}
         onChange={handleSummaryChange}
         onRemarkChange={handleRemarkChange}
         onSafetyStockChange={handleSafetyStockChange}
@@ -450,7 +884,12 @@ export function StockRemainingMaterialsFfWorkspace() {
       <StockRemainingMaterialsFfCreateForm
         open={isCreateOpen}
         period={draft.period}
-        onOpenChange={setIsCreateOpen}
+        onOpenChange={(open) => {
+          if (!open || (!readOnly && !loadLock.current && !saveLock.current)) {
+            setIsCreateOpen(open);
+          }
+        }}
+        disabled={readOnly}
         onCreate={handleCreateMaterial}
       />
 
@@ -485,6 +924,7 @@ export function StockRemainingMaterialsFfWorkspace() {
               <StockRemainingMaterialsFfDailyDetail
                 sheet={draft}
                 row={selectedDailyRow}
+                disabled={readOnly}
                 onChange={handleDailyChange}
                 onNewChange={handleDailyChange}
                 onClose={() => setSelectedDailyRowRef(null)}
@@ -495,10 +935,10 @@ export function StockRemainingMaterialsFfWorkspace() {
       </Dialog>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        ข้อมูลจำลองจาก Excel · รายการเดิมแยกด้วยเลขแถว Excel
-        และวัสดุเพิ่มใหม่ใช้ client_id · เพิ่มวัสดุเฉพาะเดือนที่เลือก ·
-        สรุปยอดแยกหน่วยนับ ไม่คำนวณราคาหรือยอดคงเหลืออัตโนมัติ ·
-        ไม่มีการเชื่อมต่อ API ฐานข้อมูล หรือพื้นที่จัดเก็บของเบราว์เซอร์
+        ข้อมูลจากฐานข้อมูล · การเพิ่มและแก้ไขอยู่ในฉบับร่างจนกว่าจะกดบันทึก ·
+        รายการเดิมแยกด้วยเลขแถว Excel และรายการที่สร้างผ่านเว็บใช้ client_id ·
+        เพิ่มวัสดุเฉพาะเดือนที่เลือก · ไม่คำนวณราคาหรือยอดคงเหลืออัตโนมัติ ·
+        ไม่ได้นำเข้าข้อมูล Excel หรือ Mock โดยอัตโนมัติ
       </p>
 
       <AlertDialog
@@ -513,17 +953,20 @@ export function StockRemainingMaterialsFfWorkspace() {
           <AlertDialogHeader>
             <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้บันทึก</AlertDialogTitle>
             <AlertDialogDescription>
-              การเปลี่ยนเดือนหรือปีจะทิ้งการแก้ไขของชีตปัจจุบัน
-              หากต้องการเก็บข้อมูล กรุณากลับไปกดบันทึกก่อนเปลี่ยนช่วงเวลา
+              {reloadPending
+                ? "การโหลดข้อมูลใหม่จะทิ้งฉบับร่างของเดือนนี้ กรุณาตรวจสอบข้อมูลก่อนดำเนินการ"
+                : "การเปลี่ยนเดือนหรือปีจะทิ้งการแก้ไขของชีตปัจจุบัน หากต้องการเก็บข้อมูล กรุณากลับไปกดบันทึกก่อนเปลี่ยนช่วงเวลา"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>กลับไปบันทึกก่อน</AlertDialogCancel>
+            <AlertDialogCancel>กลับไปยังฉบับร่าง</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmPeriodChange}
             >
-              ทิ้งการแก้ไขและเปลี่ยนช่วงเวลา
+              {reloadPending
+                ? "ทิ้งการแก้ไขและโหลดข้อมูลใหม่"
+                : "ทิ้งการแก้ไขและเปลี่ยนช่วงเวลา"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

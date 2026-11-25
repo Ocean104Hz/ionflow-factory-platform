@@ -186,7 +186,7 @@ export function CustomerMaterialsDailyForm({
         <div className="space-y-1 pr-6">
           <DialogTitle>บันทึกรับ-จ่ายวัสดุรายวัน</DialogTitle>
           <DialogDescription>
-            เพิ่มหรือแก้ไขการรับ-จ่ายวัสดุของลูกค้าตามวันที่เลือก
+            เพิ่มหรือแก้ไขการรับ-จ่ายวัสดุของลูกค้าตามวันที่เลือกลงฉบับร่าง
           </DialogDescription>
         </div>
 
@@ -270,10 +270,10 @@ export function CustomerMaterialsDailyForm({
 
             {pendingDay !== null && (
               <div role="alert" className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-sm font-medium">มีข้อมูลที่ยังไม่ได้บันทึก</p>
+                <p className="text-sm font-medium">มีข้อมูลที่ยังไม่ได้บันทึกลงฉบับร่าง</p>
                 <p className="text-xs text-muted-foreground">
                   หากเปลี่ยนเป็น{dayLabel(pendingDay)}
-                  ข้อมูลที่กำลังแก้ไขจะไม่ถูกบันทึก
+                  ข้อมูลที่กำลังแก้ไขของวันที่เดิมจะไม่ถูกเก็บลงฉบับร่าง
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => setPendingDay(null)}>
@@ -337,9 +337,9 @@ export function CustomerMaterialsDailyForm({
 
           <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
             <p>ช่องว่างและจำนวน 0 มีความหมายแตกต่างกัน</p>
-            <p>หากล้างข้อมูลทั้ง 4 ช่องแล้วบันทึก จะนำเฉพาะรายการรับ-จ่ายของวันที่เลือกออก</p>
+            <p>หากล้างข้อมูลทั้ง 4 ช่องแล้วบันทึกลงฉบับร่าง จะนำเฉพาะรายการรับ-จ่ายของวันที่เลือกออกจากฉบับร่าง</p>
             <p>ไม่คำนวณยอดสรุป คงเหลือ ผลต่าง หรือยกยอดข้ามเดือนอัตโนมัติ</p>
-            <p>UI Mock · จัดเก็บภายในเบราว์เซอร์เมื่อเชื่อมกับ Workspace ไม่มีฐานข้อมูลจริง</p>
+            <p>การแก้ไขจะอยู่ในฉบับร่าง กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล</p>
           </div>
 
           {errors.form && (
@@ -353,7 +353,7 @@ export function CustomerMaterialsDailyForm({
               ยกเลิก
             </Button>
             <Button type="submit" disabled={!draft || pendingDay !== null}>
-              บันทึกรับ-จ่ายวัสดุ
+              บันทึกลงฉบับร่าง
             </Button>
           </div>
         </form>

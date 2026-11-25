@@ -256,7 +256,7 @@ export function CustomerMaterialsForm({
             {isCreate ? "เพิ่มวัสดุใหม่" : "แก้ไขข้อมูลวัสดุ"}
           </DialogTitle>
           <DialogDescription>
-            บันทึกข้อมูลวัสดุของลูกค้าและยอดสรุปตามงวดที่เลือก
+            เพิ่มหรือแก้ไขข้อมูลวัสดุและยอดสรุปลงฉบับร่างของงวดที่เลือก
             โดยไม่คำนวณยอดคงเหลืออัตโนมัติ
           </DialogDescription>
         </div>
@@ -481,12 +481,17 @@ export function CustomerMaterialsForm({
             />
           </section>
 
+          <p className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+            การเพิ่มหรือแก้ไขในฟอร์มนี้จะอยู่ในฉบับร่างเท่านั้น
+            กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล
+          </p>
+
           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
             <Button type="button" variant="outline" onClick={onCancel}>
               ยกเลิก
             </Button>
             <Button type="submit">
-              {isCreate ? "บันทึกวัสดุใหม่" : "บันทึกการแก้ไข"}
+              {isCreate ? "เพิ่มลงฉบับร่าง" : "บันทึกลงฉบับร่าง"}
             </Button>
           </div>
         </form>

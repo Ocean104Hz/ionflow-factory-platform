@@ -52,8 +52,8 @@ const YEAR_OPTIONS = [
 ];
 
 /**
- * Controlled filters for the Excel-based Stock WIP UI mock.
- * The parent workspace owns filter state and applies it to the displayed rows.
+ * Controlled filters for Stock WIP FF.
+ * The Workspace loads the selected period and filters the current draft locally.
  */
 export function StockWipFilters({ value, onChange, onReset }: Props) {
   const searchId = useId();
@@ -117,7 +117,7 @@ export function StockWipFilters({ value, onChange, onReset }: Props) {
             ตัวกรอง Stock WIP
           </h2>
           <p className="text-xs text-muted-foreground">
-            เลือกช่วงเวลาและค้นหารายการจากข้อมูล Excel จำลอง
+            เลือกช่วงเวลาเพื่อโหลดข้อมูลจากฐานข้อมูล และค้นหาสินค้าในงวดที่เลือก
           </p>
         </div>
 
@@ -179,7 +179,7 @@ export function StockWipFilters({ value, onChange, onReset }: Props) {
       </div>
 
       <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-        ปี 2568 มีเฉพาะข้อมูลรายปี ส่วนข้อมูลรายเดือนมีเฉพาะปี 2569
+        ปี 2568 มีเฉพาะงวดรายปี ส่วนงวดรายเดือนมีเฉพาะปี 2569
         และการเปลี่ยนมุมมองจากรายปีเป็นรายเดือนจะเริ่มที่เดือนมกราคม
       </p>
     </section>
