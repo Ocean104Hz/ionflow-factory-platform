@@ -35,12 +35,9 @@ import { MaterialIssueSigners } from "./material-issue-signers";
 import { MaterialIssueHistory } from "./material-issue-history";
 import { MaterialIssueDetailModal } from "./material-issue-detail-modal";
 
-import { MOCK_MATERIAL_ISSUE_HISTORY } from "./material-issue-history.mock";
-
 import {
     createEmptyMaterialIssueDraft,
     createEmptyMaterialIssueItem,
-    hasMaterialIssueItemData,
     type MaterialIssueDraft,
     type MaterialIssueHeaderValues,
     type MaterialIssueItem,
@@ -60,13 +57,9 @@ type PendingFormAction =
 export function MaterialIssueWorkspace() {
     const [tab, setTab] = useState("form");
 
-    const [records, setRecords] = useState<
+    const [records] = useState<
         MaterialIssueRecord[]
-    >(() =>
-        structuredClone(
-            MOCK_MATERIAL_ISSUE_HISTORY,
-        ),
-    );
+    >([]);
 
     const [header, setHeader] =
         useState<MaterialIssueHeaderValues>(
@@ -112,9 +105,13 @@ export function MaterialIssueWorkspace() {
 
     const nextRowId = useRef(4);
 
-    const nextDocumentNo = useRef(
-        MOCK_MATERIAL_ISSUE_HISTORY.length + 1,
-    );
+    function handleSave(): void {
+        clearMessages();
+
+        setError(
+            "ยังไม่สามารถบันทึกเอกสารได้ เนื่องจากยังไม่ได้เชื่อมต่อฐานข้อมูล",
+        );
+    }
 
     const currentDraft: MaterialIssueDraft = {
         header,
@@ -334,175 +331,16 @@ export function MaterialIssueWorkspace() {
     }
 
     /* ==============================
-       Save Mock Document
-    ============================== */
-
-    function handleSave(): void {
-        clearMessages();
-
-        const validItems = items.filter(
-            hasMaterialIssueItemData,
-        );
-
-        if (!header.location.trim()) {
-            setError("กรุณาเลือกสถานที่");
-            return;
-        }
-
-        if (!header.productName.trim()) {
-            setError("กรุณาเลือกชื่อผลิตภัณฑ์");
-            return;
-        }
-
-        if (!header.issueDate.trim()) {
-            setError("กรุณาระบุวันที่");
-            return;
-        }
-
-        if (validItems.length === 0) {
-            setError(
-                "กรุณาระบุรายการวัสดุอย่างน้อย 1 รายการ",
-            );
-
-            return;
-        }
-
-        const incompleteItem =
-            validItems.find(
-                (item) =>
-                    !item.materialCode.trim() ||
-                    !item.materialName.trim() ||
-                    !item.unit.trim() ||
-                    !item.quantity.trim() ||
-                    !Number.isFinite(
-                        Number(item.quantity),
-                    ) ||
-                    Number(item.quantity) <= 0,
-            );
-
-        if (incompleteItem) {
-            setError(
-                "กรุณาระบุรหัสวัสดุ รายการวัสดุ หน่วย และจำนวนที่มากกว่า 0 ให้ครบ",
-            );
-
-            return;
-        }
-
-        const existingRecord = records.find(
-            (record) => record.id === editingId,
-        );
-
-        if (editingId && !existingRecord) {
-            setError(
-                "ไม่พบเอกสารที่ต้องการแก้ไข",
-            );
-
-            return;
-        }
-
-        let documentNo: string;
-
-        if (existingRecord) {
-            documentNo =
-                existingRecord.documentNo;
-        } else {
-            documentNo = `MI-DEMO-${String(
-                nextDocumentNo.current,
-            ).padStart(4, "0")}`;
-
-            nextDocumentNo.current += 1;
-        }
-
-        const savedRecord: MaterialIssueRecord = {
-            id:
-                existingRecord?.id ??
-                `material-issue-${documentNo}`,
-
-            documentNo,
-
-            header: {
-                ...header,
-            },
-
-            items: validItems.map((item) => ({
-                ...item,
-            })),
-
-            signers: {
-                ...signers,
-            },
-        };
-
-        setRecords((previous) => {
-            if (existingRecord) {
-                return previous.map((record) =>
-                    record.id === savedRecord.id
-                        ? savedRecord
-                        : record,
-                );
-            }
-
-            return [
-                savedRecord,
-                ...previous,
-            ];
-        });
-
-        setItems(savedRecord.items);
-        setEditingId(savedRecord.id);
-
-        setBaseline(
-            JSON.stringify({
-                header: savedRecord.header,
-                items: savedRecord.items,
-                signers: savedRecord.signers,
-            }),
-        );
-
-        setMessage(
-            `บันทึกข้อมูลตัวอย่าง ${documentNo} สำเร็จ ยังไม่ได้บันทึกลงฐานข้อมูลจริง`,
-        );
-
-        setTab("history");
-    }
-
-    /* ==============================
        History Actions
     ============================== */
 
     function handleDeleteRecord(
         record: MaterialIssueRecord,
     ): void {
-        if (
-            editingId === record.id &&
-            hasUnsavedChanges
-        ) {
-            setError(
-                "เอกสารนี้กำลังแก้ไขและยังไม่ได้บันทึก กรุณาบันทึกหรือเริ่มเอกสารใหม่ก่อนลบ",
-            );
+        clearMessages();
 
-            return;
-        }
-
-        setRecords((previous) =>
-            previous.filter(
-                (item) => item.id !== record.id,
-            ),
-        );
-
-        if (editingId === record.id) {
-            resetForm();
-            setTab("history");
-        }
-
-        if (viewRecordId === record.id) {
-            setViewRecordId(null);
-        }
-
-        setError("");
-
-        setMessage(
-            `ลบข้อมูลตัวอย่าง ${record.documentNo} แล้ว`,
+        setError(
+            `ยังไม่สามารถลบเอกสาร ${record.documentNo} ได้ เนื่องจากยังไม่ได้เชื่อมต่อฐานข้อมูล`,
         );
     }
 
@@ -514,7 +352,7 @@ export function MaterialIssueWorkspace() {
                 title="ใบเบิกจ่ายวัสดุ"
                 actions={
                     <StatusBadge tone="info">
-                        UI MOCK · ไม่เชื่อมระบบจริง
+                        ยังไม่เชื่อมต่อฐานข้อมูล
                     </StatusBadge>
                 }
             />

@@ -21,17 +21,17 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import {
-  MOCK_MATERIAL_STOCK,
-  type MaterialIssueStockItem,
-} from "./material-issue-stock.mock";
+import type {
+  MaterialIssueStockItem,
+} from "./material-issue-domain";
+
+const materials: MaterialIssueStockItem[] = [];
 
 type MaterialIssueStockPickerModalProps = {
   selectedCode: string;
   onSelect: (material: MaterialIssueStockItem) => void;
   onClose: () => void;
 };
-
 export function MaterialIssueStockPickerModal({
   selectedCode,
   onSelect,
@@ -46,7 +46,7 @@ export function MaterialIssueStockPickerModal({
 
   const keyword = search.trim().toLowerCase();
 
-  const filteredMaterials = MOCK_MATERIAL_STOCK.filter(
+  const filteredMaterials = materials.filter(
     (material) =>
       material.materialCode
         .toLowerCase()
@@ -143,7 +143,7 @@ export function MaterialIssueStockPickerModal({
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            ข้อมูลจากสต็อกวัสดุคงเหลือ FF เดือนตุลาคม 2569 (Mock Data)
+            ยังไม่ได้เชื่อมต่อฐานข้อมูลสต็อกวัสดุ
           </p>
         </div>
 

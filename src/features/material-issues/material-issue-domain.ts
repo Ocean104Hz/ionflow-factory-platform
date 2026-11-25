@@ -151,3 +151,10 @@ export function hasMaterialIssueItemData(
     item.additionalQuantity,
   ].some((value) => value.trim() !== "");
 }
+export type MaterialIssueStockItem = {
+    id: string;
+    materialCode: string;
+    materialName: string;
+    unit: string;
+    remainingQuantity: string;
+};
