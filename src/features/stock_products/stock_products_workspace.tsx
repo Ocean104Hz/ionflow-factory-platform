@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
   CalendarDays,
@@ -30,52 +30,48 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { stockProductsMockWorkbook } from "@/src/lib/mock-data/stock_products";
 
 import { StockProductsForm } from "./stock_products_form";
 import { StockProductsDailyForm } from "./stock_products_daily_form";
 import { StockProductsSoForm } from "./stock_products_so_form";
 
 import {
-  appendStockProductsSoForStock,
+  appendStockProductsSoRow,
+  blankStockProductsDaily,
   blankStockProductsRow,
   datesInStockProductsMonth,
   filterStockProductsRows,
   filterStockProductsSoRows,
   isValidStockProductsAddedDate,
-  removeStockProductsRow,
   stockProductsRowKey,
   stockProductsSoRowKey,
   upsertStockProductsRow,
   validateStockProductsRow,
+  validateStockProductsSoForStock,
   validateStockProductsSoSheetCoverage,
   STOCK_PRODUCTS_DAILY_FIELDS,
   STOCK_PRODUCTS_SO_SHEET_NAMES,
-  STOCK_PRODUCTS_STORAGE_KEY,
-  STOCK_PRODUCTS_STORAGE_VERSION,
   STOCK_PRODUCTS_SUMMARY_FIELDS,
   type StockProductsDailyField,
   type StockProductsDailyValues,
   type StockProductsMonth,
   type StockProductsSoRow,
   type StockProductsSoSheetName,
-  type StockProductsStoredData,
   type StockProductsWorkbook,
   type StockProductsStockRow,
   type StockProductsSummaryField,
 } from "./stock_products_domain";
 
 /**
- * Editable FF stock UI mock, with browser-local persistence.
- * The imported snapshot stays unchanged. Daily entries and SO records do not
- * automatically recalculate or deduct stock. No API or database is used.
+ * FF stock workspace backed by /api/stock/products.
+ * Daily entries and SO records do not recalculate or deduct stock.
+ * The existing report month is retained; browser-local data is not imported.
  */
 
 const COPY = {
   title: "สต็อกสินค้า",
   desc: "จัดการสต็อกสินค้า รับ-จ่ายรายวัน และรายการ SO ทั้ง 16 ชีต",
-  storage: "UI MOCK · Local Storage",
-  source: "ข้อมูลต้นฉบับ",
+  storage: "ฐานข้อมูลจริง",
   stock: "สต็อกสินค้าคงเหลือ",
   so: "รายการ SO",
   productCount: "รายการสินค้า",
@@ -92,7 +88,7 @@ const COPY = {
   noSo: "ไม่พบรายการ SO ในชีตหรือตัวกรองที่เลือก",
   dailyButton: "ดูรายวัน",
   dailyTitle: "รายละเอียดรับ-จ่ายรายวัน",
-  dateRaw: "วันที่ต้นฉบับ",
+  dateRaw: "วันที่ SO",
   totalF: "ยอด (F)",
   received: "รับเข้า",
   receivedReturn: "รับคืน",
@@ -124,8 +120,8 @@ const COPY = {
   summary: "ยอดสรุปตาม Excel",
   stockHint: "ยอดสรุปแสดงตามข้อมูลที่บันทึก โดยไม่คำนวณอัตโนมัติ",
   soHint: "รายการ SO ไม่หักยอดสต็อกอัตโนมัติ",
-  mockHint: "ข้อมูลทดลองจัดเก็บในเบราว์เซอร์ ไม่มี API หรือฐานข้อมูลจริง",
-  dateHint: "วันที่ SO แสดงค่าดิบจาก Excel อาจเป็นตัวเลข ไม่แปลงโดยการเดา",
+  databaseHint: "ข้อมูลจากฐานข้อมูล ไม่นำเข้า Local Storage อัตโนมัติ",
+  dateHint: "วันที่ SO ตามที่บันทึกในฐานข้อมูล",
   dailyHint: "แสดงครบทุกวันในเดือน รวมวันที่ไม่มีการเคลื่อนไหว",
   stockDetail: "ข้อมูลสินค้า",
   dailyRows: "วันที่มีรายการ",
@@ -170,8 +166,19 @@ const SO_SHEET_OPTIONS = [
 ];
 
 const PAGE_SIZE = 25;
-const STORAGE_EVENT = "ionflow:stock-products:changed";
-const STORAGE_UNAVAILABLE = "__STOCK_PRODUCTS_STORAGE_UNAVAILABLE__";
+const STOCK_API = "/api/stock/products";
+const CSRF_COOKIE = "ionflow_factory_csrf";
+// Retain the existing October 2569 report period from the legacy workbook.
+const REPORT_PERIOD: StockProductsMonth = { year_be: 2569, month: 10 };
+const EMPTY_WORKBOOK: StockProductsWorkbook = {
+  stock: {
+    source_sheet_name: "Stock Products",
+    report_caption: COPY.storage,
+    period: REPORT_PERIOD,
+    rows: [],
+  },
+  so_sheets: STOCK_PRODUCTS_SO_SHEET_NAMES.map((name) => ({ name, rows: [] })),
+};
 const QUANTITY_CLASSES = "whitespace-nowrap text-right tabular-nums";
 
 function originalCell(value: string | number | boolean | null): string {
@@ -189,24 +196,16 @@ function monthLabel(yearBe: number, month: number): string {
 type StockEditor = {
   mode: "CREATE" | "EDIT";
   row: StockProductsStockRow;
-  snapshot: string | null;
 };
 
 type DailyEditor = {
   row: StockProductsStockRow;
   date: string;
-  snapshot: string | null;
 };
 
 type SoEditor = {
   id: string;
   sheet: StockProductsSoSheetName;
-  snapshot: string | null;
-};
-
-type DeleteTarget = {
-  row: StockProductsStockRow;
-  snapshot: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -217,8 +216,12 @@ function isNullableString(value: unknown): boolean {
   return value === null || typeof value === "string";
 }
 
-function isOptionalId(value: unknown): boolean {
-  return value === undefined || (typeof value === "string" && value.length > 0);
+function isDatabaseId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[1-9]\d{0,18}$/.test(value) &&
+    (value.length < 19 || value <= "9223372036854775807")
+  );
 }
 
 function hasStringFields(value: unknown, fields: readonly string[]): boolean {
@@ -232,8 +235,10 @@ function isStockRow(value: unknown): value is StockProductsStockRow {
   const item = value.item;
 
   return (
-    isOptionalId(item.id) &&
-    (item.so_row_id === null || isOptionalId(item.so_row_id)) &&
+    isDatabaseId(item.id) &&
+    (item.so_row_id === undefined ||
+      item.so_row_id === null ||
+      typeof item.so_row_id === "string") &&
     (item.added_date === undefined ||
       item.added_date === null ||
       item.added_date === "" ||
@@ -263,14 +268,15 @@ function isSoRow(value: unknown): value is StockProductsSoRow {
   if (!isRecord(value)) return false;
 
   return (
-    isOptionalId(value.id) &&
-    isOptionalId(value.stock_row_key) &&
+    isDatabaseId(value.id) &&
+    typeof value.stock_row_key === "string" &&
+    value.stock_row_key.startsWith("stock:local:") &&
+    isDatabaseId(value.stock_row_key.slice("stock:local:".length)) &&
     STOCK_PRODUCTS_SO_SHEET_NAMES.some((name) => name === value.sheet_name) &&
     typeof value.source_row === "number" &&
     Number.isInteger(value.source_row) &&
-    (isNullableString(value.date_raw) ||
-      (typeof value.date_raw === "number" &&
-        Number.isFinite(value.date_raw))) &&
+    typeof value.date_raw === "string" &&
+    isValidStockProductsAddedDate(value.date_raw) &&
     hasStringFields(value, [
       "customer_name",
       "so_number",
@@ -322,104 +328,232 @@ function isWorkbook(value: unknown): value is StockProductsWorkbook {
   );
 }
 
-function subscribeStorage(callback: () => void): () => void {
-  window.addEventListener("storage", callback);
-  window.addEventListener(STORAGE_EVENT, callback);
+class StockApiError extends Error {
+  constructor(
+    message: string,
+    readonly reloadRequired = false,
+  ) {
+    super(message);
+    this.name = "StockApiError";
+  }
+}
 
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(STORAGE_EVENT, callback);
+function getCsrfToken(): string {
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+    const token = cookie
+      ? decodeURIComponent(cookie.slice(CSRF_COOKIE.length + 1))
+      : "";
+    if (token) return token;
+  } catch {
+    // Do not send a write request without the CSRF cookie.
+  }
+  throw new StockApiError("กรุณาเข้าสู่ระบบใหม่ ไม่พบ CSRF Token");
+}
+
+const UNCERTAIN_SAVE =
+  "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาโหลดข้อมูลใหม่และตรวจสอบก่อนบันทึกซ้ำ";
+const LOAD_FAILED = "ไม่สามารถโหลดข้อมูลสต็อกจากฐานข้อมูลได้";
+const INVALID_RESPONSE = "รูปแบบข้อมูลจาก API ไม่ถูกต้อง";
+
+async function requestStockJson(
+  url: string,
+  init: RequestInit,
+  writing: boolean,
+): Promise<Record<string, unknown>> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new StockApiError(writing ? UNCERTAIN_SAVE : LOAD_FAILED, writing);
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+    const reload =
+      writing &&
+      (response.ok ||
+        response.status >= 500 ||
+        response.status === 404 ||
+        response.status === 409 ||
+        response.status === 401 ||
+        response.status === 403);
+    let message =
+      isRecord(payload) && typeof payload.message === "string"
+        ? payload.message
+        : writing
+          ? UNCERTAIN_SAVE
+          : LOAD_FAILED;
+    if (response.status === 401 || response.status === 403) {
+      message = "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน";
+    }
+    throw new StockApiError(message, reload);
+  }
+  return payload;
+}
+
+function hasValidDailyDates(
+  row: StockProductsStockRow,
+  period: StockProductsMonth,
+): boolean {
+  const validDates = new Set(datesInStockProductsMonth(period));
+  const dates = row.daily.map((entry) => entry.date);
+  return (
+    new Set(dates).size === dates.length &&
+    dates.every((date) => validDates.has(date))
+  );
+}
+
+function readApiWorkbook(
+  payload: Record<string, unknown>,
+  period: StockProductsMonth,
+): StockProductsWorkbook {
+  if (
+    !isRecord(payload.period) ||
+    payload.period.year_be !== period.year_be ||
+    payload.period.month !== period.month
+  ) {
+    throw new StockApiError(INVALID_RESPONSE);
+  }
+  const workbook: unknown = {
+    stock: { ...EMPTY_WORKBOOK.stock, period, rows: payload.rows },
+    so_sheets: payload.so_sheets,
+  };
+  if (
+    !isWorkbook(workbook) ||
+    validateStockProductsSoSheetCoverage(workbook.so_sheets).length > 0
+  ) {
+    throw new StockApiError(INVALID_RESPONSE);
+  }
+  const stockKeys = workbook.stock.rows.map(stockProductsRowKey);
+  const soKeys = workbook.so_sheets.flatMap((sheet) =>
+    sheet.rows.map(stockProductsSoRowKey),
+  );
+  if (
+    new Set(stockKeys).size !== stockKeys.length ||
+    new Set(soKeys).size !== soKeys.length ||
+    workbook.stock.rows.some((row) => !hasValidDailyDates(row, period))
+  ) {
+    throw new StockApiError(INVALID_RESPONSE);
+  }
+  return workbook;
+}
+
+async function loadStockWorkbook(
+  signal: AbortSignal,
+): Promise<StockProductsWorkbook> {
+  const params = new URLSearchParams({
+    year_be: String(REPORT_PERIOD.year_be),
+    month: String(REPORT_PERIOD.month),
+  });
+  const payload = await requestStockJson(
+    `${STOCK_API}?${params}`,
+    { signal },
+    false,
+  );
+  return readApiWorkbook(payload, REPORT_PERIOD);
+}
+
+async function writeStock(
+  method: "POST" | "PATCH" | "DELETE",
+  body: Record<string, unknown>,
+) {
+  return requestStockJson(
+    STOCK_API,
+    {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
+      body: JSON.stringify(body),
+    },
+    true,
+  );
+}
+
+function productFields(row: StockProductsStockRow) {
+  const { code, name, group, unit, added_date } = row.item;
+  return { code, name, group, unit, added_date: added_date ?? null };
+}
+
+function productBody(
+  row: StockProductsStockRow,
+  editor: StockEditor,
+  period: StockProductsMonth,
+) {
+  const common = {
+    period,
+    item: productFields(row),
+    summary: row.summary,
+    remark: row.remark,
+  };
+  if (editor.mode === "CREATE") return { action: "create_product", ...common };
+  const previous = editor.row;
+  return {
+    action: "update_product",
+    item_id: previous.item.id,
+    ...common,
+    expected: {
+      item: { id: previous.item.id, ...productFields(previous) },
+      summary: previous.summary,
+      remark: previous.remark,
+    },
   };
 }
 
-function getStorageSnapshot(): string | null {
-  try {
-    return window.localStorage.getItem(STOCK_PRODUCTS_STORAGE_KEY);
-  } catch {
-    return STORAGE_UNAVAILABLE;
+function readSavedProduct(
+  payload: Record<string, unknown>,
+  period: StockProductsMonth,
+  expectedId?: string,
+): StockProductsStockRow {
+  const row = payload.row;
+  if (
+    !isStockRow(row) ||
+    !hasValidDailyDates(row, period) ||
+    (expectedId !== undefined && row.item.id !== expectedId)
+  ) {
+    throw new StockApiError(UNCERTAIN_SAVE, true);
   }
+  return row;
 }
 
-function getServerSnapshot(): null {
-  return null;
-}
-
-function decodeWorkbook(raw: string | null): {
-  workbook: StockProductsWorkbook;
-  error: string;
-} {
-  if (raw === null) {
-    return { workbook: stockProductsMockWorkbook, error: "" };
+function dailyChange(
+  previous: StockProductsStockRow,
+  next: StockProductsStockRow,
+  period: StockProductsMonth,
+) {
+  if (
+    !hasValidDailyDates(previous, period) ||
+    !hasValidDailyDates(next, period)
+  ) {
+    throw new StockApiError("วันที่รับ-จ่ายไม่ถูกต้อง");
   }
-
-  if (raw === STORAGE_UNAVAILABLE) {
-    return {
-      workbook: stockProductsMockWorkbook,
-      error: "ไม่สามารถเข้าถึง Local Storage ของเบราว์เซอร์ได้",
-    };
+  const changes = datesInStockProductsMonth(period).flatMap((date) => {
+    const expected =
+      previous.daily.find((entry) => entry.date === date)?.values ??
+      blankStockProductsDaily();
+    const values =
+      next.daily.find((entry) => entry.date === date)?.values ??
+      blankStockProductsDaily();
+    return STOCK_PRODUCTS_DAILY_FIELDS.some(
+      (field) => expected[field] !== values[field],
+    )
+      ? [{ date, expected, values }]
+      : [];
+  });
+  if (changes.length > 1) {
+    throw new StockApiError("กรุณาบันทึกรับ-จ่ายทีละวัน");
   }
-
-  try {
-    const data: unknown = JSON.parse(raw);
-
-    if (
-      !isRecord(data) ||
-      data.version !== STOCK_PRODUCTS_STORAGE_VERSION ||
-      !isWorkbook(data.workbook)
-    ) {
-      throw new Error("Invalid stored workbook");
-    }
-
-    const workbook = data.workbook;
-    const stockKeys = workbook.stock.rows.map(stockProductsRowKey);
-    const soKeys = workbook.so_sheets.flatMap((sheet) =>
-      sheet.rows.map(stockProductsSoRowKey),
-    );
-    const validSoKeys = new Set(soKeys);
-    const validDates = new Set(
-      datesInStockProductsMonth(workbook.stock.period),
-    );
-
-    if (
-      validateStockProductsSoSheetCoverage(workbook.so_sheets).length > 0 ||
-      new Set(stockKeys).size !== stockKeys.length ||
-      new Set(soKeys).size !== soKeys.length ||
-      workbook.stock.rows.some((row) => {
-        const dates = row.daily.map((entry) => entry.date);
-        return (
-          (row.item.so_row_id != null &&
-            !validSoKeys.has(`so:local:${row.item.so_row_id}`)) ||
-          new Set(dates).size !== dates.length ||
-          dates.some((date) => !validDates.has(date))
-        );
-      })
-    ) {
-      throw new Error("Invalid stored row identities or dates");
-    }
-
-    return { workbook, error: "" };
-  } catch {
-    return {
-      workbook: stockProductsMockWorkbook,
-      error:
-        "ข้อมูล Local Storage ไม่ถูกต้อง ระบบแสดงข้อมูลต้นฉบับและระงับการบันทึกเพื่อป้องกันข้อมูลเดิมสูญหาย",
-    };
-  }
-}
-
-function persistWorkbook(workbook: StockProductsWorkbook): void {
-  const data: StockProductsStoredData = {
-    version: STOCK_PRODUCTS_STORAGE_VERSION,
-    workbook,
-  };
-  const serialized = JSON.stringify(data);
-
-  if (decodeWorkbook(serialized).error) {
-    throw new Error("โครงสร้างข้อมูลไม่ถูกต้อง ไม่สามารถบันทึกได้");
-  }
-
-  window.localStorage.setItem(STOCK_PRODUCTS_STORAGE_KEY, serialized);
-  window.dispatchEvent(new Event(STORAGE_EVENT));
+  return changes[0];
 }
 
 interface PaginationProps {
@@ -572,21 +706,45 @@ export function StockProductsWorkspace() {
   const [stockEditor, setStockEditor] = useState<StockEditor | null>(null);
   const [dailyEditor, setDailyEditor] = useState<DailyEditor | null>(null);
   const [soEditor, setSoEditor] = useState<SoEditor | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<StockProductsStockRow | null>(null);
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const snapshot = useSyncExternalStore(
-    subscribeStorage,
-    getStorageSnapshot,
-    getServerSnapshot,
-  );
-  const { workbook, error: storageError } = useMemo(
-    () => decodeWorkbook(snapshot),
-    [snapshot],
-  );
+  const [workbook, setWorkbook] =
+    useState<StockProductsWorkbook>(EMPTY_WORKBOOK);
+  const [loadState, setLoadState] = useState({ loading: true, error: "" });
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshRequired, setRefreshRequired] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveLock = useRef(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadStockWorkbook(controller.signal)
+      .then((next) => {
+        if (controller.signal.aborted) return;
+        setWorkbook(next);
+        setLoadState({ loading: false, error: "" });
+        setRefreshRequired(false);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setLoadState({
+          loading: false,
+          error: error instanceof StockApiError ? error.message : LOAD_FAILED,
+        });
+      });
+    return () => controller.abort();
+  }, [refreshToken]);
+
   const { stock, so_sheets: soSheets } = workbook;
-  const readOnly = Boolean(storageError);
+  const readOnly =
+    loadState.loading ||
+    Boolean(loadState.error) ||
+    refreshRequired ||
+    isSaving;
+
   const selectedStockRow =
     stock.rows.find((row) => stockProductsRowKey(row) === selectedStockKey) ??
     null;
@@ -632,174 +790,256 @@ export function StockProductsWorkspace() {
     setNotice("");
   }
 
-  function saveWorkbook(
-    nextWorkbook: StockProductsWorkbook,
-    expectedSnapshot: string | null,
-    message: string,
-  ): boolean {
+  function reloadWorkbook() {
+    if (
+      saveLock.current ||
+      loadState.loading ||
+      stockEditor ||
+      dailyEditor ||
+      soEditor ||
+      deleteTarget
+    )
+      return;
     clearFeedback();
+    setLoadState({ loading: true, error: "" });
+    setRefreshToken((previous) => previous + 1);
+  }
 
+  async function runSave<T>(
+    work: () => Promise<T>,
+    commit: (value: T) => void,
+    message: string,
+  ) {
+    if (readOnly || saveLock.current) return;
+    saveLock.current = true;
+    setIsSaving(true);
+    clearFeedback();
     try {
-      if (storageError) throw new Error(storageError);
-
-      if (
-        expectedSnapshot !== snapshot ||
-        getStorageSnapshot() !== expectedSnapshot
-      ) {
-        throw new Error(
-          "ข้อมูลมีการเปลี่ยนแปลง กรุณาปิดฟอร์มแล้วเปิดใหม่ก่อนบันทึก",
-        );
-      }
-
-      persistWorkbook(nextWorkbook);
+      const result = await work();
+      commit(result);
       setNotice(message);
-      return true;
     } catch (error) {
+      if (!(error instanceof StockApiError) || error.reloadRequired) {
+        setRefreshRequired(true);
+      }
       setSaveError(
-        error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้",
+        error instanceof StockApiError ? error.message : UNCERTAIN_SAVE,
       );
-      return false;
+    } finally {
+      saveLock.current = false;
+      setIsSaving(false);
     }
   }
 
   function openCreateProduct() {
+    if (readOnly || saveLock.current) return;
     clearFeedback();
-
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
-    const today = `${year}-${month}-${day}`;
     const row = blankStockProductsRow(crypto.randomUUID());
-
     setStockEditor({
       mode: "CREATE",
       row: {
         ...row,
-        item: {
-          ...row.item,
-          added_date: today,
-        },
+        item: { ...row.item, added_date: `${year}-${month}-${day}` },
       },
-      snapshot,
     });
   }
 
   function openEditProduct(row: StockProductsStockRow) {
+    if (readOnly || saveLock.current) return;
     clearFeedback();
-    setStockEditor({ mode: "EDIT", row, snapshot });
+    setStockEditor({ mode: "EDIT", row });
   }
 
-  function finishProductSave(
-    rows: readonly StockProductsStockRow[],
-    key: string,
-  ) {
-    setStockEditor(null);
-    setStockSearch("");
-    const index = rows.findIndex(
-      (current) => stockProductsRowKey(current) === key,
-    );
-    setStockPage(Math.floor(index / PAGE_SIZE) + 1);
+  function replaceProduct(saved: StockProductsStockRow) {
+    const rows = upsertStockProductsRow(stock.rows, saved);
+    setWorkbook((previous) => ({
+      ...previous,
+      stock: { ...previous.stock, rows },
+    }));
+    return rows;
   }
 
-  function saveProduct(row: StockProductsStockRow) {
-    if (!stockEditor) return;
-
-    const isCreate = stockEditor.mode === "CREATE";
+  async function saveProduct(row: StockProductsStockRow) {
+    if (!stockEditor || readOnly || saveLock.current) return;
+    const editor = stockEditor;
+    const isCreate = editor.mode === "CREATE";
     const key = stockProductsRowKey(row);
     const exists = stock.rows.some(
       (current) => stockProductsRowKey(current) === key,
     );
-
     if (
       isCreate === exists ||
-      (isCreate && !row.item.id?.trim()) ||
-      key !== stockProductsRowKey(stockEditor.row) ||
-      row.item.so_row_id !== stockEditor.row.item.so_row_id
+      key !== stockProductsRowKey(editor.row) ||
+      (!isCreate && !isDatabaseId(row.item.id)) ||
+      row.item.so_row_id !== editor.row.item.so_row_id
     ) {
-      setSaveError("ไม่สามารถระบุรายการสินค้าได้ กรุณาปิดฟอร์มแล้วเปิดใหม่");
+      setSaveError("ไม่สามารถระบุรายการสินค้าได้ กรุณาเปิดฟอร์มใหม่");
       return;
     }
-
-    const error = Object.values(
-      validateStockProductsRow(row, stockEditor.mode),
-    )[0];
+    const error = Object.values(validateStockProductsRow(row, editor.mode))[0];
     if (error) {
       setSaveError(error);
       return;
     }
+    await runSave(
+      async () => {
+        const payload = await writeStock(
+          isCreate ? "POST" : "PATCH",
+          productBody(row, editor, stock.period),
+        );
+        const saved = readSavedProduct(
+          payload,
+          stock.period,
+          isCreate ? undefined : editor.row.item.id,
+        );
+        if (
+          isCreate &&
+          stock.rows.some((current) => current.item.id === saved.item.id)
+        ) {
+          throw new StockApiError(UNCERTAIN_SAVE, true);
+        }
+        return saved;
+      },
+      (saved) => {
+        const rows = replaceProduct(saved);
+        setStockEditor(null);
+        setStockSearch("");
+        const index = rows.findIndex(
+          (current) =>
+            stockProductsRowKey(current) === stockProductsRowKey(saved),
+        );
+        setStockPage(Math.floor(index / PAGE_SIZE) + 1);
+      },
+      isCreate ? "เพิ่มสินค้าเรียบร้อยแล้ว" : "แก้ไขสินค้าเรียบร้อยแล้ว",
+    );
+  }
 
-    const rows = upsertStockProductsRow(stock.rows, row);
+  function openDeleteProduct(row: StockProductsStockRow) {
+    if (readOnly || saveLock.current) return;
+    clearFeedback();
+    setDeleteTarget(row);
+  }
+
+  function closeDeleteProduct() {
+    if (saveLock.current) return;
+    setDeleteTarget(null);
+    setSaveError("");
+  }
+
+  async function confirmDeleteProduct() {
+    if (!deleteTarget || readOnly || saveLock.current) return;
+    const target = deleteTarget;
+    const itemId = target.item.id;
     if (
-      !saveWorkbook(
-        { ...workbook, stock: { ...stock, rows } },
-        stockEditor.snapshot,
-        isCreate ? "เพิ่มสินค้าเรียบร้อยแล้ว" : "แก้ไขสินค้าเรียบร้อยแล้ว",
-      )
+      !isDatabaseId(itemId) ||
+      !stock.rows.some((row) => row.item.id === itemId)
     ) {
+      setSaveError(INVALID_RESPONSE);
       return;
     }
 
-    finishProductSave(rows, key);
-  }
-
-  function confirmDeleteProduct() {
-    if (!deleteTarget) return;
-    const key = stockProductsRowKey(deleteTarget.row);
-    const rows = removeStockProductsRow(stock.rows, key);
-
-    if (
-      !saveWorkbook(
-        { ...workbook, stock: { ...stock, rows } },
-        deleteTarget.snapshot,
-        "ลบสินค้าเรียบร้อยแล้ว",
-      )
-    )
-      return;
-
-    setDeleteTarget(null);
-    if (selectedStockKey === key) setSelectedStockKey(null);
-    setStockPage(currentStockPage);
+    await runSave(
+      async () => {
+        const payload = await writeStock("DELETE", {
+          action: "delete_product",
+          item_id: itemId,
+          period: stock.period,
+          expected: {
+            item: { id: itemId, ...productFields(target) },
+            summary: target.summary,
+            remark: target.remark,
+            daily: target.daily,
+          },
+        });
+        if (payload.item_id !== itemId) {
+          throw new StockApiError(UNCERTAIN_SAVE, true);
+        }
+        return itemId;
+      },
+      (deletedId) => {
+        setWorkbook((previous) => ({
+          ...previous,
+          stock: {
+            ...previous.stock,
+            rows: previous.stock.rows.filter(
+              (row) => row.item.id !== deletedId,
+            ),
+          },
+        }));
+        if (selectedStockKey === stockProductsRowKey(target)) {
+          setSelectedStockKey(null);
+        }
+        setDeleteTarget(null);
+        setStockPage(currentStockPage);
+      },
+      "ลบสินค้าออกจากเดือนรายงานเรียบร้อยแล้ว",
+    );
   }
 
   function openDailyEditor(row: StockProductsStockRow, date: string) {
+    if (readOnly || saveLock.current) return;
     clearFeedback();
     setSelectedStockKey(null);
-    setDailyEditor({ row, date, snapshot });
+    setDailyEditor({ row, date });
   }
 
   function closeDailyEditor() {
+    if (saveLock.current) return;
     if (dailyEditor) setSelectedStockKey(stockProductsRowKey(dailyEditor.row));
     setDailyEditor(null);
     setSaveError("");
   }
 
-  function saveDaily(row: StockProductsStockRow) {
-    if (!dailyEditor) return;
-    const key = stockProductsRowKey(row);
-
+  async function saveDaily(row: StockProductsStockRow) {
+    if (!dailyEditor || readOnly || saveLock.current) return;
+    const previous = dailyEditor.row;
+    const itemId = previous.item.id;
     if (
-      key !== stockProductsRowKey(dailyEditor.row) ||
-      !stock.rows.some((current) => stockProductsRowKey(current) === key)
+      !isDatabaseId(itemId) ||
+      stockProductsRowKey(row) !== stockProductsRowKey(previous) ||
+      !stock.rows.some((current) => current.item.id === itemId)
     ) {
-      setSaveError("ไม่พบสินค้าที่ต้องการบันทึก กรุณาเปิดฟอร์มใหม่");
+      setSaveError("ไม่พบสินค้าที่ต้องการบันทึก");
       return;
     }
-
-    const rows = upsertStockProductsRow(stock.rows, row);
-    if (
-      !saveWorkbook(
-        { ...workbook, stock: { ...stock, rows } },
-        dailyEditor.snapshot,
-        "บันทึกข้อมูลรับ-จ่ายเรียบร้อยแล้ว",
-      )
-    )
+    let change: ReturnType<typeof dailyChange>;
+    try {
+      change = dailyChange(previous, row, stock.period);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : INVALID_RESPONSE);
       return;
-
-    closeDailyEditor();
+    }
+    if (!change) {
+      closeDailyEditor();
+      return;
+    }
+    await runSave(
+      async () => {
+        const payload = await writeStock("POST", {
+          action: "save_daily",
+          item_id: itemId,
+          period: stock.period,
+          date: change.date,
+          values: change.values,
+          expected: change.expected,
+        });
+        return readSavedProduct(payload, stock.period, itemId);
+      },
+      (saved) => {
+        replaceProduct(saved);
+        setDailyEditor(null);
+        setSelectedStockKey(stockProductsRowKey(saved));
+      },
+      "บันทึกข้อมูลรับ-จ่ายเรียบร้อยแล้ว",
+    );
   }
 
   function openCreateSo() {
+    if (readOnly || saveLock.current) return;
     clearFeedback();
     setSoEditor({
       id: crypto.randomUUID(),
@@ -807,40 +1047,71 @@ export function StockProductsWorkspace() {
         selectedSheet === "ALL"
           ? STOCK_PRODUCTS_SO_SHEET_NAMES[0]
           : selectedSheet,
-      snapshot,
     });
   }
 
-  function saveSo(row: StockProductsSoRow) {
-    if (!soEditor) return;
-
-    if (row.id !== soEditor.id) {
-      setSaveError("ไม่สามารถระบุรายการ SO ได้ กรุณาปิดฟอร์มแล้วเปิดใหม่");
+  async function saveSo(row: StockProductsSoRow) {
+    if (!soEditor || readOnly || saveLock.current) return;
+    const selected = stock.rows.find(
+      (current) => stockProductsRowKey(current) === row.stock_row_key,
+    );
+    if (
+      row.id !== soEditor.id ||
+      !selected ||
+      !isDatabaseId(selected.item.id)
+    ) {
+      setSaveError("กรุณาเลือกสินค้าจากสต็อก");
       return;
     }
-
-    try {
-      const nextWorkbook = appendStockProductsSoForStock(workbook, row);
-      const sheets = nextWorkbook.so_sheets;
-      if (
-        !saveWorkbook(
-          nextWorkbook,
-          soEditor.snapshot,
-          "เพิ่มรายการ SO เรียบร้อยแล้ว",
-        )
-      )
-        return;
-
-      const sheet = sheets.find((current) => current.name === row.sheet_name);
-      setSoEditor(null);
-      setSelectedSheet(row.sheet_name);
-      setSoSearch("");
-      setSoPage(Math.max(1, Math.ceil((sheet?.rows.length ?? 0) / PAGE_SIZE)));
-    } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "ไม่สามารถเพิ่มรายการ SO ได้",
-      );
+    const error = Object.values(
+      validateStockProductsSoForStock(row, stock.rows),
+    )[0];
+    if (error) {
+      setSaveError(error);
+      return;
     }
+    const itemId = selected.item.id;
+    await runSave(
+      async () => {
+        const payload = await writeStock("POST", {
+          action: "create_so",
+          item_id: itemId,
+          period: stock.period,
+          sheet_name: row.sheet_name,
+          date_raw: String(row.date_raw).trim(),
+          customer_name: row.customer_name.trim(),
+          so_number: row.so_number.trim(),
+          quantity: row.quantity.trim(),
+          unit: row.unit.trim(),
+        });
+        const saved = payload.row;
+        if (
+          !isSoRow(saved) ||
+          saved.sheet_name !== row.sheet_name ||
+          saved.stock_row_key !== stockProductsRowKey(selected) ||
+          soSheets.some((sheet) =>
+            sheet.rows.some((current) => current.id === saved.id),
+          )
+        ) {
+          throw new StockApiError(UNCERTAIN_SAVE, true);
+        }
+        return saved;
+      },
+      (saved) => {
+        const sheets = appendStockProductsSoRow(soSheets, saved);
+        const sheet = sheets.find(
+          (current) => current.name === saved.sheet_name,
+        );
+        setWorkbook((previous) => ({ ...previous, so_sheets: sheets }));
+        setSoEditor(null);
+        setSelectedSheet(saved.sheet_name);
+        setSoSearch("");
+        setSoPage(
+          Math.max(1, Math.ceil((sheet?.rows.length ?? 0) / PAGE_SIZE)),
+        );
+      },
+      "เพิ่มรายการ SO เรียบร้อยแล้ว",
+    );
   }
 
   function chooseSoSheet(next: string) {
@@ -864,12 +1135,29 @@ export function StockProductsWorkspace() {
         actions={<Badge variant="outline">{COPY.storage}</Badge>}
       />
 
-      {storageError && (
+      {loadState.loading && (
+        <p
+          role="status"
+          className="rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground"
+        >
+          กำลังโหลดข้อมูลจากฐานข้อมูล...
+        </p>
+      )}
+      {(loadState.error || refreshRequired) && (
         <p
           role="alert"
           className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
         >
-          {storageError}
+          {loadState.error ||
+            "กรุณาปิดฟอร์มและโหลดข้อมูลใหม่ก่อนบันทึกอีกครั้ง"}
+        </p>
+      )}
+      {isSaving && (
+        <p
+          role="status"
+          className="fixed right-4 bottom-4 z-1000 max-w-sm rounded-lg border border-border bg-background p-4 text-sm shadow-lg"
+        >
+          กำลังบันทึกข้อมูล...
         </p>
       )}
       {notice && (
@@ -901,11 +1189,22 @@ export function StockProductsWorkspace() {
             </p>
           </div>
         </div>
-        <Badge variant="secondary">
-          {snapshot !== null && !storageError
-            ? "ข้อมูลในเบราว์เซอร์"
-            : COPY.source}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{COPY.storage}</Badge>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              loadState.loading ||
+              isSaving ||
+              Boolean(stockEditor || dailyEditor || soEditor || deleteTarget)
+            }
+            onClick={reloadWorkbook}
+          >
+            โหลดข้อมูลใหม่
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1036,7 +1335,7 @@ export function StockProductsWorkspace() {
                         colSpan={18}
                         className="py-10 text-center text-muted-foreground"
                       >
-                        {COPY.noStock}
+                        {loadState.loading ? "กำลังโหลด..." : COPY.noStock}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1102,12 +1401,9 @@ export function StockProductsWorkspace() {
                               variant="ghost"
                               disabled={readOnly}
                               title="ลบสินค้า"
-                              aria-label={`ลบ ${row.item.name}`}
+                              aria-label={`ลบสินค้า ${row.item.name}`}
                               className="text-danger"
-                              onClick={() => {
-                                clearFeedback();
-                                setDeleteTarget({ row, snapshot });
-                              }}
+                              onClick={() => openDeleteProduct(row)}
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
                             </Button>
@@ -1205,7 +1501,7 @@ export function StockProductsWorkspace() {
                         colSpan={7}
                         className="py-10 text-center text-muted-foreground"
                       >
-                        {COPY.noSo}
+                        {loadState.loading ? "กำลังโหลด..." : COPY.noSo}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1249,7 +1545,7 @@ export function StockProductsWorkspace() {
       )}
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        {COPY.mockHint} · {COPY.stockHint} · {COPY.soHint}
+        {COPY.databaseHint} · {COPY.stockHint} · {COPY.soHint}
       </p>
 
       <Dialog
@@ -1309,8 +1605,11 @@ export function StockProductsWorkspace() {
           key={stockProductsRowKey(stockEditor.row)}
           row={stockEditor.row}
           mode={stockEditor.mode}
-          onSave={saveProduct}
+          onSave={(row) => {
+            void saveProduct(row);
+          }}
           onCancel={() => {
+            if (saveLock.current) return;
             setStockEditor(null);
             setSaveError("");
           }}
@@ -1323,7 +1622,9 @@ export function StockProductsWorkspace() {
           row={dailyEditor.row}
           period={stock.period}
           initialDate={dailyEditor.date}
-          onSave={saveDaily}
+          onSave={(row) => {
+            void saveDaily(row);
+          }}
           onCancel={closeDailyEditor}
         />
       )}
@@ -1334,8 +1635,11 @@ export function StockProductsWorkspace() {
           id={soEditor.id}
           initialSheet={soEditor.sheet}
           stockRows={stock.rows}
-          onSave={saveSo}
+          onSave={(row) => {
+            void saveSo(row);
+          }}
           onCancel={() => {
+            if (saveLock.current) return;
             setSoEditor(null);
             setSaveError("");
           }}
@@ -1345,42 +1649,45 @@ export function StockProductsWorkspace() {
       <Dialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-            setSaveError("");
-          }
+          if (!open) closeDeleteProduct();
         }}
       >
-        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] sm:max-w-md"
+          showCloseButton={!isSaving}
+        >
           <DialogTitle>ยืนยันการลบสินค้า</DialogTitle>
           <DialogDescription>
-            สินค้าและข้อมูลรับ-จ่ายรายวันของสินค้านี้จะถูกนำออกจากข้อมูลที่บันทึก
-            โดยไม่ลบรายการ SO หรือแก้ไข Excel ต้นฉบับ
+            สินค้าจะถูกนำออกจากสต็อกของเดือนที่แสดง โดยไม่ลบทะเบียนสินค้า
+            ข้อมูลรับ-จ่าย หรือ SO ออกจากฐานข้อมูล
           </DialogDescription>
           {deleteTarget && (
             <div className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/25 p-4">
-                <p className="font-semibold">{deleteTarget.row.item.name}</p>
+                <p className="font-semibold">{deleteTarget.item.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  รหัสสินค้า: {originalCell(deleteTarget.row.item.code)} ·
-                  ข้อมูลรายวัน {deleteTarget.row.daily.length} วัน
+                  {monthLabel(stock.period.year_be, stock.period.month)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  รหัสสินค้า: {originalCell(deleteTarget.item.code)} ·
+                  ข้อมูลรายวัน {deleteTarget.daily.length} วัน
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setDeleteTarget(null);
-                    setSaveError("");
-                  }}
+                  disabled={isSaving}
+                  onClick={closeDeleteProduct}
                 >
                   ยกเลิก
                 </Button>
                 <Button
                   type="button"
                   disabled={readOnly}
-                  onClick={confirmDeleteProduct}
+                  onClick={() => {
+                    void confirmDeleteProduct();
+                  }}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                   ยืนยันการลบ

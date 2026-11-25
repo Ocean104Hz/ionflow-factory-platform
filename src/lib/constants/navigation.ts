@@ -164,19 +164,19 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "WAREHOUSE",
-    title: "วัสดุคงเหลือ Foliar Fertilizer",
+    title: "วัสดุคงเหลือ ",
     href: "/stock_remaining_materials_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก WIP Foliar Fertilizer",
+    title: "สต็อก WIP ",
     href: "/stock_wip_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก RM Foliar Fertilizer",
+    title: "สต็อก RM ",
     href: "/stock_rm_ff",
     icon: Boxes,
   },
