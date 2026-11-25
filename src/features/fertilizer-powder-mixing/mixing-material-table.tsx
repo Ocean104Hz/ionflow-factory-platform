@@ -17,9 +17,9 @@ import {
   SectionCard,
   type Column,
 } from "@/src/components/factory/patterns";
-import { mixingCatalog } from "@/src/lib/mock-data/fertilizer-powder-mixing";
 import { quantity } from "@/src/lib/formatters";
 import { MixingField } from "./mixing-header";
+import { useMixing } from "./mixing-provider";
 import type { Material, FieldErrors } from "./mixing-domain";
 
 export function MixingMaterialTable({
@@ -31,6 +31,7 @@ export function MixingMaterialTable({
   onChange?: (rows: Material[]) => void;
   errors?: FieldErrors;
 }) {
+  const { catalog, loading, busy, error } = useMixing();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const update = (index: number, patch: Partial<Material>) =>
@@ -88,9 +89,9 @@ export function MixingMaterialTable({
     { key: "unit", label: "หน่วย", render: (r) => r.unit },
     {
       key: "stock",
-      label: "คงเหลือจำลอง (อ้างอิง)",
+      label: "คงเหลือ (อ้างอิง)",
       numeric: true,
-      render: (r) => quantity(r.stock_balance),
+      render: (r) => r.stock_balance === null ? "—" : quantity(r.stock_balance),
     },
   ];
   if (onChange)
@@ -103,6 +104,7 @@ export function MixingMaterialTable({
           variant="ghost"
           size="icon"
           aria-label={`ลบวัตถุดิบ ${i + 1}`}
+          disabled={busy}
           onClick={() => onChange(rows.filter((m) => m.id !== r.id))}
         >
           <Trash2 aria-hidden="true" />
@@ -114,12 +116,12 @@ export function MixingMaterialTable({
       title="วัตถุดิบตามใบสั่งผสม"
       className="gap-3 border-0 py-2 shadow-none"
       contentClassName="px-0"
-      subtitle="จำนวนตามแผน ไม่ใช่ยอดใช้จริง · คงเหลือเป็นข้อมูลจำลอง ไม่จองหรือตัดสต็อก"
+      subtitle="จำนวนตามแผน ไม่ใช่ยอดใช้จริง · ยังไม่เชื่อมยอดคงเหลือ ไม่จองหรือตัดสต็อก"
       action={
         onChange && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button type="button" variant="outline">
+              <Button type="button" variant="outline" disabled={loading || busy || !!error}>
                 <Plus aria-hidden="true" />
                 เพิ่มวัตถุดิบ
               </Button>
@@ -127,7 +129,7 @@ export function MixingMaterialTable({
             <DialogContent className="max-h-[85dvh] w-[94vw] max-w-[94vw] overflow-y-auto sm:max-w-4xl">
               <DialogHeader>
                 <DialogTitle>ค้นหาวัตถุดิบ</DialogTitle>
-                <DialogDescription>เลือกจากรายการวัตถุดิบจำลองของโมดูลนี้</DialogDescription>
+                <DialogDescription>เลือกจากรายการวัตถุดิบใน Master Data</DialogDescription>
               </DialogHeader>
               <Label htmlFor="mix-material-search">
                 ค้นหารหัส / ชื่อวัตถุดิบ
@@ -137,7 +139,7 @@ export function MixingMaterialTable({
                 <Input id="mix-material-search" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               <div className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
-                {mixingCatalog
+                {catalog
                   .filter((m) =>
                     `${m.material_code} ${m.material_name}`
                       .toLowerCase()
@@ -149,12 +151,16 @@ export function MixingMaterialTable({
                       type="button"
                       variant="ghost"
                       className="h-auto w-full justify-start py-3 text-left whitespace-normal"
+                      disabled={busy || loading || !!error}
                       onClick={() => {
                         onChange([
                           ...rows,
                           {
-                            ...m,
                             id: crypto.randomUUID(),
+                            material_code: m.material_code,
+                            material_name: m.material_name,
+                            unit: m.unit,
+                            stock_balance: m.stock_balance,
                             lot_no: "",
                             order_qty: 1,
                           },
@@ -166,19 +172,18 @@ export function MixingMaterialTable({
                       <span>
                         <span className="block">{m.material_name}</span>
                         <span className="block text-xs text-muted-foreground">
-                          {m.material_code} · {quantity(m.stock_balance)}{" "}
-                          {m.unit} (จำลอง)
+                          {m.material_code} · — {m.unit}
                         </span>
                       </span>
                     </Button>
                   ))}
-                {!mixingCatalog.some((m) =>
+                {!catalog.some((m) =>
                   `${m.material_code} ${m.material_name}`
                     .toLowerCase()
                     .includes(search.toLowerCase()),
                 ) && (
                   <p className="p-3 text-sm text-muted-foreground">
-                    ไม่พบวัตถุดิบ
+                    {error || (loading ? "กำลังโหลดวัตถุดิบ" : "ไม่พบวัตถุดิบ")}
                   </p>
                 )}
               </div>

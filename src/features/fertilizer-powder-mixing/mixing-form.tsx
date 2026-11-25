@@ -10,6 +10,7 @@ import {
   type MixingReport,
   type FieldErrors,
 } from "./mixing-domain";
+
 export function MixingForm({
   initial,
   onSaved,
@@ -22,8 +23,10 @@ export function MixingForm({
   const [row, setRow] = useState(() => structuredClone(initial));
   const [errors, setErrors] = useState<FieldErrors>({});
   const summary = useRef<HTMLDivElement>(null);
-  const { save } = useMixing();
+  const submitting = useRef(false);
+  const { save, busy, loading, error: loadError } = useMixing();
   const patch = (value: Partial<MixingReport>) => {
+    if (submitting.current || busy) return;
     setRow((r) => ({ ...r, ...value }));
     onDirtyChange?.();
   };
@@ -32,12 +35,15 @@ export function MixingForm({
       id="mixing-editor"
       noValidate
       className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (submitting.current || busy || loading || loadError) return;
+        submitting.current = true;
+        setErrors({});
         try {
-          save(row);
+          await save(row);
           onSaved();
-        } catch (error) {
+        } catch (error: unknown) {
           setErrors(
             error instanceof MixingValidationError
               ? error.fields
@@ -47,6 +53,8 @@ export function MixingForm({
                 },
           );
           summary.current?.focus();
+        } finally {
+          submitting.current = false;
         }
       }}
     >

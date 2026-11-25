@@ -22,6 +22,17 @@ import {
   DialogFooter,
 } from "@/src/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/src/components/ui/alert-dialog";
+import {
   PageHeader,
   FactoryDataTable,
   Pagination,
@@ -29,7 +40,6 @@ import {
   StatusBadge,
   type Column,
 } from "@/src/components/factory/patterns";
-import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { date, dateTime } from "@/src/lib/formatters";
 import { useMixing } from "./mixing-provider";
 import {
@@ -49,6 +59,33 @@ import {
   MixingExportPreview,
   MixingImportPreview,
 } from "./mixing-import-preview";
+import type { ReactNode } from "react";
+
+// Same existing AlertDialog primitives; the shared demo ConfirmDialog appends
+// a misleading demo-only notice, so keep the real archive confirmation local.
+function ConfirmDialog({ title, description, trigger, onConfirm, disabled }: {
+  title: string;
+  description: string;
+  trigger: ReactNode;
+  onConfirm: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+      <AlertDialogContent className="bg-surface">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+          <AlertDialogAction disabled={disabled} onClick={onConfirm}>ยืนยัน</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 function newReport(records: MixingReport[]) {
   const day = new Intl.DateTimeFormat("en-CA", {
@@ -57,11 +94,13 @@ function newReport(records: MixingReport[]) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  // Preserve the existing document-number suggestion until the owner approves a real prefix.
   return blankReport(day, nextDocumentNumber(records, `MIX-DEMO-${day.replaceAll("-", "")}`));
 }
 
 export function MixingList() {
-  const { records, remove, copy } = useMixing();
+  const { records, remove, copy, loading, busy, error } = useMixing();
+  const blocked = loading || busy || !!error;
   const [draft, setDraft] = useState(emptyFilters);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
@@ -86,10 +125,12 @@ export function MixingList() {
   const selectedRows = filtered.filter((r) => selected.includes(r.id));
   const report = records.find((r) => r.id === panel?.id);
   function openFormTab() {
+    if (busy) return;
     if (!editor) setEditor(newReport(records));
     setActiveTab("form");
   }
   function startEditor(row?: MixingReport) {
+    if (blocked) return;
     if (dirty && !window.confirm("มีข้อมูลที่ยังไม่ได้บันทึก ต้องการละทิ้งการแก้ไขหรือไม่?")) return;
     setEditor(row ? structuredClone(row) : newReport(records));
     setEditorKey((key) => key + 1);
@@ -99,16 +140,19 @@ export function MixingList() {
   }
   const allChecked =
     visible.length > 0 && visible.every((r) => selected.includes(r.id));
-  function act(action: () => void, success: string) {
+  async function act(action: () => Promise<void>, success: string): Promise<boolean> {
+    if (blocked) return false;
     try {
-      action();
+      await action();
       setMessage(success);
-    } catch (e) {
+      return true;
+    } catch (e: unknown) {
       setMessage(e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
+      return false;
     }
   }
   function copyRow(row: MixingReport) {
-    act(
+    return act(
       () => copy(row.id),
       "คัดลอกเป็นเอกสารใหม่แล้ว · ล้างผลตรวจและผู้ลงชื่อเพื่อบันทึกใหม่",
     );
@@ -240,6 +284,7 @@ export function MixingList() {
             size="icon"
             className="size-9 hover:bg-primary/5 hover:text-primary"
             aria-label={`แก้ไข ${r.doc_no}`}
+            disabled={blocked}
             onClick={() => startEditor(r)}
           >
             <Pencil aria-hidden="true" />
@@ -249,6 +294,7 @@ export function MixingList() {
             size="icon"
             className="size-9 hover:bg-primary/5 hover:text-primary"
             aria-label={`คัดลอก ${r.doc_no}`}
+            disabled={blocked}
             onClick={() => copyRow(r)}
           >
             <Copy aria-hidden="true" />
@@ -268,25 +314,28 @@ export function MixingList() {
           <ConfirmDialog
             title={`ลบรายงาน ${r.doc_no}?`}
             description="ลบเฉพาะรายงานนี้ ไม่กระทบสต็อกหรือสูตร BOM"
+            disabled={blocked}
             trigger={
               <Button
                 variant="ghost"
                 size="icon"
                 className="size-9 text-danger hover:bg-danger/10 hover:text-danger"
                 aria-label={`ลบ ${r.doc_no}`}
+                disabled={blocked}
               >
                 <Trash2 aria-hidden="true" />
               </Button>
             }
             onConfirm={() =>
-              act(() => {
+              act(async () => {
                 if (editor?.id === r.id && dirty) {
                   throw new Error("กรุณาบันทึกหรือยกเลิกการแก้ไขเอกสารนี้ก่อนลบ");
                 }
-                remove(r.id);
+                if (!r.version) throw new Error("ไม่พบเวอร์ชันเอกสาร กรุณาโหลดข้อมูลใหม่");
+                await remove(r.id, r.version);
                 if (editor?.id === r.id) setEditor(null);
                 setSelected((ids) => ids.filter((id) => id !== r.id));
-              }, "ลบรายงานจำลองแล้ว")
+              }, "ลบรายงานแล้ว")
             }
           />
         </div>
@@ -295,14 +344,14 @@ export function MixingList() {
   ];
   return (
     <div className="space-y-5">
-      <PageHeader title="รายงานผสมปุ๋ยผง" description="ข้อมูลจำลองในเซสชันนี้ · ยังไม่ได้เชื่อม API" />
+      <PageHeader title="รายงานผสมปุ๋ยผง" description={error ? `โหลดข้อมูลไม่สำเร็จ: ${error} · กรุณารีโหลดหน้า` : loading ? "กำลังโหลดข้อมูลจาก API" : "รายงานผสมปุ๋ยผง · บันทึกผ่าน API"} />
       <div className="flex justify-center py-1">
         <div role="group" aria-label="หน้ารายงานผสมปุ๋ยผง" className="inline-flex w-full max-w-xl rounded-full border border-border bg-card p-1 shadow-sm">
-          <button type="button" aria-pressed={activeTab === "form"} onClick={openFormTab}
+          <button type="button" disabled={busy} aria-pressed={activeTab === "form"} onClick={openFormTab}
             className={`flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${activeTab === "form" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted"}`}>
             แบบฟอร์มรายงานผสม
           </button>
-          <button type="button" aria-pressed={activeTab === "history"} onClick={() => setActiveTab("history")}
+          <button type="button" disabled={busy} aria-pressed={activeTab === "history"} onClick={() => { if (!busy) setActiveTab("history"); }}
             className={`flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${activeTab === "history" ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted"}`}>
             ประวัติรายงานผสม
           </button>
@@ -313,31 +362,31 @@ export function MixingList() {
           {editor.id && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-warning">
               <span>กำลังแก้ไขเอกสาร: {editor.doc_no}</span>
-              <Button type="button" variant="outline" size="sm" onClick={() => startEditor()}>ยกเลิกการแก้ไข</Button>
+              <Button type="button" variant="outline" size="sm" disabled={blocked} onClick={() => startEditor()}>ยกเลิกการแก้ไข</Button>
             </div>
           )}
           <div className="flex flex-wrap items-center justify-end gap-2">
             <MixingImportPreview />
-            <Button type="button" variant="outline" onClick={() => startEditor()}>
+            <Button type="button" variant="outline" disabled={blocked} onClick={() => startEditor()}>
               <Plus aria-hidden="true" /> สร้างรายงานใหม่
             </Button>
           </div>
           <MixingForm key={editorKey} initial={editor} onDirtyChange={() => setDirty(true)} onSaved={() => {
             setEditor(null);
             setDirty(false);
-            setMessage("บันทึกรายงานจำลองแล้ว");
+            setMessage("บันทึกรายงานแล้ว");
             setActiveTab("history");
           }} />
           <div className="flex justify-end gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
-            <Button type="button" variant="outline" onClick={() => startEditor()}>ล้างแบบฟอร์ม</Button>
-            <Button type="submit" form="mixing-editor">บันทึกรายงาน</Button>
+            <Button type="button" variant="outline" disabled={blocked} onClick={() => startEditor()}>ล้างแบบฟอร์ม</Button>
+            <Button type="submit" form="mixing-editor" disabled={blocked}>บันทึกรายงาน</Button>
           </div>
         </div>
       )}
       <div className={activeTab === "history" ? "space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm" : "hidden"}>
       <h2 className="border-b border-border pb-3 text-base font-semibold">ข้อมูลที่บันทึก</h2>
       <form
-        className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-7"
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
@@ -441,8 +490,7 @@ export function MixingList() {
         </div>
       </div>
       <p role="status" className="text-sm text-muted-foreground">
-        {message ||
-          "ข้อมูลจำลอง · อยู่ต่อเมื่อเปลี่ยนหน้าภายในระบบ และคืนค่าเมื่อรีโหลดเบราว์เซอร์"}
+        {error || (loading ? "กำลังโหลดข้อมูล" : busy ? "กำลังดำเนินการ" : message || "ข้อมูลรายงานจาก API")}
       </p>
       <div className="[&_.factory-table_thead]:bg-primary! [&_.factory-table_thead_tr]:bg-primary! [&_.factory-table_thead_th]:text-primary-foreground! [&_.factory-table_td]:py-2!">
       <FactoryDataTable
@@ -464,18 +512,17 @@ export function MixingList() {
       <Dialog
         open={panel !== null}
         onOpenChange={(open) => {
-          if (!open) setPanel(null);
+          if (!open && !busy) setPanel(null);
         }}
       >
         <DialogContent className="flex max-h-[94dvh] w-[97vw] max-w-[97vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1600px]">
           <DialogHeader className="shrink-0 border-b px-5 py-5 pr-14">
             <DialogTitle>รายละเอียดรายงานผสมปุ๋ยผง</DialogTitle>
             <DialogDescription>
-              {report?.doc_no} · ข้อมูลจำลอง
-              ไม่เชื่อมต่อสต็อกหรือระบบอนุมัติจริง
+              {report?.doc_no} · ไม่เชื่อมต่อสต็อกหรือระบบอนุมัติจริง
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 p-4 scrollbar-none [&::-webkit-scrollbar]:hidden sm:p-5">
             {report ? <MixingDetail row={report} /> : <p>ไม่พบรายงาน อาจถูกลบแล้ว</p>}
           </div>
           <DialogFooter className="shrink-0 border-t bg-card px-5 py-3">
@@ -484,8 +531,9 @@ export function MixingList() {
                 <MixingPrintPreview rows={[report]} />
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    copyRow(report);
+                  disabled={blocked}
+                  onClick={async () => {
+                    await copyRow(report);
                     setPanel(null);
                   }}
                 >
@@ -493,6 +541,7 @@ export function MixingList() {
                   คัดลอกเป็นใหม่
                 </Button>
                 <Button
+                  disabled={blocked}
                   onClick={() => startEditor(report)}
                 >
                   <Pencil aria-hidden="true" />
@@ -500,7 +549,7 @@ export function MixingList() {
                 </Button>
               </>
             )}
-            <Button variant="outline" onClick={() => setPanel(null)}>
+            <Button variant="outline" disabled={busy} onClick={() => setPanel(null)}>
               ปิดรายละเอียด
             </Button>
           </DialogFooter>
