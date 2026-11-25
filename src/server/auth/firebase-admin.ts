@@ -70,3 +70,21 @@ export async function findFirebaseUserByEmail(email: string) {
     throw new FactoryAuthError("INVALID_REQUEST", 400);
   }
 }
+
+export async function sendFirebasePasswordSetupEmail(uid: string): Promise<void> {
+  const apiKey = process.env.FIREBASE_WEB_API_KEY;
+  if (!apiKey) throw new FactoryAuthError("AUTH_UNAVAILABLE", 503);
+  const identity = await getAuth(firebaseApp()).getUser(uid);
+  if (!identity.email || !identity.emailVerified || identity.disabled)
+    throw new FactoryAuthError("INVALID_REQUEST", 400);
+
+  const endpoint = new URL("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode");
+  endpoint.searchParams.set("key", apiKey);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Firebase-Locale": "th" },
+    body: JSON.stringify({ requestType: "PASSWORD_RESET", email: identity.email }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new FactoryAuthError("AUTH_UNAVAILABLE", 503);
+}

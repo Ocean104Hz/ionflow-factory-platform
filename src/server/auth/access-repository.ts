@@ -160,6 +160,16 @@ export async function listAccessAdministration(): Promise<{
   });
 }
 
+export async function findAccessUserUid(id: string): Promise<string | null> {
+  return withClient(async (client) => {
+    const result = await client.query<{ firebase_uid: string }>(
+      "SELECT firebase_uid FROM foliar_fertilizer.app_users WHERE id=$1",
+      [id],
+    );
+    return result.rows[0]?.firebase_uid ?? null;
+  });
+}
+
 export async function saveAccessUser(input: {
   firebaseUid: string;
   email: string;
