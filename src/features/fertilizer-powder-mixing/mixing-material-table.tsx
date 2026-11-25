@@ -1,14 +1,17 @@
 "use client";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/src/components/ui/popover";
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/src/components/ui/dialog";
 import {
   FactoryDataTable,
   SectionCard,
@@ -109,29 +112,31 @@ export function MixingMaterialTable({
   return (
     <SectionCard
       title="วัตถุดิบตามใบสั่งผสม"
+      className="gap-3 border-0 py-2 shadow-none"
+      contentClassName="px-0"
       subtitle="จำนวนตามแผน ไม่ใช่ยอดใช้จริง · คงเหลือเป็นข้อมูลจำลอง ไม่จองหรือตัดสต็อก"
       action={
         onChange && (
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
               <Button type="button" variant="outline">
                 <Plus aria-hidden="true" />
                 เพิ่มวัตถุดิบ
               </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-[min(480px,90vw)] space-y-3"
-            >
+            </DialogTrigger>
+            <DialogContent className="max-h-[85dvh] w-[94vw] max-w-[94vw] overflow-y-auto sm:max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>ค้นหาวัตถุดิบ</DialogTitle>
+                <DialogDescription>เลือกจากรายการวัตถุดิบจำลองของโมดูลนี้</DialogDescription>
+              </DialogHeader>
               <Label htmlFor="mix-material-search">
                 ค้นหารหัส / ชื่อวัตถุดิบ
               </Label>
-              <Input
-                id="mix-material-search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <div className="max-h-64 space-y-1 overflow-y-auto">
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="mix-material-search" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+              <div className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
                 {mixingCatalog
                   .filter((m) =>
                     `${m.material_code} ${m.material_name}`
@@ -177,8 +182,8 @@ export function MixingMaterialTable({
                   </p>
                 )}
               </div>
-            </PopoverContent>
-          </Popover>
+            </DialogContent>
+          </Dialog>
         )
       }
     >
@@ -187,12 +192,14 @@ export function MixingMaterialTable({
           {errors.materials}
         </p>
       )}
+      <div className="[&_.factory-table_td]:py-2! [&_.factory-table_th]:px-3! [&_.factory-table_td]:px-3!">
       <FactoryDataTable
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
-        minWidth={850}
+        minWidth={760}
       />
+      </div>
     </SectionCard>
   );
 }

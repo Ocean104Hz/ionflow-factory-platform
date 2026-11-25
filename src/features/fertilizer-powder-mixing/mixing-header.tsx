@@ -10,10 +10,9 @@ import {
 } from "@/src/components/factory/patterns";
 import {
   mixingFormulas,
-  mixingLocations,
 } from "@/src/lib/mock-data/fertilizer-powder-mixing";
 import { date } from "@/src/lib/formatters";
-import { shifts, type MixingReport, type FieldErrors } from "./mixing-domain";
+import { type MixingReport, type FieldErrors } from "./mixing-domain";
 import { MasterSelect } from "@/src/features/master-data/master-select";
 import { useMasterData } from "@/src/features/master-data/master-provider";
 
@@ -52,7 +51,8 @@ export function MixingHeader({
   const { state } = useMasterData();
   return (
     <SectionCard
-      title="ข้อมูลรายงาน"
+      title="ส่วนหัวเอกสาร"
+      className="gap-3 rounded-xl border bg-card py-3 shadow-sm [&_[data-slot=card-header]]:border-b [&_[data-slot=card-header]]:px-4 [&_[data-slot=card-header]]:pb-3 [&_[data-slot=card-content]]:px-4"
       subtitle={
         onChange ? "ระบุข้อมูลการผสม · ช่องที่มี * จำเป็นต้องกรอก" : undefined
       }
@@ -77,7 +77,7 @@ export function MixingHeader({
           ))}
         </InfoGrid>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MixingField
             label="วันที่รายงาน *"
             type="date"
@@ -86,11 +86,29 @@ export function MixingHeader({
             error={errors.report_date}
           />
           <MixingField
+            label="Lot No. *"
+            value={row.lot_no}
+            onChange={(e) => onChange({ lot_no: e.target.value })}
+            error={errors.lot_no}
+          />
+          <MixingField
             label="เลขที่เอกสาร *"
             value={row.doc_no}
             onChange={(e) => onChange({ doc_no: e.target.value })}
             error={errors.doc_no}
           />
+          <div>
+            <MasterSelect
+              kind="areas"
+              reference={row.masterRefs?.location}
+              label="สถานที่ผสม *"
+              value={row.location}
+              onChange={(location) => onChange({ location })}
+            />
+            {errors.location && (
+              <p className="mt-2 text-xs text-danger">{errors.location}</p>
+            )}
+          </div>
           <div>
             <SelectField
               label="สูตร / ผลิตภัณฑ์ *"
@@ -102,12 +120,6 @@ export function MixingHeader({
               <p className="mt-2 text-xs text-danger">{errors.fertilizer}</p>
             )}
           </div>
-          <MixingField
-            label="Lot No. *"
-            value={row.lot_no}
-            onChange={(e) => onChange({ lot_no: e.target.value })}
-            error={errors.lot_no}
-          />
           <div>
             <MasterSelect
               kind="shifts"
@@ -118,18 +130,6 @@ export function MixingHeader({
             />
             {errors.shift && (
               <p className="mt-2 text-xs text-danger">{errors.shift}</p>
-            )}
-          </div>
-          <div>
-            <MasterSelect
-              kind="areas"
-              reference={row.masterRefs?.location}
-              label="สถานที่ผสม *"
-              value={row.location}
-              onChange={(location) => onChange({ location })}
-            />
-            {errors.location && (
-              <p className="mt-2 text-xs text-danger">{errors.location}</p>
             )}
           </div>
           <MasterSelect
