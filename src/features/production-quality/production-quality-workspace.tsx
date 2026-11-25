@@ -74,12 +74,12 @@ export function ProductionQualityWorkspace() {
       <PageHeader
         title="ตรวจสอบคุณภาพการผลิต"
         description={loadError ? `โหลดข้อมูลไม่สำเร็จ: ${loadError} · กรุณารีเฟรชหน้า` : !loaded ? "กำลังโหลดข้อมูลจากฐานข้อมูล" : "บันทึกผลตรวจตามช่วงเวลา ติดตามประวัติ และสรุปผลรายปี · ไม่อนุมัติคุณภาพหรือเปลี่ยนสต็อก"}
-        actions={
-          <Button disabled={busy || !loaded} onClick={() => requestForm(blankInspection())}>
-            <Plus />
-            สร้างเอกสารใหม่
-          </Button>
-        }
+        // actions={
+        //   <Button disabled={busy || !loaded} onClick={() => requestForm(blankInspection())}>
+        //     <Plus />
+        //     สร้างเอกสารใหม่
+        //   </Button>
+        // }
       />
       <Tabs value={tab} onValueChange={(next) => { if (!busy && loaded) setTab(next); }} className="min-w-0">
         <div className="max-w-full overflow-x-auto">
@@ -189,7 +189,7 @@ export function ProductionQualityWorkspace() {
                       <dt>
                         {s.stop || "—"} → {s.restart || "—"}
                       </dt>
-                      <dd className="break-words">{s.reason || "—"}</dd>
+                      <dd className="wrap-break-word">{s.reason || "—"}</dd>
                     </div>
                   ))}
                 </dl>
@@ -213,7 +213,7 @@ export function ProductionQualityWorkspace() {
                 </p>
               </SectionCard>
               <SectionCard title="หมายเหตุและข้อมูลการบันทึก">
-                <p className="whitespace-pre-wrap break-words">
+                <p className="whitespace-pre-wrap wrap-break-word">
                   {viewed.notes || "—"}
                 </p>
                 <p className="mt-3 text-xs text-muted-foreground">

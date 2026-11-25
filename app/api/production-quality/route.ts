@@ -6,8 +6,6 @@ import { QualityValidationError } from "@/src/features/production-quality/produc
 import { QualityConflictError } from "@/src/server/production-quality/quality-repository";
 import { qualityService } from "@/src/server/production-quality/quality-service";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 4_000_000;
 function response(data: unknown, status = 200) { return NextResponse.json({ok:true,data},{status,headers:{"Cache-Control":"no-store"}}); }
 function fail(message: string,status: number,field?: string) { return NextResponse.json({ok:false,message,...(field ? {field} : {})},{status,headers:{"Cache-Control":"no-store"}}); }
