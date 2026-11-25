@@ -82,8 +82,9 @@ function monthDates(
   const month = String(period.month).padStart(2, "0");
   const lastDay = new Date(Date.UTC(year, period.month, 0)).getUTCDate();
 
-  return Array.from({ length: lastDay }, (_, index) =>
-    `${year}-${month}-${String(index + 1).padStart(2, "0")}`,
+  return Array.from(
+    { length: lastDay },
+    (_, index) => `${year}-${month}-${String(index + 1).padStart(2, "0")}`,
   );
 }
 
@@ -207,13 +208,15 @@ export function StockWipDailyDetail({
               ข้อมูลรายวันของ {row.item.name}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {row.item.code_new} · {row.item.code_old ?? "—"} · {row.item.unit}
+              {row.item.code_new} · {row.item.code_old ?? "—"}
             </p>
             <p className="text-xs text-muted-foreground">
               {sheet.source_sheet_name}
               {isMonthly
                 ? ` · ${MONTH_FORMATTER.format(
-                    new Date(Date.UTC(period.year_be - 543, period.month - 1, 1)),
+                    new Date(
+                      Date.UTC(period.year_be - 543, period.month - 1, 1),
+                    ),
                   )}`
                 : ""}
               {isMonthly ? ` · ${filledDays}/${dates.length} วัน` : ""}
@@ -246,16 +249,32 @@ export function StockWipDailyDetail({
             >
               <TableHeader className="bg-muted/60">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead rowSpan={2} scope="col" className="sticky left-0 z-10 w-36 bg-muted text-center">
+                  <TableHead
+                    rowSpan={2}
+                    scope="col"
+                    className="sticky left-0 z-10 w-36 bg-muted text-center"
+                  >
                     วันที่บันทึก
                   </TableHead>
-                  <TableHead rowSpan={2} scope="col" className="min-w-32 text-center">
+                  <TableHead
+                    rowSpan={2}
+                    scope="col"
+                    className="min-w-32 text-center"
+                  >
                     รับเข้า (+)
                   </TableHead>
-                  <TableHead colSpan={ISSUE_COLUMNS.length} scope="colgroup" className="border-l text-center">
+                  <TableHead
+                    colSpan={ISSUE_COLUMNS.length}
+                    scope="colgroup"
+                    className="border-l text-center"
+                  >
                     จ่าย (-)
                   </TableHead>
-                  <TableHead colSpan={transferColumns.length} scope="colgroup" className="border-l text-center">
+                  <TableHead
+                    colSpan={transferColumns.length}
+                    scope="colgroup"
+                    className="border-l text-center"
+                  >
                     โอน (-)
                   </TableHead>
                 </TableRow>

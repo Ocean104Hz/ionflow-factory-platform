@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, RotateCcw, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 
 import { PageHeader } from "@/src/components/factory/patterns";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -29,6 +35,7 @@ import {
 } from "@/src/lib/mock-data/stock_rm_ff";
 
 import {
+  addStockRmRow,
   DEFAULT_STOCK_RM_FILTERS,
   saveStockRmSheet,
   stockRmPeriodKey,
@@ -36,6 +43,7 @@ import {
   updateStockRmRemark,
   updateStockRmSummary,
   validateStockRmSheet,
+  type StockRmCreateInput,
   type StockRmFilters as StockRmFilterValues,
   type StockRmMovementField,
   type StockRmPeriod,
@@ -44,6 +52,7 @@ import {
   type StockRmSummaryField,
   type StockRmValidationErrors,
 } from "./stock_rm_ff_domain";
+import { StockRmFfCreateForm } from "./stock_rm_ff_create_form";
 import { StockRmDailyDetail } from "./stock_rm_ff_daily_detail";
 import { StockRmFilters } from "./stock_rm_ff_filters";
 import { StockRmSummary } from "./stock_rm_ff_summary";
@@ -58,6 +67,7 @@ import { StockRmTable } from "./stock_rm_ff_table";
 type Notice = {
   tone: "success" | "error" | "info";
   text: string;
+  title?: string;
 };
 
 function copyFilters(filters: StockRmFilterValues): StockRmFilterValues {
@@ -116,7 +126,10 @@ export function StockRmWorkspace() {
   const [filters, setFilters] = useState<StockRmFilterValues>(() =>
     copyFilters(DEFAULT_STOCK_RM_FILTERS),
   );
-  const [selectedDailyCode, setSelectedDailyCode] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedDailyCode, setSelectedDailyCode] = useState<string | null>(
+    null,
+  );
   const [pendingFilters, setPendingFilters] =
     useState<StockRmFilterValues | null>(null);
   const [errors, setErrors] = useState<StockRmValidationErrors>({});
@@ -159,6 +172,7 @@ export function StockRmWorkspace() {
 
     setFilters(copyFilters(nextFilters));
     setDraft(structuredClone(nextSheet));
+    setCreateOpen(false);
     setSelectedDailyCode(null);
     setErrors({});
     setNotice(null);
@@ -180,6 +194,31 @@ export function StockRmWorkspace() {
     }
 
     openPeriod(nextFilters);
+  }
+
+  function openCreateForm() {
+    if (draft.period.view !== "MONTH") {
+      return;
+    }
+
+    setSelectedDailyCode(null);
+    setCreateOpen(true);
+  }
+
+  function handleCreate(input: StockRmCreateInput) {
+    // Validate synchronously so a failure reaches the create form's catch.
+    // Do not update savedSheets here; Save and Discard remain in Workspace.
+    const nextDraft = addStockRmRow(draft, input);
+
+    setDraft(nextDraft);
+    setFilters((current) => ({ ...current, search: "" }));
+    setSelectedDailyCode(null);
+    setErrors({});
+    setNotice({
+      tone: "info",
+      title: "เพิ่มวัตถุดิบลงฉบับร่างแล้ว",
+      text: "เพิ่มรายการวัตถุดิบแล้ว กรุณากดบันทึกข้อมูลจำลองจากหน้าหลักเพื่อเก็บการแก้ไข",
+    });
   }
 
   function handleSummaryChange(
@@ -204,14 +243,19 @@ export function StockRmWorkspace() {
     field: StockRmMovementField,
     value: string,
   ) {
-    setDraft((current) => updateStockRmDaily(current, codeNew, date, field, value));
+    setDraft((current) =>
+      updateStockRmDaily(current, codeNew, date, field, value),
+    );
     setErrors({});
     setNotice(null);
   }
 
   function handleDiscard() {
     if (!savedSheet) {
-      setNotice({ tone: "error", text: "ไม่พบข้อมูลที่บันทึกไว้สำหรับช่วงเวลานี้" });
+      setNotice({
+        tone: "error",
+        text: "ไม่พบข้อมูลที่บันทึกไว้สำหรับช่วงเวลานี้",
+      });
       return;
     }
 
@@ -276,13 +320,17 @@ export function StockRmWorkspace() {
       <PageHeader
         title="Stock RM FF"
         description="สต็อกวัตถุดิบจากไฟล์ Stock RM FF 2569.xlsx"
-        actions={<Badge variant="outline">UI MOCK · React State เท่านั้น</Badge>}
+        actions={
+          <Badge variant="outline">UI MOCK · React State เท่านั้น</Badge>
+        }
       />
 
       <StockRmFilters
         value={filters}
         onChange={handleFiltersChange}
-        onReset={() => handleFiltersChange(copyFilters(DEFAULT_STOCK_RM_FILTERS))}
+        onReset={() =>
+          handleFiltersChange(copyFilters(DEFAULT_STOCK_RM_FILTERS))
+        }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
@@ -306,13 +354,31 @@ export function StockRmWorkspace() {
           <Button
             type="button"
             variant="outline"
+            onClick={openCreateForm}
+            disabled={draft.period.view !== "MONTH"}
+            title={
+              draft.period.view === "YEAR"
+                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มวัตถุดิบ"
+                : "เพิ่มรายการวัตถุดิบ"
+            }
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            เพิ่มวัตถุดิบ
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={handleDiscard}
             disabled={!hasUnsavedChanges}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             ยกเลิกการแก้ไข
           </Button>
-          <Button type="button" onClick={handleSave} disabled={!hasUnsavedChanges}>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={!hasUnsavedChanges}
+          >
             <Save className="size-4" aria-hidden="true" />
             บันทึกข้อมูลจำลอง
           </Button>
@@ -327,11 +393,12 @@ export function StockRmWorkspace() {
             <AlertTriangle className="size-4" aria-hidden="true" />
           )}
           <AlertTitle>
-            {notice.tone === "success"
-              ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
-              : notice.tone === "error"
-                ? "ต้องตรวจสอบข้อมูล"
-                : "ยกเลิกการแก้ไขแล้ว"}
+            {notice.title ??
+              (notice.tone === "success"
+                ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
+                : notice.tone === "error"
+                  ? "ต้องตรวจสอบข้อมูล"
+                  : "ยกเลิกการแก้ไขแล้ว")}
           </AlertTitle>
           <AlertDescription>{notice.text}</AlertDescription>
         </Alert>
@@ -341,7 +408,9 @@ export function StockRmWorkspace() {
         <div ref={errorSummaryRef} tabIndex={-1}>
           <Alert variant="destructive">
             <AlertTriangle className="size-4" aria-hidden="true" />
-            <AlertTitle>พบข้อมูลที่ไม่ผ่านการตรวจสอบ {errorCount} ช่อง</AlertTitle>
+            <AlertTitle>
+              พบข้อมูลที่ไม่ผ่านการตรวจสอบ {errorCount} ช่อง
+            </AlertTitle>
             <AlertDescription>
               กรุณาตรวจสอบช่องที่มีสีเตือนในตารางหลักหรือรายละเอียดรายวัน
               แล้วบันทึกใหม่
@@ -379,6 +448,16 @@ export function StockRmWorkspace() {
             : undefined
         }
       />
+
+      {draft.period.view === "MONTH" && (
+        <StockRmFfCreateForm
+          key={draft.id}
+          open={createOpen}
+          period={draft.period}
+          onOpenChange={setCreateOpen}
+          onCreate={handleCreate}
+        />
+      )}
 
       <Dialog
         open={Boolean(selectedDailyRow)}
@@ -418,8 +497,8 @@ export function StockRmWorkspace() {
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         ข้อมูลจำลองอ้างอิงจาก Excel เท่านั้น · น้ำหนัก ราคาเฉลี่ย มูลค่า
-        และยอดรายวันไม่ถูกคำนวณตามกันอัตโนมัติ · ไม่มีการเชื่อม API
-        ฐานข้อมูล หรือพื้นที่จัดเก็บของเบราว์เซอร์
+        และยอดรายวันไม่ถูกคำนวณตามกันอัตโนมัติ · ไม่มีการเชื่อม API ฐานข้อมูล
+        หรือพื้นที่จัดเก็บของเบราว์เซอร์
       </p>
 
       <AlertDialog
@@ -440,7 +519,10 @@ export function StockRmWorkspace() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>กลับไปบันทึกก่อน</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmPeriodChange}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmPeriodChange}
+            >
               ทิ้งการแก้ไขและเปลี่ยนช่วงเวลา
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -9,7 +9,6 @@ import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 
 import {
-  STOCK_WIP_CATEGORIES,
   STOCK_WIP_MONTHS,
   type StockWipFilters as StockWipFilterValues,
   type StockWipMonth,
@@ -50,14 +49,6 @@ const MONTH_OPTIONS = STOCK_WIP_MONTHS.map((month) => ({
 const YEAR_OPTIONS = [
   { value: "2568", label: "2568" },
   { value: "2569", label: "2569" },
-];
-
-const CATEGORY_OPTIONS = [
-  { value: "ALL", label: "ทุกหมวดสินค้า" },
-  ...STOCK_WIP_CATEGORIES.map((category) => ({
-    value: category.id,
-    label: category.label,
-  })),
 ];
 
 /**
@@ -112,21 +103,6 @@ export function StockWipFilters({ value, onChange, onReset }: Props) {
 
     if (month !== undefined) {
       changePeriod({ view: "MONTH", year_be: 2569, month });
-    }
-  }
-
-  function changeCategory(nextCategory: string) {
-    if (nextCategory === "ALL") {
-      onChange({ ...value, category: "ALL" });
-      return;
-    }
-
-    const category = STOCK_WIP_CATEGORIES.find(
-      (candidate) => candidate.id === nextCategory,
-    );
-
-    if (category) {
-      onChange({ ...value, category: category.id });
     }
   }
 

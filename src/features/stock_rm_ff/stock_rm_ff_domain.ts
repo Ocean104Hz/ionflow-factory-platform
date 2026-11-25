@@ -138,6 +138,13 @@ export interface StockRmSheet {
   updated_at: string;
 }
 
+/** Input for creating one RM item in a monthly draft. */
+export interface StockRmCreateInput {
+  code_new: string;
+  remark: string;
+  daily: StockRmDailyEntry[];
+}
+
 export interface StockRmFilters {
   period: StockRmPeriod;
   search: string;
@@ -208,6 +215,14 @@ export function blankStockRmMovement(): StockRmMovementValues {
     issued_for_production: "",
     issued_adjustment: "",
     issued_discarded: "",
+  };
+}
+
+export function blankStockRmCreateInput(): StockRmCreateInput {
+  return {
+    code_new: "",
+    remark: "",
+    daily: [],
   };
 }
 
@@ -472,6 +487,53 @@ export function validateStockRmSheet(
   }
 
   return errors;
+}
+
+/** Add one item to the selected monthly draft without changing other rows. */
+export function addStockRmRow(
+  sheet: StockRmSheet,
+  input: StockRmCreateInput,
+): StockRmSheet {
+  if (sheet.period.view !== "MONTH") {
+    throw new Error("Stock RM FF creation requires a monthly sheet.");
+  }
+
+  const codeNew = input.code_new.trim();
+  if (!codeNew) {
+    throw new Error("The RM item code is required.");
+  }
+  if (sheet.rows.some((row) => row.item.code_new.trim() === codeNew)) {
+    throw new Error("The RM item code already exists in the selected month.");
+  }
+
+  const nextNo =
+    sheet.rows.reduce((highest, row) => Math.max(highest, row.item.no), 0) +
+    1;
+  const row: StockRmRow = {
+    item: {
+      no: nextNo,
+      code_new: codeNew,
+      name: null,
+    },
+    summary: blankStockRmSummary(),
+    remark: input.remark,
+    daily: input.daily
+      .map((entry) => ({
+        date: entry.date,
+        values: { ...entry.values },
+      }))
+      .sort((left, right) => left.date.localeCompare(right.date)),
+    year_months: [],
+  };
+
+  // Reuse existing structural and numeric validation for the new row.
+  const errors = validateStockRmSheet({ ...sheet, rows: [row] });
+  const firstError = Object.values(errors)[0];
+  if (firstError) {
+    throw new Error(firstError);
+  }
+
+  return { ...sheet, rows: [...sheet.rows, row] };
 }
 
 /** Immutable in-memory upsert. A browser refresh resets all mock edits. */

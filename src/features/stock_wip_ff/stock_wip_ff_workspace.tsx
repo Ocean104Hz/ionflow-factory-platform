@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, RotateCcw, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  RotateCcw,
+  Save,
+} from "lucide-react";
 
 import { PageHeader } from "@/src/components/factory/patterns";
 import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
@@ -26,12 +32,14 @@ import {
 import { createStockWipMockSheets } from "@/src/lib/mock-data/stock_wip_ff";
 
 import {
+  addStockWipRow,
   DEFAULT_STOCK_WIP_FILTERS,
   saveStockWipSheet,
   stockWipPeriodKey,
   updateStockWipDaily,
   updateStockWipSummary,
   validateStockWipSheet,
+  type StockWipCreateInput,
   type StockWipFilters as StockWipFilterValues,
   type StockWipMovementField,
   type StockWipPeriod,
@@ -40,6 +48,7 @@ import {
   type StockWipSummaryField,
   type StockWipValidationErrors,
 } from "./stock_wip_ff_domain";
+import { StockWipFfCreateForm } from "./stock_wip_ff_create_form";
 import { StockWipDailyDetail } from "./stock_wip_ff_daily_detail";
 import { StockWipFilters } from "./stock_wip_ff_filters";
 import { StockWipSummary } from "./stock_wip_ff_summary";
@@ -54,6 +63,7 @@ import { StockWipTable } from "./stock_wip_ff_table";
 type Notice = {
   tone: "success" | "error" | "info";
   text: string;
+  title?: string;
 };
 
 function copyFilters(filters: StockWipFilterValues): StockWipFilterValues {
@@ -98,10 +108,6 @@ function filterStockWipRows(
   const search = normalizeSearch(filters.search);
 
   return rows.filter((row) => {
-    if (filters.category !== "ALL" && row.item.category !== filters.category) {
-      return false;
-    }
-
     if (!search) {
       return true;
     }
@@ -120,6 +126,7 @@ export function StockWipWorkspace() {
   const [filters, setFilters] = useState<StockWipFilterValues>(() =>
     copyFilters(DEFAULT_STOCK_WIP_FILTERS),
   );
+  const [createOpen, setCreateOpen] = useState(false);
   const [selectedDailyCode, setSelectedDailyCode] = useState<string | null>(
     null,
   );
@@ -163,6 +170,7 @@ export function StockWipWorkspace() {
 
     setFilters(copyFilters(nextFilters));
     setDraft(structuredClone(nextSheet));
+    setCreateOpen(false);
     setSelectedDailyCode(null);
     setErrors({});
     setNotice(null);
@@ -184,6 +192,31 @@ export function StockWipWorkspace() {
     }
 
     openPeriod(nextFilters);
+  }
+
+  function openCreateForm() {
+    if (draft.period.view !== "MONTH") {
+      return;
+    }
+
+    setSelectedDailyCode(null);
+    setCreateOpen(true);
+  }
+
+  function handleCreate(input: StockWipCreateInput) {
+    // Validate synchronously so the form can display creation errors.
+    // The saved sheet remains unchanged until the user presses Save.
+    const nextDraft = addStockWipRow(draft, input);
+
+    setDraft(nextDraft);
+    setFilters((current) => ({ ...current, search: "" }));
+    setSelectedDailyCode(null);
+    setErrors({});
+    setNotice({
+      tone: "info",
+      title: "เพิ่มรายการ WIP ลงฉบับร่างแล้ว",
+      text: "เพิ่มรายการ WIP แล้ว กรุณากดบันทึกข้อมูลจำลองจากหน้าหลักเพื่อเก็บการแก้ไข",
+    });
   }
 
   function handleSummaryChange(
@@ -315,6 +348,20 @@ export function StockWipWorkspace() {
           <Button
             type="button"
             variant="outline"
+            onClick={openCreateForm}
+            disabled={draft.period.view !== "MONTH"}
+            title={
+              draft.period.view === "YEAR"
+                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
+                : "เพิ่มรายการ WIP"
+            }
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            เพิ่มรายการ WIP
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={handleDiscard}
             disabled={!hasUnsavedChanges}
           >
@@ -340,11 +387,12 @@ export function StockWipWorkspace() {
             <AlertTriangle className="size-4" aria-hidden="true" />
           )}
           <AlertTitle>
-            {notice.tone === "success"
-              ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
-              : notice.tone === "error"
-                ? "ต้องตรวจสอบข้อมูล"
-                : "ยกเลิกการแก้ไขแล้ว"}
+            {notice.title ??
+              (notice.tone === "success"
+                ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
+                : notice.tone === "error"
+                  ? "ต้องตรวจสอบข้อมูล"
+                  : "ยกเลิกการแก้ไขแล้ว")}
           </AlertTitle>
           <AlertDescription>{notice.text}</AlertDescription>
         </Alert>
@@ -378,6 +426,16 @@ export function StockWipWorkspace() {
         }
       />
 
+      {draft.period.view === "MONTH" && (
+        <StockWipFfCreateForm
+          key={draft.id}
+          open={createOpen}
+          period={draft.period}
+          onOpenChange={setCreateOpen}
+          onCreate={handleCreate}
+        />
+      )}
+
       <Dialog
         open={Boolean(selectedDailyRow)}
         onOpenChange={(open) => {
@@ -409,8 +467,6 @@ export function StockWipWorkspace() {
           )}
         </DialogContent>
       </Dialog>
-
-
 
       <AlertDialog
         open={pendingFilters !== null}

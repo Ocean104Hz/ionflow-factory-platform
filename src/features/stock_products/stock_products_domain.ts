@@ -5,7 +5,7 @@
  * Source workbook data is a snapshot, not an API or a live inventory ledger.
  *
  * IMPORTANT:
- * - SO records are independent reference rows. They never deduct stock.
+ * - SO records never deduct stock. New SO rows reference existing stock rows.
  * - Item codes and names are not unique keys; use sheet and Excel row.
  * - Empty cells remain distinct from the numeric value zero.
  * - SO dates may be Excel numbers or literal text. Preserve the raw cell.
@@ -66,8 +66,10 @@ export const STOCK_PRODUCTS_SUMMARY_FIELDS = [
 
 export type StockProductsSummaryField =
   (typeof STOCK_PRODUCTS_SUMMARY_FIELDS)[number];
-export type StockProductsSummaryValues =
-  Record<StockProductsSummaryField, string>;
+export type StockProductsSummaryValues = Record<
+  StockProductsSummaryField,
+  string
+>;
 
 export const STOCK_PRODUCTS_EXCEL_STOCK_COLUMNS = {
   item_no: 1, // A
@@ -101,13 +103,16 @@ export interface StockProductsMonth {
 }
 
 export interface StockProductsItem {
-  /** Physical row number in the source Excel summary sheet. */
+  id?: string;
+  added_date?: string | null;
+  /** Legacy link from the combined form; preserve previously stored data. */
+  so_row_id?: string | null;
   source_row: number;
-  no: number | null; // A : may restart or be blank
-  group: string | null; // B : do not fill down blank source cells
-  code: string | null; // C : may be blank or repeated
-  name: string; // D
-  unit: string | null; // E
+  no: number | null;
+  group: string | null;
+  code: string | null;
+  name: string;
+  unit: string | null;
 }
 
 export interface StockProductsDailyEntry {
@@ -138,17 +143,27 @@ export type StockProductsSourceDate = string | number | null;
 export type StockProductsRawCell = string | number | boolean | null;
 
 export interface StockProductsSoRow {
-  /** Sheet + Excel row identify a record. SO number alone is not unique. */
+  id?: string;
+  /** Existing stock row key; older imported SO rows may not have a link. */
+  stock_row_key?: string;
   sheet_name: StockProductsSoSheetName;
   source_row: number;
-  date_raw: StockProductsSourceDate; // A : preserve Excel cell
-  customer_name: string; // B
-  so_number: string; // C
-  product_name: string; // E
-  quantity: string; // F : numeric-text, zero differs from blank
-  unit: string; // G
-  /** H:N source cells, retained without guessing their meanings. */
+  date_raw: StockProductsSourceDate;
+  customer_name: string;
+  so_number: string;
+  product_name: string;
+  quantity: string;
+  unit: string;
   supplementary_cells: StockProductsRawCell[];
+}
+
+/** @deprecated Transitional contract for the previous combined form. */
+export interface StockProductsNewSoDetails {
+  sheet_name: StockProductsSoSheetName | "";
+  date_raw: string;
+  customer_name: string;
+  so_number: string;
+  quantity: string;
 }
 
 export interface StockProductsSoSheet {
@@ -229,7 +244,9 @@ function isValidMonth(period: StockProductsMonth): boolean {
 }
 
 /** Returns ISO days for the period; no date is taken from the filename. */
-export function datesInStockProductsMonth(period: StockProductsMonth): string[] {
+export function datesInStockProductsMonth(
+  period: StockProductsMonth,
+): string[] {
   if (!isValidMonth(period)) {
     return [];
   }
@@ -244,12 +261,17 @@ export function datesInStockProductsMonth(period: StockProductsMonth): string[] 
 }
 
 /** Source-row identity is stable even when item codes or names repeat. */
+
 export function stockProductsRowKey(row: StockProductsStockRow): string {
-  return `stock:${row.item.source_row}`;
+  return row.item.id
+    ? `stock:local:${row.item.id}`
+    : `stock:${row.item.source_row}`;
 }
 
 export function stockProductsSoRowKey(row: StockProductsSoRow): string {
-  return `so:${row.sheet_name}:${row.source_row}`;
+  return row.id
+    ? `so:local:${row.id}`
+    : `so:${row.sheet_name}:${row.source_row}`;
 }
 
 function normalizeSearch(value: string): string {
@@ -267,8 +289,12 @@ export function filterStockProductsRows(
   }
 
   return rows.filter((row) =>
-    [row.item.code ?? "", row.item.name, row.item.group ?? "", row.item.unit ?? ""]
-      .some((value) => normalizeSearch(value).includes(query)),
+    [
+      row.item.code ?? "",
+      row.item.name,
+      row.item.group ?? "",
+      row.item.unit ?? "",
+    ].some((value) => normalizeSearch(value).includes(query)),
   );
 }
 
@@ -329,4 +355,424 @@ export function validateStockProductsSoSheetCoverage(
   }
 
   return errors;
+}
+
+// --------------------------------------------------
+// Stock Products Local Storage
+// --------------------------------------------------
+
+export const STOCK_PRODUCTS_STORAGE_KEY = "ionflow:stock-products:v1";
+
+export const STOCK_PRODUCTS_STORAGE_VERSION = 1;
+
+export interface StockProductsStoredData {
+  version: typeof STOCK_PRODUCTS_STORAGE_VERSION;
+  workbook: StockProductsWorkbook;
+}
+
+// --------------------------------------------------
+// Create blank stock product
+// --------------------------------------------------
+
+export function blankStockProductsRow(id: string): StockProductsStockRow {
+  return {
+    item: {
+      id,
+      added_date: "",
+      source_row: 0,
+      no: null,
+      group: "",
+      code: "",
+      name: "",
+      unit: "",
+    },
+    summary: blankStockProductsSummary(),
+    remark: "",
+    daily: [],
+  };
+}
+
+// --------------------------------------------------
+// Create blank daily entry
+// --------------------------------------------------
+
+export function blankStockProductsDailyEntry(
+  date: string,
+): StockProductsDailyEntry {
+  return {
+    date,
+    values: blankStockProductsDaily(),
+  };
+}
+
+// --------------------------------------------------
+// Create blank SO row
+// --------------------------------------------------
+
+export function blankStockProductsSoRow(
+  id: string,
+  sheetName: StockProductsSoSheetName,
+): StockProductsSoRow {
+  return {
+    id,
+    sheet_name: sheetName,
+    source_row: 0,
+    date_raw: "",
+    customer_name: "",
+    so_number: "",
+    product_name: "",
+    quantity: "",
+    unit: "",
+    supplementary_cells: [null, null, null, null, null, null, null],
+  };
+}
+
+// --------------------------------------------------
+// Form validation
+// --------------------------------------------------
+
+export type StockProductsFormErrors = Record<string, string>;
+
+export function isValidStockProductsAddedDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
+}
+
+export function validateStockProductsRow(
+  row: StockProductsStockRow,
+  mode: "CREATE" | "EDIT" = "EDIT",
+): StockProductsFormErrors {
+  const errors: StockProductsFormErrors = {};
+
+  if (!row.item.name.trim()) {
+    errors.name = "กรุณาระบุชื่อสินค้า";
+  }
+
+  const addedDate = row.item.added_date?.trim() ?? "";
+
+  if (!addedDate) {
+    if (mode === "CREATE") {
+      errors.added_date = "กรุณาระบุวันที่เพิ่มสินค้า";
+    }
+  } else if (!isValidStockProductsAddedDate(addedDate)) {
+    errors.added_date = "กรุณาระบุวันที่ให้ถูกต้อง";
+  }
+
+  return errors;
+}
+
+export function validateStockProductsSoRow(
+  row: Pick<
+    StockProductsSoRow,
+    "date_raw" | "customer_name" | "so_number" | "product_name" | "quantity"
+  >,
+): StockProductsFormErrors {
+  const errors: StockProductsFormErrors = {};
+
+  if (row.date_raw === null || String(row.date_raw).trim() === "") {
+    errors.date_raw = "กรุณาระบุวันที่";
+  }
+
+  if (!row.customer_name.trim()) {
+    errors.customer_name = "กรุณาระบุชื่อลูกค้า";
+  }
+
+  if (!row.so_number.trim()) {
+    errors.so_number = "กรุณาระบุเลข SO";
+  }
+
+  if (!row.product_name.trim()) {
+    errors.product_name = "กรุณาระบุชื่อสินค้า";
+  }
+
+  if (!row.quantity.trim()) {
+    errors.quantity = "กรุณาระบุจำนวน";
+  } else if (!Number.isFinite(Number(row.quantity))) {
+    errors.quantity = "กรุณาระบุจำนวนเป็นตัวเลข";
+  }
+
+  return errors;
+}
+
+/** @deprecated Transitional validator for the previous combined form. */
+export function validateStockProductsNewSoDetails(
+  details: StockProductsNewSoDetails,
+  productName: string,
+): StockProductsFormErrors {
+  const errors = validateStockProductsSoRow({
+    ...details,
+    product_name: productName,
+  });
+
+  if (
+    !STOCK_PRODUCTS_SO_SHEET_NAMES.some((name) => name === details.sheet_name)
+  ) {
+    errors.sheet_name = "กรุณาเลือกชีต SO";
+  }
+
+  const date = details.date_raw.trim();
+  if (date && !isValidStockProductsAddedDate(date)) {
+    errors.date_raw = "กรุณาระบุวันที่ SO ให้ถูกต้อง";
+  }
+
+  return errors;
+}
+
+// --------------------------------------------------
+// Add or update stock product
+// --------------------------------------------------
+
+export function upsertStockProductsRow(
+  rows: readonly StockProductsStockRow[],
+  nextRow: StockProductsStockRow,
+): StockProductsStockRow[] {
+  const key = stockProductsRowKey(nextRow);
+
+  const exists = rows.some((row) => stockProductsRowKey(row) === key);
+
+  if (!exists) {
+    return [...rows, nextRow];
+  }
+
+  return rows.map((row) => (stockProductsRowKey(row) === key ? nextRow : row));
+}
+
+// --------------------------------------------------
+// Delete stock product
+// --------------------------------------------------
+
+export function removeStockProductsRow(
+  rows: readonly StockProductsStockRow[],
+  rowKey: string,
+): StockProductsStockRow[] {
+  return rows.filter((row) => stockProductsRowKey(row) !== rowKey);
+}
+
+// --------------------------------------------------
+// Add or update daily entry
+// --------------------------------------------------
+
+export function upsertStockProductsDailyEntry(
+  row: StockProductsStockRow,
+  entry: StockProductsDailyEntry,
+  period: StockProductsMonth,
+): StockProductsStockRow {
+  const validDates = datesInStockProductsMonth(period);
+
+  if (!validDates.includes(entry.date)) {
+    throw new Error("วันที่รับ-จ่ายไม่อยู่ในเดือนของเอกสาร");
+  }
+
+  const daily = row.daily.filter((record) => record.date !== entry.date);
+
+  const hasValues = STOCK_PRODUCTS_DAILY_FIELDS.some(
+    (field) => entry.values[field].trim() !== "",
+  );
+
+  if (hasValues) {
+    daily.push(entry);
+  }
+
+  return {
+    ...row,
+    daily: daily.sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+// --------------------------------------------------
+// Add SO row
+// --------------------------------------------------
+
+export function appendStockProductsSoRow(
+  sheets: readonly StockProductsSoSheet[],
+  nextRow: StockProductsSoRow,
+): StockProductsSoSheet[] {
+  const target = sheets.find((sheet) => sheet.name === nextRow.sheet_name);
+
+  if (!target) {
+    throw new Error("ไม่พบชีต SO ที่เลือก");
+  }
+
+  const key = stockProductsSoRowKey(nextRow);
+
+  if (target.rows.some((row) => stockProductsSoRowKey(row) === key)) {
+    throw new Error("พบรายการ SO ที่มี ID ซ้ำกัน");
+  }
+
+  return sheets.map((sheet) =>
+    sheet.name === nextRow.sheet_name
+      ? {
+          ...sheet,
+          rows: [...sheet.rows, nextRow],
+        }
+      : sheet,
+  );
+}
+
+/** @deprecated Transitional helper for the previous combined form. */
+export function createStockProductWithSo(
+  workbook: StockProductsWorkbook,
+  row: StockProductsStockRow,
+  details: StockProductsNewSoDetails,
+  soId: string,
+): StockProductsWorkbook {
+  const productErrors = validateStockProductsRow(row, "CREATE");
+  const soErrors = validateStockProductsNewSoDetails(details, row.item.name);
+  const error = [
+    ...Object.values(productErrors),
+    ...Object.values(soErrors),
+  ][0];
+
+  if (error) {
+    throw new Error(error);
+  }
+
+  if (!row.item.id?.trim() || !soId.trim()) {
+    throw new Error("ไม่สามารถระบุ ID ของสินค้าและรายการ SO ได้");
+  }
+
+  const key = stockProductsRowKey(row);
+  if (
+    workbook.stock.rows.some((current) => stockProductsRowKey(current) === key)
+  ) {
+    throw new Error("พบ ID สินค้าซ้ำกัน");
+  }
+
+  if (
+    workbook.so_sheets.some((sheet) =>
+      sheet.rows.some((current) => current.id === soId),
+    )
+  ) {
+    throw new Error("พบ ID รายการ SO ซ้ำกัน");
+  }
+
+  const sheetName = STOCK_PRODUCTS_SO_SHEET_NAMES.find(
+    (name) => name === details.sheet_name,
+  );
+  if (!sheetName) {
+    throw new Error("ไม่พบชีต SO ที่เลือก");
+  }
+
+  const soRow: StockProductsSoRow = {
+    ...blankStockProductsSoRow(soId, sheetName),
+    date_raw: details.date_raw.trim(),
+    customer_name: details.customer_name.trim(),
+    so_number: details.so_number.trim(),
+    product_name: row.item.name.trim(),
+    quantity: details.quantity.trim(),
+    unit: row.item.unit?.trim() ?? "",
+  };
+
+  const stockRow: StockProductsStockRow = {
+    ...row,
+    item: {
+      ...row.item,
+      added_date: row.item.added_date?.trim() ?? null,
+      name: row.item.name.trim(),
+      so_row_id: soId,
+    },
+  };
+
+  const soSheets = appendStockProductsSoRow(workbook.so_sheets, soRow);
+
+  return {
+    ...workbook,
+    stock: {
+      ...workbook.stock,
+      rows: [...workbook.stock.rows, stockRow],
+    },
+    so_sheets: soSheets,
+  };
+}
+
+/** Validate a new SO against the stock list without changing imported SO rows. */
+export function validateStockProductsSoForStock(
+  row: StockProductsSoRow,
+  rows: readonly StockProductsStockRow[],
+): StockProductsFormErrors {
+  const selected = rows.find(
+    (current) => stockProductsRowKey(current) === row.stock_row_key,
+  );
+  const errors = validateStockProductsSoRow({
+    ...row,
+    product_name: selected?.item.name ?? "",
+  });
+
+  if (!selected || !selected.item.name.trim()) {
+    delete errors.product_name;
+    errors.stock_row_key = "กรุณาเลือกสินค้าจากสต็อก";
+  }
+
+  if (!STOCK_PRODUCTS_SO_SHEET_NAMES.includes(row.sheet_name)) {
+    errors.sheet_name = "กรุณาเลือกชีต SO";
+  }
+
+  if (
+    row.date_raw !== null &&
+    String(row.date_raw).trim() !== "" &&
+    (typeof row.date_raw !== "string" ||
+      !isValidStockProductsAddedDate(row.date_raw.trim()))
+  ) {
+    errors.date_raw = "กรุณาระบุวันที่ SO ให้ถูกต้อง";
+  }
+
+  return errors;
+}
+
+/** Append only a new SO row. The stock rows and their summaries stay unchanged. */
+export function appendStockProductsSoForStock(
+  workbook: StockProductsWorkbook,
+  row: StockProductsSoRow,
+): StockProductsWorkbook {
+  const error = Object.values(
+    validateStockProductsSoForStock(row, workbook.stock.rows),
+  )[0];
+
+  if (error) {
+    throw new Error(error);
+  }
+
+  const selected = workbook.stock.rows.find(
+    (current) => stockProductsRowKey(current) === row.stock_row_key,
+  );
+
+  if (!selected) {
+    throw new Error("ไม่พบสินค้าที่เลือกในสต็อก");
+  }
+
+  if (!row.id?.trim()) {
+    throw new Error("ไม่สามารถระบุ ID รายการ SO ได้");
+  }
+
+  const key = stockProductsSoRowKey(row);
+  if (
+    workbook.so_sheets.some((sheet) =>
+      sheet.rows.some((current) => stockProductsSoRowKey(current) === key),
+    )
+  ) {
+    throw new Error("พบ ID รายการ SO ซ้ำกัน");
+  }
+
+  const nextRow: StockProductsSoRow = {
+    ...blankStockProductsSoRow(row.id, row.sheet_name),
+    stock_row_key: stockProductsRowKey(selected),
+    date_raw: String(row.date_raw).trim(),
+    customer_name: row.customer_name.trim(),
+    so_number: row.so_number.trim(),
+    product_name: selected.item.name.trim(),
+    quantity: row.quantity.trim(),
+    unit: row.unit.trim(),
+  };
+
+  return {
+    ...workbook,
+    so_sheets: appendStockProductsSoRow(workbook.so_sheets, nextRow),
+  };
 }

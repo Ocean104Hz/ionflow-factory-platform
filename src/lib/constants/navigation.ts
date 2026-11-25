@@ -152,6 +152,12 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "WAREHOUSE",
+    title: "วัสดุคงเหลือลูกค้า",
+    href: "/stock_customer_materials",
+    icon: Boxes,
+  },
+  {
+    group: "WAREHOUSE",
     title: "สต็อกสินค้า",
     href: "/stock_products",
     icon: Boxes,
