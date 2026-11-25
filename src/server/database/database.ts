@@ -22,7 +22,78 @@ export interface ReadOnlyQueries {
 }
 export interface DevelopmentDatabase extends ReadOnlyQueries {
   readOnly<T>(work: (queries: ReadOnlyQueries) => Promise<T>): Promise<T>;
+  write<T>(
+    work: (queries: WriteQueries) => Promise<T>,
+  ): Promise<T>;
   close(): Promise<void>;
+}
+
+export interface WriteQueries {
+  query(
+    text: string,
+    values?: readonly SqlValue[],
+  ): Promise<DatabaseRow[]>;
+}
+
+async function verifyWriteClient(
+  client: DriverClient,
+  config: DatabaseConfig,
+): Promise<void> {
+  const result = await client.query(
+    `
+    SELECT (
+      current_database() = $1
+      AND current_user = $2
+      AND current_setting('transaction_read_only') = 'off'
+
+      AND has_schema_privilege(
+        current_user, $3, 'USAGE'
+      )
+
+      AND NOT has_schema_privilege(
+        current_user, $3, 'CREATE'
+      )
+
+      AND NOT has_database_privilege(
+        current_user, current_database(), 'CREATE'
+      )
+
+      AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = current_user
+          AND NOT rolsuper
+          AND NOT rolcreatedb
+          AND NOT rolcreaterole
+          AND NOT rolreplication
+          AND NOT rolbypassrls
+      )
+
+      AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_namespace
+        WHERE nspname = $3
+          AND pg_get_userbyid(nspowner) <> current_user
+      )
+
+      AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_database
+        WHERE datname = current_database()
+          AND pg_get_userbyid(datdba) <> current_user
+      )
+    ) AS valid
+    `,
+    [
+      config.database,
+      config.user,
+      config.schema,
+    ],
+  );
+
+  if (result.rows[0]?.valid !== true) {
+    throw new BackendError("DB_VERIFICATION_FAILED");
+  }
 }
 
 export function createDevelopmentDatabase(
@@ -116,8 +187,72 @@ export function createDevelopmentDatabase(
       }
     }
   }
+  async function write<T>(
+    work: (queries: WriteQueries) => Promise<T>,
+  ): Promise<T> {
+    let client: DriverClient;
+
+    try {
+      client = await pool.connect();
+    } catch {
+      throw new BackendError("DB_UNAVAILABLE");
+    }
+
+    let destroy = false;
+    let active = false;
+    let stage: "query" | "commit" = "query";
+
+    try {
+      await client.query("BEGIN READ WRITE");
+
+      await client.query(
+        "SET LOCAL search_path TO pg_catalog",
+      );
+
+      await verifyWriteClient(client, config);
+
+      active = true;
+
+      const result = await work({
+        async query(text, values = []) {
+          if (!active || !text.trim()) {
+            throw new BackendError("DB_QUERY_FAILED");
+          }
+
+          return (
+            await client.query(text, [...values])
+          ).rows;
+        },
+      });
+
+      active = false;
+      stage = "commit";
+
+      await client.query("COMMIT");
+
+      return result;
+    } catch (error: unknown) {
+      active = false;
+
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        destroy = true;
+      }
+
+      if (stage === "commit") {
+        throw new BackendError("DB_TRANSACTION_FAILED");
+      }
+
+      throw error;
+    } finally {
+      active = false;
+      client.release(destroy);
+    }
+  }
   return {
     readOnly,
+    write,
     query: (text, values) => readOnly((q) => q.query(text, values)),
     async close() {
       try {

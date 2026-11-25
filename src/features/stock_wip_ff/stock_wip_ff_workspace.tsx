@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
 } from "lucide-react";
@@ -29,12 +30,15 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/src/components/ui/dialog";
-import { createStockWipMockSheets } from "@/src/lib/mock-data/stock_wip_ff";
 
 import {
   addStockWipRow,
   DEFAULT_STOCK_WIP_FILTERS,
-  saveStockWipSheet,
+  STOCK_WIP_MOVEMENT_FIELDS,
+  STOCK_WIP_SUMMARY_FIELDS,
+  blankStockWipSheet,
+  stockWipSourceSheetName,
+  stockWipSupportsBioTransfer,
   stockWipPeriodKey,
   updateStockWipDaily,
   updateStockWipSummary,
@@ -55,16 +59,37 @@ import { StockWipSummary } from "./stock_wip_ff_summary";
 import { StockWipTable } from "./stock_wip_ff_table";
 
 /**
- * Stock WIP FF: UI MOCK ONLY.
- * All edits and saved sheets remain in React State, and are lost on page refresh.
- * No API, database, browser storage, or automatic Excel balance calculation.
+ * The Workspace owns the editable draft. Only Save writes to the database.
+ * Daily, monthly and annual values are independent snapshots.
  */
+
+const STOCK_API = "/api/stock/wip-ff";
+const CSRF_COOKIE = "ionflow_factory_csrf";
+const LOAD_FAILED = "ไม่สามารถโหลดข้อมูล Stock WIP จากฐานข้อมูลได้";
+const INVALID_RESPONSE = "รูปแบบข้อมูลจาก API ไม่ถูกต้อง";
+const UNCERTAIN_SAVE =
+  "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาโหลดข้อมูลใหม่และตรวจสอบก่อนบันทึกซ้ำ";
 
 type Notice = {
   tone: "success" | "error" | "info";
   text: string;
   title?: string;
 };
+
+type SavedSnapshot = {
+  sheet: StockWipSheet;
+  revision: string;
+};
+
+class StockWipApiError extends Error {
+  constructor(
+    message: string,
+    readonly reloadRequired = false,
+  ) {
+    super(message);
+    this.name = "StockWipApiError";
+  }
+}
 
 function copyFilters(filters: StockWipFilterValues): StockWipFilterValues {
   return {
@@ -73,15 +98,210 @@ function copyFilters(filters: StockWipFilterValues): StockWipFilterValues {
   };
 }
 
-function createInitialDraft(): StockWipSheet {
-  const key = stockWipPeriodKey(DEFAULT_STOCK_WIP_FILTERS.period);
-  const sheet = createStockWipMockSheets().find((entry) => entry.id === key);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  if (!sheet) {
-    throw new Error(`Missing initial Stock WIP mock sheet: ${key}`);
+function getCsrfToken(): string {
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+    const token = cookie
+      ? decodeURIComponent(cookie.slice(CSRF_COOKIE.length + 1))
+      : "";
+    if (token) return token;
+  } catch {
+    // Never send a write request without the CSRF cookie.
+  }
+  throw new StockWipApiError("กรุณาเข้าสู่ระบบใหม่ ไม่พบ CSRF Token");
+}
+
+async function requestStockJson(
+  url: string,
+  init: RequestInit,
+  writing: boolean,
+): Promise<Record<string, unknown>> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new StockWipApiError(writing ? UNCERTAIN_SAVE : LOAD_FAILED, writing);
   }
 
-  return sheet;
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+    const reloadRequired = writing && (response.ok || response.status !== 400);
+    const message =
+      response.status === 401 || response.status === 403
+        ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน"
+        : isRecord(payload) && typeof payload.message === "string"
+          ? payload.message
+          : writing
+            ? UNCERTAIN_SAVE
+            : LOAD_FAILED;
+    throw new StockWipApiError(message, reloadRequired);
+  }
+  return payload;
+}
+
+function hasQuantityFields(
+  value: unknown,
+  fields: readonly StockWipSummaryField[],
+  supportsBio: boolean,
+): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === fields.length &&
+    fields.every((field) =>
+      field === "transfer_bio" && !supportsBio
+        ? value[field] === null
+        : typeof value[field] === "string",
+    )
+  );
+}
+
+function isStockWipRow(
+  value: unknown,
+  supportsBio: boolean,
+): value is StockWipRow {
+  if (!isRecord(value) || !isRecord(value.item)) return false;
+  const item = value.item;
+  return (
+    typeof item.no === "number" &&
+    Number.isSafeInteger(item.no) &&
+    item.no > 0 &&
+    typeof item.code_new === "string" &&
+    Boolean(item.code_new.trim()) &&
+    (item.code_old === null ||
+      (typeof item.code_old === "string" && Boolean(item.code_old.trim()))) &&
+    typeof item.name === "string" &&
+    Boolean(item.name.trim()) &&
+    hasQuantityFields(value.summary, STOCK_WIP_SUMMARY_FIELDS, supportsBio) &&
+    Array.isArray(value.daily) &&
+    value.daily.length <= 31 &&
+    value.daily.every(
+      (entry: unknown) =>
+        isRecord(entry) &&
+        typeof entry.date === "string" &&
+        hasQuantityFields(entry.values, STOCK_WIP_MOVEMENT_FIELDS, supportsBio),
+    )
+  );
+}
+
+function readSnapshot(
+  payload: Record<string, unknown>,
+  period: StockWipPeriod,
+  writing: boolean,
+): SavedSnapshot {
+  const source = payload.sheet;
+  const revision = payload.revision;
+  const supportsBio = stockWipSupportsBioTransfer(period);
+  const invalid = () =>
+    new StockWipApiError(writing ? UNCERTAIN_SAVE : INVALID_RESPONSE, writing);
+
+  if (
+    !isRecord(source) ||
+    !isRecord(source.period) ||
+    source.period.view !== period.view ||
+    source.period.year_be !== period.year_be ||
+    (period.view === "MONTH" && source.period.month !== period.month) ||
+    (period.view === "YEAR" && Object.hasOwn(source.period, "month")) ||
+    source.id !== stockWipPeriodKey(period) ||
+    source.source_sheet_name !== stockWipSourceSheetName(period) ||
+    source.supports_bio_transfer !== supportsBio ||
+    typeof source.created_at !== "string" ||
+    typeof source.updated_at !== "string" ||
+    typeof revision !== "string" ||
+    !/^[a-f0-9]{64}$/.test(revision) ||
+    !Array.isArray(source.rows) ||
+    !source.rows.every((row: unknown) => isStockWipRow(row, supportsBio))
+  ) {
+    throw invalid();
+  }
+
+  const rows: StockWipRow[] = source.rows;
+  const sheet: StockWipSheet = {
+    ...blankStockWipSheet(period),
+    rows,
+    created_at: source.created_at,
+    updated_at: source.updated_at,
+  };
+  const codes = new Set(rows.map((row) => row.item.code_new.trim()));
+  if (
+    codes.size !== rows.length ||
+    Object.keys(validateStockWipSheet(sheet)).length > 0
+  ) {
+    throw invalid();
+  }
+  return { sheet, revision };
+}
+
+async function loadStockWip(
+  period: StockWipPeriod,
+  signal: AbortSignal,
+): Promise<SavedSnapshot> {
+  const params = new URLSearchParams({
+    view: period.view,
+    year_be: String(period.year_be),
+  });
+  if (period.view === "MONTH") params.set("month", String(period.month));
+  const payload = await requestStockJson(
+    `${STOCK_API}?${params}`,
+    { signal },
+    false,
+  );
+  return readSnapshot(payload, period, false);
+}
+
+function draftChanges(saved: StockWipSheet, draft: StockWipSheet) {
+  const savedRows = new Map(saved.rows.map((row) => [row.item.code_new, row]));
+  const draftCodes = new Set(draft.rows.map((row) => row.item.code_new));
+  return {
+    changes: draft.rows.filter(
+      (row) =>
+        JSON.stringify(row) !==
+        JSON.stringify(savedRows.get(row.item.code_new)),
+    ),
+    // Compare the full draft, never the filtered table. Only explicitly removed
+    // rows from the saved snapshot become deletion references.
+    deleted_refs: saved.rows
+      .filter((row) => !draftCodes.has(row.item.code_new))
+      .map((row) => row.item.code_new),
+  };
+}
+
+async function saveStockWip(
+  snapshot: SavedSnapshot,
+  draft: StockWipSheet,
+): Promise<SavedSnapshot> {
+  if (snapshot.sheet.id !== draft.id) {
+    throw new StockWipApiError(INVALID_RESPONSE, true);
+  }
+  const payload = await requestStockJson(
+    STOCK_API,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
+      body: JSON.stringify({
+        action: "save_sheet",
+        period: draft.period,
+        expected_revision: snapshot.revision,
+        ...draftChanges(snapshot.sheet, draft),
+      }),
+    },
+    true,
+  );
+  return readSnapshot(payload, draft.period, true);
 }
 
 function periodLabel(period: StockWipPeriod): string {
@@ -119,13 +339,18 @@ function filterStockWipRows(
 }
 
 export function StockWipWorkspace() {
-  const [savedSheets, setSavedSheets] = useState<StockWipSheet[]>(
-    createStockWipMockSheets,
+  const [snapshot, setSnapshot] = useState<SavedSnapshot | null>(null);
+  const [draft, setDraft] = useState<StockWipSheet>(() =>
+    blankStockWipSheet(DEFAULT_STOCK_WIP_FILTERS.period),
   );
-  const [draft, setDraft] = useState<StockWipSheet>(createInitialDraft);
   const [filters, setFilters] = useState<StockWipFilterValues>(() =>
     copyFilters(DEFAULT_STOCK_WIP_FILTERS),
   );
+  const [loadTarget, setLoadTarget] = useState<StockWipFilterValues | null>(
+    () => copyFilters(DEFAULT_STOCK_WIP_FILTERS),
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [reloadRequired, setReloadRequired] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedDailyCode, setSelectedDailyCode] = useState<string | null>(
     null,
@@ -137,9 +362,14 @@ export function StockWipWorkspace() {
 
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
-  const savedSheet = savedSheets.find((sheet) => sheet.id === draft.id);
-  const hasUnsavedChanges =
-    JSON.stringify(draft.rows) !== JSON.stringify(savedSheet?.rows ?? []);
+  const savedSheet = snapshot?.sheet;
+  const hasUnsavedChanges = Boolean(
+    savedSheet &&
+    JSON.stringify(draft.rows) !== JSON.stringify(savedSheet.rows),
+  );
+  const isLoading = loadTarget !== null;
+  const isBusy = isLoading || isSaving;
+  const canEdit = Boolean(snapshot) && !isBusy && !reloadRequired;
   const visibleRows = useMemo(
     () => filterStockWipRows(draft.rows, filters),
     [draft.rows, filters],
@@ -156,27 +386,56 @@ export function StockWipWorkspace() {
     }
   }, [errorCount]);
 
-  function openPeriod(nextFilters: StockWipFilterValues) {
-    const key = stockWipPeriodKey(nextFilters.period);
-    const nextSheet = savedSheets.find((sheet) => sheet.id === key);
+  useEffect(() => {
+    if (!loadTarget) return;
+    const controller = new AbortController();
+    const target = loadTarget;
 
-    if (!nextSheet) {
-      setNotice({
-        tone: "error",
-        text: `ไม่พบข้อมูลจำลองสำหรับช่วงเวลา ${periodLabel(nextFilters.period)}`,
-      });
-      return;
+    async function load() {
+      try {
+        const next = await loadStockWip(target.period, controller.signal);
+        if (controller.signal.aborted) return;
+        setSnapshot(next);
+        setDraft(structuredClone(next.sheet));
+        setFilters(copyFilters(target));
+        setErrors({});
+        setReloadRequired(false);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setNotice({
+          tone: "error",
+          title: "โหลดข้อมูลไม่สำเร็จ",
+          text: error instanceof StockWipApiError ? error.message : LOAD_FAILED,
+        });
+      } finally {
+        if (!controller.signal.aborted) setLoadTarget(null);
+      }
     }
 
-    setFilters(copyFilters(nextFilters));
-    setDraft(structuredClone(nextSheet));
+    void load();
+    return () => controller.abort();
+  }, [loadTarget]);
+
+  function openPeriod(nextFilters: StockWipFilterValues) {
+    if (isBusy) return;
+    // Keep the current draft until the requested period loads successfully.
     setCreateOpen(false);
     setSelectedDailyCode(null);
-    setErrors({});
     setNotice(null);
+    setLoadTarget(copyFilters(nextFilters));
+  }
+
+  function handleReload() {
+    if (isBusy) return;
+    if (hasUnsavedChanges) {
+      setPendingFilters(copyFilters(filters));
+      return;
+    }
+    openPeriod(filters);
   }
 
   function handleFiltersChange(nextFilters: StockWipFilterValues) {
+    if (isBusy) return;
     const currentKey = stockWipPeriodKey(filters.period);
     const nextKey = stockWipPeriodKey(nextFilters.period);
 
@@ -195,7 +454,7 @@ export function StockWipWorkspace() {
   }
 
   function openCreateForm() {
-    if (draft.period.view !== "MONTH") {
+    if (!canEdit || draft.period.view !== "MONTH") {
       return;
     }
 
@@ -204,6 +463,7 @@ export function StockWipWorkspace() {
   }
 
   function handleCreate(input: StockWipCreateInput) {
+    if (!canEdit) return false;
     // Validate synchronously so the form can display creation errors.
     // The saved sheet remains unchanged until the user presses Save.
     const nextDraft = addStockWipRow(draft, input);
@@ -215,7 +475,7 @@ export function StockWipWorkspace() {
     setNotice({
       tone: "info",
       title: "เพิ่มรายการ WIP ลงฉบับร่างแล้ว",
-      text: "เพิ่มรายการ WIP แล้ว กรุณากดบันทึกข้อมูลจำลองจากหน้าหลักเพื่อเก็บการแก้ไข",
+      text: "เพิ่มรายการ WIP แล้ว กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อเก็บการแก้ไขลงฐานข้อมูล",
     });
   }
 
@@ -224,6 +484,7 @@ export function StockWipWorkspace() {
     field: StockWipSummaryField,
     value: string,
   ) {
+    if (!canEdit) return;
     setDraft((current) =>
       updateStockWipSummary(current, codeNew, field, value),
     );
@@ -237,6 +498,7 @@ export function StockWipWorkspace() {
     field: StockWipMovementField,
     value: string,
   ) {
+    if (!canEdit) return;
     setDraft((current) =>
       updateStockWipDaily(current, codeNew, date, field, value),
     );
@@ -245,6 +507,7 @@ export function StockWipWorkspace() {
   }
 
   function handleDiscard() {
+    if (isBusy) return;
     if (!savedSheet) {
       setNotice({
         tone: "error",
@@ -254,17 +517,22 @@ export function StockWipWorkspace() {
     }
 
     setDraft(structuredClone(savedSheet));
+    setSelectedDailyCode(null);
+    setCreateOpen(false);
     setErrors({});
     setNotice({
       tone: "info",
-      text: "ยกเลิกการแก้ไขแล้ว ข้อมูลกลับไปเป็นค่าที่บันทึกไว้ล่าสุดในหน้านี้",
+      text: reloadRequired
+        ? "ยกเลิกฉบับร่างแล้ว กรุณาโหลดข้อมูลล่าสุดจากฐานข้อมูลก่อนแก้ไขอีกครั้ง"
+        : "ยกเลิกการแก้ไขแล้ว ข้อมูลกลับไปเป็นค่าที่โหลดหรือบันทึกไว้ล่าสุด",
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!snapshot || !canEdit || !hasUnsavedChanges) return;
+
     const nextErrors = validateStockWipSheet(draft);
     setErrors(nextErrors);
-
     if (Object.keys(nextErrors).length > 0) {
       setNotice({
         tone: "error",
@@ -273,35 +541,35 @@ export function StockWipWorkspace() {
       return;
     }
 
+    setIsSaving(true);
+    setNotice(null);
     try {
-      const updatedSheets = saveStockWipSheet(
-        savedSheets,
-        draft,
-        new Date().toISOString(),
-      );
-      const saved = updatedSheets.find((sheet) => sheet.id === draft.id);
-
-      if (!saved) {
-        throw new Error("The saved mock sheet was not found.");
-      }
-
-      setSavedSheets(updatedSheets);
-      setDraft(structuredClone(saved));
+      const saved = await saveStockWip(snapshot, draft);
+      setSnapshot(saved);
+      setDraft(structuredClone(saved.sheet));
       setErrors({});
       setNotice({
         tone: "success",
-        text: "บันทึกข้อมูลจำลองใน React State แล้ว ข้อมูลจะหายเมื่อรีเฟรชหน้าเว็บ",
+        text: "บันทึกข้อมูล Stock WIP ลงฐานข้อมูลเรียบร้อยแล้ว",
       });
-    } catch {
+    } catch (error) {
+      // Preserve the draft. Never retry a write with an uncertain outcome.
+      if (!(error instanceof StockWipApiError) || error.reloadRequired) {
+        setReloadRequired(true);
+      }
       setNotice({
         tone: "error",
-        text: "ไม่สามารถบันทึกข้อมูลจำลองได้ กรุณาตรวจสอบข้อมูลอีกครั้ง",
+        title: "บันทึกข้อมูลไม่สำเร็จ",
+        text:
+          error instanceof StockWipApiError ? error.message : UNCERTAIN_SAVE,
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   function confirmPeriodChange() {
-    if (!pendingFilters) {
+    if (isBusy || !pendingFilters) {
       return;
     }
 
@@ -314,18 +582,18 @@ export function StockWipWorkspace() {
       <PageHeader
         title="Stock WIP FF"
         description="สต็อกสินค้าระหว่างการผลิตจากไฟล์ Stock WIP FF 2569.xlsx"
-        actions={
-          <Badge variant="outline">UI MOCK · React State เท่านั้น</Badge>
-        }
+        actions={<Badge variant="outline">DATABASE</Badge>}
       />
 
-      <StockWipFilters
-        value={filters}
-        onChange={handleFiltersChange}
-        onReset={() =>
-          handleFiltersChange(copyFilters(DEFAULT_STOCK_WIP_FILTERS))
-        }
-      />
+      <fieldset disabled={isBusy} className="min-w-0 border-0 p-0">
+        <StockWipFilters
+          value={filters}
+          onChange={handleFiltersChange}
+          onReset={() =>
+            handleFiltersChange(copyFilters(DEFAULT_STOCK_WIP_FILTERS))
+          }
+        />
+      </fieldset>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
         <div className="min-w-0 space-y-1">
@@ -333,14 +601,28 @@ export function StockWipWorkspace() {
             {periodLabel(filters.period)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {draft.source_sheet_name} · แสดง{" "}
-            {visibleRows.length.toLocaleString("th-TH")} จาก{" "}
-            {draft.rows.length.toLocaleString("th-TH")} รายการ
+            {snapshot ? (
+              <>
+                {draft.source_sheet_name} · แสดง{" "}
+                {visibleRows.length.toLocaleString("th-TH")} จาก{" "}
+                {draft.rows.length.toLocaleString("th-TH")} รายการ
+              </>
+            ) : (
+              "ยังไม่มีข้อมูลที่โหลดสำเร็จ"
+            )}
           </p>
           <p className="text-xs text-muted-foreground">
-            {hasUnsavedChanges
-              ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
-              : "ข้อมูลตรงกับฉบับที่บันทึกไว้ในหน้านี้"}
+            {loadTarget
+              ? `กำลังโหลด ${periodLabel(loadTarget.period)} ...`
+              : isSaving
+                ? "กำลังบันทึกข้อมูล..."
+                : !snapshot
+                  ? "ยังไม่ได้โหลดข้อมูลจากฐานข้อมูล"
+                  : reloadRequired
+                    ? "กรุณาโหลดข้อมูลล่าสุดก่อนแก้ไขหรือบันทึกอีกครั้ง"
+                    : hasUnsavedChanges
+                      ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
+                      : "ข้อมูลตรงกับฉบับที่โหลดหรือบันทึกไว้ล่าสุด"}
           </p>
         </div>
 
@@ -348,8 +630,17 @@ export function StockWipWorkspace() {
           <Button
             type="button"
             variant="outline"
+            onClick={handleReload}
+            disabled={isBusy}
+          >
+            <RefreshCw className="size-4" aria-hidden="true" />
+            โหลดข้อมูลใหม่
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={openCreateForm}
-            disabled={draft.period.view !== "MONTH"}
+            disabled={!canEdit || draft.period.view !== "MONTH"}
             title={
               draft.period.view === "YEAR"
                 ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
@@ -363,7 +654,7 @@ export function StockWipWorkspace() {
             type="button"
             variant="outline"
             onClick={handleDiscard}
-            disabled={!hasUnsavedChanges}
+            disabled={isBusy || !hasUnsavedChanges}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             ยกเลิกการแก้ไข
@@ -371,10 +662,10 @@ export function StockWipWorkspace() {
           <Button
             type="button"
             onClick={handleSave}
-            disabled={!hasUnsavedChanges}
+            disabled={!canEdit || !hasUnsavedChanges}
           >
             <Save className="size-4" aria-hidden="true" />
-            บันทึกข้อมูลจำลอง
+            {isSaving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
           </Button>
         </div>
       </div>
@@ -389,7 +680,7 @@ export function StockWipWorkspace() {
           <AlertTitle>
             {notice.title ??
               (notice.tone === "success"
-                ? "บันทึกสำเร็จ (เฉพาะข้อมูลจำลอง)"
+                ? "บันทึกสำเร็จ"
                 : notice.tone === "error"
                   ? "ต้องตรวจสอบข้อมูล"
                   : "ยกเลิกการแก้ไขแล้ว")}
@@ -413,18 +704,24 @@ export function StockWipWorkspace() {
         </div>
       )}
 
-      <StockWipSummary rows={visibleRows} />
-
-      <StockWipTable
-        rows={visibleRows}
-        supportsBioTransfer={draft.supports_bio_transfer}
-        onChange={handleSummaryChange}
-        onViewDaily={
-          draft.period.view === "MONTH"
-            ? (row) => setSelectedDailyCode(row.item.code_new)
-            : undefined
-        }
-      />
+      {snapshot && (
+        <>
+          <StockWipSummary rows={visibleRows} />
+          <StockWipTable
+            rows={visibleRows}
+            supportsBioTransfer={draft.supports_bio_transfer}
+            onChange={handleSummaryChange}
+            onViewDaily={
+              draft.period.view === "MONTH"
+                ? (row) => {
+                    if (!isBusy) setSelectedDailyCode(row.item.code_new);
+                  }
+                : undefined
+            }
+            disabled={!canEdit}
+          />
+        </>
+      )}
 
       {draft.period.view === "MONTH" && (
         <StockWipFfCreateForm
@@ -433,6 +730,7 @@ export function StockWipWorkspace() {
           period={draft.period}
           onOpenChange={setCreateOpen}
           onCreate={handleCreate}
+          disabled={!canEdit}
         />
       )}
 
@@ -462,6 +760,7 @@ export function StockWipWorkspace() {
                 row={selectedDailyRow}
                 onChange={handleDailyChange}
                 onClose={() => setSelectedDailyCode(null)}
+                disabled={!canEdit}
               />
             </>
           )}
@@ -480,17 +779,18 @@ export function StockWipWorkspace() {
           <AlertDialogHeader>
             <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้บันทึก</AlertDialogTitle>
             <AlertDialogDescription>
-              การเปลี่ยนช่วงเวลาจะทิ้งการแก้ไขของชีตปัจจุบัน
-              หากต้องการเก็บข้อมูล กรุณากลับไปกดบันทึกก่อนเปลี่ยนปีหรือเดือน
+              การโหลดข้อมูลใหม่หรือเปลี่ยนช่วงเวลาจะทิ้งฉบับร่างปัจจุบัน
+              เมื่อโหลดข้อมูลสำเร็จ หากต้องการเก็บการแก้ไข กรุณากลับไปบันทึกก่อน
+              (หากระบบยังอนุญาตให้บันทึก)
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>กลับไปบันทึกก่อน</AlertDialogCancel>
+            <AlertDialogCancel>กลับไปตรวจสอบฉบับร่าง</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmPeriodChange}
             >
-              ทิ้งการแก้ไขและเปลี่ยนช่วงเวลา
+              ทิ้งการแก้ไขและโหลดข้อมูล
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

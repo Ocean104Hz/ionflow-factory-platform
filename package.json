@@ -18,7 +18,8 @@
     "db:migrate:sales-documents": "node --env-file=.env.local scripts/migrate-foliar-access.mjs --sales-documents",
     "db:migrate:sales-hub": "node --env-file=.env.local scripts/migrate-foliar-access.mjs --sales-hub",
     "auth:bootstrap-admin": "node --env-file=.env.local scripts/bootstrap-factory-admin.mjs",
-    "db:check:access": "node --env-file=.env.local scripts/check-access-database.mjs"
+    "db:check:access": "node --env-file=.env.local scripts/check-access-database.mjs",
+    "migration": "node --env-file=.env.local scripts/migrate-0006-0009.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

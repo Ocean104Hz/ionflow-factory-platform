@@ -10,7 +10,7 @@ import {
   StatusBadge,
   SectionCard,
 } from "@/src/components/factory/patterns";
-import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/src/components/ui/alert-dialog";
 import { qualityProfiles } from "./production-quality-profiles";
 import {
   emptyFilters,
@@ -29,7 +29,7 @@ export function QualityHistory({
   onEdit: (row: Inspection) => void;
   onView: (row: Inspection) => void;
 }) {
-  const { records, remove } = useProductionQuality();
+  const { records, remove, loaded, busy } = useProductionQuality();
   const [filters, setFilters] = useState({ ...emptyFilters });
   const [page, setPage] = useState(1),
     [size, setSize] = useState(10),
@@ -51,7 +51,7 @@ export function QualityHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติการตรวจสอบ"
-        subtitle={`พบ ${rows.length} จาก ${records.length} เอกสาร · ข้อมูลใน demo session`}
+        subtitle={`พบ ${rows.length} จาก ${records.length} เอกสาร · ข้อมูลจากฐานข้อมูล`}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-2">
@@ -237,23 +237,26 @@ export function QualityHistory({
                   แก้ไข
                 </Button>
                 <QualityPrintPreview row={r} />
-                <ConfirmDialog
-                  title="ลบเอกสารตรวจสอบนี้?"
-                  description="ลบเฉพาะเอกสารสาธิตนี้ ไม่เปลี่ยนสต็อก"
-                  trigger={
-                    <Button variant="ghost" size="sm" className="text-danger">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-danger" disabled={busy || !loaded}>
                       ลบ
                     </Button>
-                  }
-                  onConfirm={() => {
-                    try {
-                      remove(r.id);
-                      setError("");
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "ลบไม่สำเร็จ");
-                    }
-                  }}
-                />
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-surface">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>ลบเอกสารตรวจสอบนี้?</AlertDialogTitle>
+                      <AlertDialogDescription>นำเอกสารออกจากรายการโดยเก็บประวัติไว้ ไม่เปลี่ยนสต็อก</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                      <AlertDialogAction disabled={busy || !loaded} onClick={async () => {
+                        try { await remove(r); setError(""); }
+                        catch (e) { setError(e instanceof Error ? e.message : "ลบไม่สำเร็จ"); }
+                      }}>ยืนยัน</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             ),
           },

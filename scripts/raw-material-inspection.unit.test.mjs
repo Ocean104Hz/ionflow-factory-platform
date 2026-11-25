@@ -31,14 +31,30 @@ const example = () => ({
 
 test("QC print includes all fields, seven checks and escaped content on A5 landscape", async () => {
   const domainUrl = `data:text/javascript;base64,${Buffer.from(js).toString("base64")}`;
+  const thaiDateJs = ts.transpileModule(
+    read("src/lib/date/thai-date.ts"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+      },
+    },
+  ).outputText;
+
+  const thaiDateUrl =
+    `data:text/javascript;base64,${Buffer.from(thaiDateJs).toString("base64")}`;
   const printSource = ts
     .transpileModule(
       read("src/features/raw-material-inspections/inspection-print.ts"),
       { compilerOptions: { module: ts.ModuleKind.ESNext } },
     )
-    .outputText.replace(
+    .outputText
+    .replace(
       /from ["']\.\/inspection-domain["']/,
       `from "${domainUrl}"`,
+    )
+    .replace(
+      /from ["']@\/src\/lib\/date\/thai-date["']/,
+      `from "${thaiDateUrl}"`,
     );
   const { buildInspectionPrintHtml } = await import(
     `data:text/javascript;base64,${Buffer.from(printSource).toString("base64")}`
@@ -126,7 +142,7 @@ test("completion requires inspector, seven results and reasons; N/A alone cannot
   assert.ok(validateInspection(row, []).includes("อย่างน้อย"));
 });
 
-test("QC route and menu use shared shadcn patterns with no backend", () => {
+test("QC route and menu use shared shadcn patterns with backend integration", () => {
   const page = read(
     "src/features/raw-material-inspections/raw-material-inspections.tsx",
   );
@@ -153,5 +169,10 @@ test("QC route and menu use shared shadcn patterns with no backend", () => {
     "บันทึกผลตรวจครบถ้วน",
   ])
     assert.ok(page.includes(token), token);
-  assert.doesNotMatch(page, /fetch\(|axios|\/api\//);
+  assert.match(page, /fetch\("\/api\/qc-raw-material"/);
+  assert.match(page, /fetch\("\/api\/auth\/csrf"/);
+  assert.match(page, /method:\s*row\.id\s*\?\s*"PUT"\s*:\s*"POST"/);
+  assert.match(page, /method:\s*"DELETE"/);
+  assert.match(page, /x-csrf-token/);
+  assert.doesNotMatch(page, /mock-data/);
 });

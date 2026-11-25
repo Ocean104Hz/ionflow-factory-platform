@@ -13,7 +13,6 @@ import { MixingField } from "./mixing-header";
 import { MasterSelect } from "@/src/features/master-data/master-select";
 import {
   blankRound,
-  shifts,
   type MixingRound,
   type FieldErrors,
 } from "./mixing-domain";
@@ -177,7 +176,8 @@ export function MixingRoundTable({
     });
   return (
     <SectionCard
-      title="รอบผสมและผลตรวจ"
+      title="รอบผสมและผลตรวจ 6 จุด"
+      className="gap-3 rounded-xl border bg-card py-3 shadow-sm [&_[data-slot=card-header]]:border-b [&_[data-slot=card-header]]:px-4 [&_[data-slot=card-header]]:pb-3 [&_[data-slot=card-content]]:px-4"
       subtitle={`ผ่าน ${rows.filter((r) => r.is_pass === true).length} · ไม่ผ่าน ${rows.filter((r) => r.is_pass === false).length} · ยังไม่ตรวจ ${rows.filter((r) => r.is_pass === null).length} — ผลตรวจต่อรอบ ไม่ใช่สถานะอนุมัติเอกสาร`}
       action={
         onChange && (
@@ -199,12 +199,14 @@ export function MixingRoundTable({
           {errors.mix_rounds}
         </p>
       )}
+      <div className="[&_.factory-table_td]:py-2! [&_.factory-table_th]:px-3! [&_.factory-table_td]:px-3! [&_td_label]:sr-only">
       <FactoryDataTable
         rows={rows}
         columns={columns}
         rowKey={(r) => r.id}
-        minWidth={1150}
+        minWidth={1100}
       />
+      </div>
     </SectionCard>
   );
 }

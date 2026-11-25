@@ -1,22 +1,25 @@
 "use client";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/src/components/ui/popover";
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/src/components/ui/dialog";
 import {
   FactoryDataTable,
   SectionCard,
   type Column,
 } from "@/src/components/factory/patterns";
-import { mixingCatalog } from "@/src/lib/mock-data/fertilizer-powder-mixing";
 import { quantity } from "@/src/lib/formatters";
 import { MixingField } from "./mixing-header";
+import { useMixing } from "./mixing-provider";
 import type { Material, FieldErrors } from "./mixing-domain";
 
 export function MixingMaterialTable({
@@ -28,6 +31,7 @@ export function MixingMaterialTable({
   onChange?: (rows: Material[]) => void;
   errors?: FieldErrors;
 }) {
+  const { catalog, loading, busy, error } = useMixing();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const update = (index: number, patch: Partial<Material>) =>
@@ -85,9 +89,9 @@ export function MixingMaterialTable({
     { key: "unit", label: "หน่วย", render: (r) => r.unit },
     {
       key: "stock",
-      label: "คงเหลือจำลอง (อ้างอิง)",
+      label: "คงเหลือ (อ้างอิง)",
       numeric: true,
-      render: (r) => quantity(r.stock_balance),
+      render: (r) => r.stock_balance === null ? "—" : quantity(r.stock_balance),
     },
   ];
   if (onChange)
@@ -100,6 +104,7 @@ export function MixingMaterialTable({
           variant="ghost"
           size="icon"
           aria-label={`ลบวัตถุดิบ ${i + 1}`}
+          disabled={busy}
           onClick={() => onChange(rows.filter((m) => m.id !== r.id))}
         >
           <Trash2 aria-hidden="true" />
@@ -109,30 +114,32 @@ export function MixingMaterialTable({
   return (
     <SectionCard
       title="วัตถุดิบตามใบสั่งผสม"
-      subtitle="จำนวนตามแผน ไม่ใช่ยอดใช้จริง · คงเหลือเป็นข้อมูลจำลอง ไม่จองหรือตัดสต็อก"
+      className="gap-3 border-0 py-2 shadow-none"
+      contentClassName="px-0"
+      subtitle="จำนวนตามแผน ไม่ใช่ยอดใช้จริง · ยังไม่เชื่อมยอดคงเหลือ ไม่จองหรือตัดสต็อก"
       action={
         onChange && (
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline">
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline" disabled={loading || busy || !!error}>
                 <Plus aria-hidden="true" />
                 เพิ่มวัตถุดิบ
               </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-[min(480px,90vw)] space-y-3"
-            >
+            </DialogTrigger>
+            <DialogContent className="max-h-[85dvh] w-[94vw] max-w-[94vw] overflow-y-auto sm:max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>ค้นหาวัตถุดิบ</DialogTitle>
+                <DialogDescription>เลือกจากรายการวัตถุดิบใน Master Data</DialogDescription>
+              </DialogHeader>
               <Label htmlFor="mix-material-search">
                 ค้นหารหัส / ชื่อวัตถุดิบ
               </Label>
-              <Input
-                id="mix-material-search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <div className="max-h-64 space-y-1 overflow-y-auto">
-                {mixingCatalog
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="mix-material-search" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+              <div className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                {catalog
                   .filter((m) =>
                     `${m.material_code} ${m.material_name}`
                       .toLowerCase()
@@ -144,12 +151,16 @@ export function MixingMaterialTable({
                       type="button"
                       variant="ghost"
                       className="h-auto w-full justify-start py-3 text-left whitespace-normal"
+                      disabled={busy || loading || !!error}
                       onClick={() => {
                         onChange([
                           ...rows,
                           {
-                            ...m,
                             id: crypto.randomUUID(),
+                            material_code: m.material_code,
+                            material_name: m.material_name,
+                            unit: m.unit,
+                            stock_balance: m.stock_balance,
                             lot_no: "",
                             order_qty: 1,
                           },
@@ -161,24 +172,23 @@ export function MixingMaterialTable({
                       <span>
                         <span className="block">{m.material_name}</span>
                         <span className="block text-xs text-muted-foreground">
-                          {m.material_code} · {quantity(m.stock_balance)}{" "}
-                          {m.unit} (จำลอง)
+                          {m.material_code} · — {m.unit}
                         </span>
                       </span>
                     </Button>
                   ))}
-                {!mixingCatalog.some((m) =>
+                {!catalog.some((m) =>
                   `${m.material_code} ${m.material_name}`
                     .toLowerCase()
                     .includes(search.toLowerCase()),
                 ) && (
                   <p className="p-3 text-sm text-muted-foreground">
-                    ไม่พบวัตถุดิบ
+                    {error || (loading ? "กำลังโหลดวัตถุดิบ" : "ไม่พบวัตถุดิบ")}
                   </p>
                 )}
               </div>
-            </PopoverContent>
-          </Popover>
+            </DialogContent>
+          </Dialog>
         )
       }
     >
@@ -187,12 +197,14 @@ export function MixingMaterialTable({
           {errors.materials}
         </p>
       )}
+      <div className="[&_.factory-table_td]:py-2! [&_.factory-table_th]:px-3! [&_.factory-table_td]:px-3!">
       <FactoryDataTable
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
-        minWidth={850}
+        minWidth={760}
       />
+      </div>
     </SectionCard>
   );
 }

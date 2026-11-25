@@ -23,7 +23,7 @@ const domainUrl = url(
 );
 const d = await import(domainUrl);
 const p = await import(profileUrl);
-const fixtureSource = compile(read("src/lib/mock-data/production-quality.ts"))
+const fixtureSource = compile(read("scripts/fixtures/production-quality.ts"))
   .replace(
     /from ["']@\/src\/features\/production-quality\/production-quality-domain["']/g,
     `from "${domainUrl}"`,
@@ -62,7 +62,7 @@ const deepFreeze = (value) => {
   return value;
 };
 
-test("all new feature files parse and have no explicit any or backend/inventory imports", () => {
+test("all feature files parse and isolate network requests to the quality API client", () => {
   for (const file of readdirSync(new URL(`../${root}`, import.meta.url))) {
     if (!/\.tsx?$/.test(file)) continue;
     const source = read(root + file);
@@ -77,9 +77,13 @@ test("all new feature files parse and have no explicit any or backend/inventory 
     assert.deepEqual(result.diagnostics, [], file);
     assert.doesNotMatch(
       source,
-      /\bany\b|\bfetch\s*\(|localStorage|sessionStorage|from ["'][^"']*(?:inventory|purchase-requisitions|bom|raw-material-inspections|master-data|firebase|\bpg\b)/,
+      /\bany\b|localStorage|sessionStorage|from ["'][^"']*(?:inventory|purchase-requisitions|bom|raw-material-inspections|master-data|firebase|\bpg\b)/,
       file,
     );
+    if (file === "production-quality-api.ts") {
+      assert.match(source, /\/api\/production-quality/);
+      assert.match(source, /\/api\/auth\/csrf/);
+    } else assert.doesNotMatch(source, /\bfetch\s*\(/, file);
   }
 });
 
@@ -95,7 +99,7 @@ test("new Production Quality sources satisfy the project's strict TypeScript opt
     .map((f) => fileURLToPath(new URL(`../${root}${f}`, import.meta.url)));
   files.push(
     fileURLToPath(
-      new URL("../src/lib/mock-data/production-quality.ts", import.meta.url),
+      new URL("../scripts/fixtures/production-quality.ts", import.meta.url),
     ),
   );
   const program = ts.createProgram(files, {
@@ -500,7 +504,7 @@ test("provider is mounted once at Factory layout; page/workspace has three views
     "InventoryOperationsProvider",
     "MasterDataProvider",
   ])
-    assert.ok(layout.includes(`<${provider}>`));
+    assert.match(layout, new RegExp(`<${provider}(?=\\s|>)`), provider);
   assert.doesNotMatch(
     read("app/(factory)/production-quality/page.tsx"),
     /Provider/,
@@ -511,8 +515,11 @@ test("provider is mounted once at Factory layout; page/workspace has three views
   const provider = read(root + "production-quality-provider.tsx");
   assert.doesNotMatch(
     provider,
-    /commitOperation|ledger|inventory|fetch|Storage/,
+    /commitOperation|ledger|inventory|fetch|Storage|demoQualityInspections|mock-data/,
   );
+  assert.match(provider, /qualityApi\.list/);
+  assert.match(provider, /qualityApi\.save/);
+  assert.match(provider, /qualityApi\.archive/);
 });
 test("QC actions never receive or mutate Ledger: frozen external stock state stays byte-identical", () => {
   const ledger = deepFreeze({

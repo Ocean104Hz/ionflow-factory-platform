@@ -52,7 +52,10 @@ export function CustomerMaterialsCountForm({
 
   /* ---------------- update field ---------------- */
 
-  function updateValue(field: keyof CustomerMaterialsCountValues, value: string) {
+  function updateValue(
+    field: keyof CustomerMaterialsCountValues,
+    value: string,
+  ) {
     setDraft((previous) => ({ ...previous, [field]: value }));
     setErrors((previous) => {
       const next = { ...previous };
@@ -105,7 +108,7 @@ export function CustomerMaterialsCountForm({
         <div className="space-y-1 pr-6">
           <DialogTitle>บันทึกตรวจนับวัสดุ</DialogTitle>
           <DialogDescription>
-            บันทึกหรือแก้ไขจำนวนตรวจนับและผลต่างตามข้อมูลจริงของงวดที่เลือก
+            เพิ่มหรือแก้ไขจำนวนตรวจนับและผลต่างในฉบับร่างของงวดที่เลือก
           </DialogDescription>
         </div>
 
@@ -113,19 +116,29 @@ export function CustomerMaterialsCountForm({
           {/* Read-only material identity. */}
           <section className="space-y-3 rounded-xl border border-border bg-muted/25 p-4">
             <div className="flex items-center gap-2">
-              <ClipboardCheck className="size-4 text-primary" aria-hidden="true" />
+              <ClipboardCheck
+                className="size-4 text-primary"
+                aria-hidden="true"
+              />
               <h3 className="text-sm font-semibold">ข้อมูลวัสดุ</h3>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { label: "งวดข้อมูล", value: `${period.label} (${row.sheet_name})` },
+                {
+                  label: "งวดข้อมูล",
+                  value: `${period.label} (${row.sheet_name})`,
+                },
                 { label: "ฝ่ายขาย / ลูกค้า", value: row.item.sales_customer },
                 { label: "ประเภทวัสดุ", value: row.item.material_type },
                 { label: "รหัสสินค้า", value: row.item.code },
                 { label: "No.", value: row.item.no },
                 { label: "หน่วยนับ", value: row.item.unit },
-                { label: "รายละเอียด", value: row.item.description, wide: true },
+                {
+                  label: "รายละเอียด",
+                  value: row.item.description,
+                  wide: true,
+                },
               ].map((field) => (
                 <div
                   key={field.label}
@@ -144,7 +157,9 @@ export function CustomerMaterialsCountForm({
           <section className="rounded-xl border border-border bg-muted/25 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold">ยอดคงเหลือตามข้อมูลที่บันทึก</h3>
+                <h3 className="text-sm font-semibold">
+                  ยอดคงเหลือของรายการในฉบับร่าง
+                </h3>
                 <p className="text-xs text-muted-foreground">
                   แสดงเพื่ออ้างอิงเท่านั้น ไม่เปลี่ยนจากการตรวจนับ
                 </p>
@@ -153,7 +168,9 @@ export function CustomerMaterialsCountForm({
                 <p className="wrap-break-word text-xl font-semibold tabular-nums">
                   {row.summary.remaining_quantity || "-"}
                 </p>
-                <p className="text-xs text-muted-foreground">{row.item.unit || "หน่วย"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {row.item.unit || "หน่วย"}
+                </p>
               </div>
             </div>
           </section>
@@ -180,7 +197,9 @@ export function CustomerMaterialsCountForm({
                   value={draft.physical_count}
                   placeholder="ระบุจำนวนหรือข้อความตามต้นฉบับ"
                   className="tabular-nums"
-                  onChange={(event) => updateValue("physical_count", event.currentTarget.value)}
+                  onChange={(event) =>
+                    updateValue("physical_count", event.currentTarget.value)
+                  }
                 />
                 <p className="text-xs text-muted-foreground">
                   รองรับข้อความใน Excel เดิม เช่น ลบ 2 และค่าตัวเลข
@@ -206,7 +225,9 @@ export function CustomerMaterialsCountForm({
                       ? `${formId}-count-difference-error`
                       : `${formId}-count-difference-help`
                   }
-                  onChange={(event) => updateValue("count_difference", event.currentTarget.value)}
+                  onChange={(event) =>
+                    updateValue("count_difference", event.currentTarget.value)
+                  }
                 />
                 {errors.count_difference ? (
                   <p
@@ -217,7 +238,10 @@ export function CustomerMaterialsCountForm({
                     {errors.count_difference}
                   </p>
                 ) : (
-                  <p id={`${formId}-count-difference-help`} className="text-xs text-muted-foreground">
+                  <p
+                    id={`${formId}-count-difference-help`}
+                    className="text-xs text-muted-foreground"
+                  >
                     รองรับตัวเลขบวก ลบ ทศนิยม หรือเว้นว่าง
                   </p>
                 )}
@@ -234,7 +258,9 @@ export function CustomerMaterialsCountForm({
               rows={3}
               value={draft.remark}
               placeholder="ระบุหมายเหตุเพิ่มเติม"
-              onChange={(event) => updateValue("remark", event.currentTarget.value)}
+              onChange={(event) =>
+                updateValue("remark", event.currentTarget.value)
+              }
             />
             <p className="text-xs text-muted-foreground">
               หมายเหตุเป็นช่องเดียวกับหมายเหตุของรายการวัสดุ (คอลัมน์ O)
@@ -243,13 +269,22 @@ export function CustomerMaterialsCountForm({
 
           <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
             <p>ช่องว่างและจำนวน 0 มีความหมายแตกต่างกัน</p>
-            <p>บันทึกเฉพาะตรวจนับ ผลต่าง และหมายเหตุ ไม่แก้ยอดสรุปอื่นหรือรับ-จ่ายรายวัน</p>
+            <p>
+              แก้ไขเฉพาะตรวจนับ ผลต่าง และหมายเหตุในฉบับร่าง
+              ไม่แก้ยอดสรุปอื่นหรือรับ-จ่ายรายวัน
+            </p>
             <p>ไม่คำนวณผลต่าง ยอดคงเหลือ หรือยกยอดข้ามเดือนอัตโนมัติ</p>
-            <p>UI Mock · จัดเก็บภายในเบราว์เซอร์เมื่อเชื่อมกับ Workspace ไม่มีฐานข้อมูลจริง</p>
+            <p>
+              ข้อมูลในฟอร์มนี้จะอยู่ในฉบับร่างเท่านั้น
+              กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล
+            </p>
           </div>
 
           {errors.form && (
-            <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">
+            <p
+              role="alert"
+              className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive"
+            >
               {errors.form}
             </p>
           )}
@@ -258,7 +293,7 @@ export function CustomerMaterialsCountForm({
             <Button type="button" variant="outline" onClick={onCancel}>
               ยกเลิก
             </Button>
-            <Button type="submit">บันทึกตรวจนับวัสดุ</Button>
+            <Button type="submit">บันทึกลงฉบับร่าง</Button>
           </div>
         </form>
       </DialogContent>

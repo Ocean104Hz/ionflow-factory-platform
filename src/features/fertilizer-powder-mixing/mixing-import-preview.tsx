@@ -78,11 +78,11 @@ export function MixingImportPreview() {
   ];
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      {/* <DialogTrigger asChild>
         <Button variant="outline" onClick={() => setMessage("")}>
           Import Preview
         </Button>
-      </DialogTrigger>
+      </DialogTrigger> */}
       <DialogContent className="flex max-h-[92dvh] w-[96vw] max-w-[96vw] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader className="pr-8">
           <DialogTitle>นำเข้าข้อมูลตัวอย่าง · UI Demo</DialogTitle>

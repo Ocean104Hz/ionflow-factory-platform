@@ -10,30 +10,40 @@ import {
   type MixingReport,
   type FieldErrors,
 } from "./mixing-domain";
+
 export function MixingForm({
   initial,
   onSaved,
+  onDirtyChange,
 }: {
   initial: MixingReport;
   onSaved: () => void;
+  onDirtyChange?: () => void;
 }) {
   const [row, setRow] = useState(() => structuredClone(initial));
   const [errors, setErrors] = useState<FieldErrors>({});
   const summary = useRef<HTMLDivElement>(null);
-  const { save } = useMixing();
-  const patch = (value: Partial<MixingReport>) =>
+  const submitting = useRef(false);
+  const { save, busy, loading, error: loadError } = useMixing();
+  const patch = (value: Partial<MixingReport>) => {
+    if (submitting.current || busy) return;
     setRow((r) => ({ ...r, ...value }));
+    onDirtyChange?.();
+  };
   return (
     <form
       id="mixing-editor"
       noValidate
       className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (submitting.current || busy || loading || loadError) return;
+        submitting.current = true;
+        setErrors({});
         try {
-          save(row);
+          await save(row);
           onSaved();
-        } catch (error) {
+        } catch (error: unknown) {
           setErrors(
             error instanceof MixingValidationError
               ? error.fields
@@ -43,6 +53,8 @@ export function MixingForm({
                 },
           );
           summary.current?.focus();
+        } finally {
+          submitting.current = false;
         }
       }}
     >
@@ -64,6 +76,8 @@ export function MixingForm({
         )}
       </div>
       <MixingHeader row={row} onChange={patch} errors={errors} />
+      <section aria-label="ตารางรอบผสมและวัตถุดิบ" className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <h2 className="border-b border-border pb-3 text-base font-semibold">ตารางรอบผสมและวัตถุดิบ</h2>
       <MixingMaterialTable
         rows={row.materials}
         onChange={(materials) => patch({ materials })}
@@ -76,6 +90,7 @@ export function MixingForm({
         onChange={(mix_rounds) => patch({ mix_rounds })}
         errors={errors}
       />
+      </section>
       <MixingSigners row={row} onChange={patch} errors={errors} />
     </form>
   );
