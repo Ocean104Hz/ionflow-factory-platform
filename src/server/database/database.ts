@@ -59,7 +59,7 @@ export function createDevelopmentDatabase(
       statement_timeout: config.statementTimeoutMillis,
       query_timeout: config.statementTimeoutMillis + 1000,
       lock_timeout: config.statementTimeoutMillis,
-      application_name: "foliar-fertilizer-development",
+      application_name: "foliar-fertilizer-app",
       ssl: false,
       options: "-c search_path=pg_catalog -c default_transaction_read_only=on",
     });

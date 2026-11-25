@@ -113,7 +113,7 @@ export function SettingsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">
               {selected === "users"
-                ? "จัดการข้อมูลผู้ใช้ บทบาท และการมองเห็นเมนูในระบบสาธิต"
+                ? "จัดการผู้ใช้ Role และ Module ที่บังคับใช้จริงใน Foliar Fertilizer"
                 : selected === "branding"
                   ? "ปรับชื่อ โลโก้ ภาพประกอบ และสีธีมของโรงงาน"
                   : `จัดการข้อมูล${title}สำหรับการใช้งานภายในโรงงาน`}

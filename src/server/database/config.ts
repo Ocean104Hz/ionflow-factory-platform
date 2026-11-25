@@ -21,8 +21,8 @@ export class BackendError extends Error {
   }
 }
 export interface DatabaseConfig {
-  host: "127.0.0.1";
-  port: 5433;
+  host: string;
+  port: number;
   database: "production";
   schema: "foliar_fertilizer";
   user: string;
@@ -35,16 +35,24 @@ export interface DatabaseConfig {
 export function readDatabaseConfig(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): DatabaseConfig {
-  if (env.NODE_ENV === "production")
-    throw new BackendError("DB_CONFIG_INVALID");
   if (env.FACTORY_DB_ENABLED !== "true") throw new BackendError("DB_DISABLED");
-  const fail = () => {
+  const fail = (): never => {
     throw new BackendError("DB_CONFIG_INVALID");
   };
-  const host = env.FACTORY_DB_HOST;
-  if (host !== "127.0.0.1") return fail();
+  const production = env.NODE_ENV === "production";
+  const instance = env.FACTORY_DB_INSTANCE_CONNECTION_NAME ?? "";
+  const host = production ? `/cloudsql/${instance}` : env.FACTORY_DB_HOST;
+  const port = production ? 5432 : Number(env.FACTORY_DB_PORT);
   if (
-    env.FACTORY_DB_PORT !== "5433" ||
+    (production &&
+      instance !==
+        "ionflow-data-prod:asia-southeast3:ionflow-central-postgres") ||
+    (!production && host !== "127.0.0.1") ||
+    !host
+  )
+    return fail();
+  if (
+    (!production && env.FACTORY_DB_PORT !== "5433") ||
     env.FACTORY_DB_NAME !== "production" ||
     env.FACTORY_DB_SCHEMA !== "foliar_fertilizer"
   )
@@ -68,7 +76,7 @@ export function readDatabaseConfig(
   }
   return {
     host,
-    port: 5433,
+    port,
     database: "production",
     schema: "foliar_fertilizer",
     user,
