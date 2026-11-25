@@ -216,9 +216,9 @@ export function MaterialIssueProductPickerModal({
                         {row.summary.closing_balance || "-"}
                       </TableCell>
 
-                      <TableCell className="text-center">
+                      {/* <TableCell className="text-center">
                         {row.item.unit || "-"}
-                      </TableCell>
+                      </TableCell> */}
 
                       <TableCell className="text-center">
                         <Button
