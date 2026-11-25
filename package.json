@@ -12,7 +12,8 @@
     "db:migrate:production-v1": "node --env-file=.env.local scripts/migrate-foliar-access.mjs --production-v1",
     "db:migrate:organic": "node --env-file=.env.local scripts/migrate-foliar-access.mjs --organic",
     "auth:bootstrap-admin": "node --env-file=.env.local scripts/bootstrap-factory-admin.mjs",
-    "db:check:access": "node --env-file=.env.local scripts/check-access-database.mjs"
+    "db:check:access": "node --env-file=.env.local scripts/check-access-database.mjs",
+    "migration": "node --env-file=.env.local scripts/migrate-0006-0009.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

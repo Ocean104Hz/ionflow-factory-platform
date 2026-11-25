@@ -3,22 +3,18 @@ import {
   inspectionStatus,
   type Inspection,
 } from "./inspection-domain";
+import { formatDateForPrint } from "@/src/lib/date/thai-date";
 
 const text = (value: string) =>
   (value || "—").replace(
     /[&<>"']/g,
     (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
+      c
       ]!,
   );
 const date = (value: string) =>
-  value && !Number.isNaN(Date.parse(value))
-    ? new Intl.DateTimeFormat("th-TH", {
-        dateStyle: "medium",
-        timeZone: "Asia/Bangkok",
-      }).format(new Date(`${value}T00:00:00+07:00`))
-    : "—";
+  formatDateForPrint(value) || "—";
 
 export function buildInspectionPrintHtml(
   row: Inspection,
@@ -31,9 +27,9 @@ export function buildInspectionPrintHtml(
 ) {
   const logo =
     branding.logoDataUrl &&
-    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
-      branding.logoDataUrl,
-    )
+      /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+        branding.logoDataUrl,
+      )
       ? `<img alt="โลโก้โรงงาน" src="${text(branding.logoDataUrl)}">`
       : `<strong>${text(branding.shortName)}</strong>`;
   const field = (label: string, value: string) =>

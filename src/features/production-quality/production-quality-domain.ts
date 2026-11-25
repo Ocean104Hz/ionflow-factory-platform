@@ -103,6 +103,8 @@ export const signerRoles = [
 ] as const;
 export type Inspection = {
   id: string;
+  /** Database optimistic-concurrency version, absent for unsaved forms. */
+  version?: string;
   profileId: ProfileId;
   inspectionDate: string;
   documentNumber: string;

@@ -6,7 +6,7 @@ export type Material = {
   lot_no: string;
   order_qty: number;
   unit: string;
-  stock_balance: number;
+  stock_balance: number | null;
 };
 export type MixingRound = {
   id: string;
@@ -20,6 +20,7 @@ export type MixingRound = {
 };
 export type MixingReport = {
   masterRefs?: MasterReferences;
+  version?: string | undefined;
   id: string;
   report_date: string;
   fertilizer: string;

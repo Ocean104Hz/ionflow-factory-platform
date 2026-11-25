@@ -19,9 +19,11 @@ import type { Inspection } from "./inspection-domain";
 export function InspectionPrintPreview({
   row,
   unsaved = false,
+  iconOnly = false,
 }: {
   row: Inspection;
   unsaved?: boolean;
+  iconOnly?: boolean;
 }) {
   const { branding } = useBranding();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -41,10 +43,23 @@ export function InspectionPrintPreview({
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline">
-          <Printer />
-          พิมพ์ใบตรวจสอบ
-        </Button>
+        {iconOnly ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-9 hover:bg-primary/5 hover:text-primary"
+            title="พิมพ์เอกสาร"
+            aria-label="พิมพ์เอกสาร"
+          >
+            <Printer className="size-4" />
+          </Button>
+        ) : (
+          <Button type="button" variant="outline">
+            <Printer />
+            พิมพ์ใบตรวจสอบ
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="flex max-h-[94dvh] w-[96vw] max-w-[96vw] flex-col sm:max-w-6xl">
         <DialogHeader className="pr-8">

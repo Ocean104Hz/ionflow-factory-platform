@@ -23,28 +23,21 @@ export function MixingSigners({
   ] as const;
   return (
     <SectionCard
-      title="ผู้ลงชื่อ"
+      title="ชื่อผู้ลงนาม"
+      className="gap-3 rounded-xl border bg-card py-3 shadow-sm [&_[data-slot=card-header]]:border-b [&_[data-slot=card-header]]:px-4 [&_[data-slot=card-header]]:pb-3 [&_[data-slot=card-content]]:px-4"
       subtitle="ข้อมูลชื่อจำลองเท่านั้น ไม่ใช่ลายเซ็นดิจิทัลหรือสิทธิ์อนุมัติจริง"
     >
       {onChange ? (
         <div className="grid gap-4 md:grid-cols-3">
           {roles.map(([key, label]) => (
-            <MasterSelect
-              kind="personnel"
-              reference={row.masterRefs?.[key]}
-              key={key}
-              label={label}
-              value={row[key]}
-              onChange={(value) => onChange({ [key]: value })}
-            />
+            <div key={key} className="space-y-3 rounded-xl border border-border bg-card p-4">
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <MasterSelect kind="personnel" reference={row.masterRefs?.[key]} label="ชื่อ / รหัสผู้ใช้" value={row[key]} onChange={(value) => onChange({ [key]: value })} />
+              {key === "inspector" && (
+                <MixingField label="วันที่ตรวจสอบคุณภาพ" type="date" value={row.inspector_date} onChange={(e) => onChange({ inspector_date: e.target.value })} error={errors.inspector_date} />
+              )}
+            </div>
           ))}
-          <MixingField
-            label="วันที่ตรวจสอบคุณภาพ"
-            type="date"
-            value={row.inspector_date}
-            onChange={(e) => onChange({ inspector_date: e.target.value })}
-            error={errors.inspector_date}
-          />
         </div>
       ) : (
         <InfoGrid>
