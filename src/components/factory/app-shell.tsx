@@ -52,6 +52,7 @@ import {
   navigation,
   navigationGroups,
   isNavigationActive,
+  navigationModuleKey,
 } from "@/src/lib/constants/navigation";
 import { Alert, AlertDescription } from "../ui/alert";
 
@@ -59,6 +60,7 @@ type CurrentUser = Readonly<{
   displayName: string;
   email: string;
   roles: readonly string[];
+  modules: readonly string[];
 }>;
 
 const SIDEBAR_STORAGE_KEY = "ionflow.sidebar.open";
@@ -215,7 +217,12 @@ function AppSidebar({
     return (
       <SidebarMenu>
         {navigation
-          .filter((item) => item.group === group)
+          .filter(
+            (item) =>
+              item.group === group &&
+              item.href &&
+              currentUser.modules.includes(navigationModuleKey(item.href)),
+          )
           .map((item) => (
             <SidebarMenuItem key={item.title}>
               {item.href ? (
@@ -244,32 +251,7 @@ function AppSidebar({
                     {!compact && <span>{item.title}</span>}
                   </Link>
                 </SidebarMenuButton>
-              ) : (
-                <SidebarMenuButton
-                  tooltip={`${item.title} · ยังไม่มีหน้าสาธิต`}
-                  aria-label={`${item.title} · ยังไม่มีหน้าสาธิต`}
-                  className="h-9"
-                  onClick={() => {
-                    onPreview(item.title);
-                    setOpenMobile(false);
-                  }}
-                >
-                  <item.icon aria-hidden="true" />
-                  {!compact && (
-                    <>
-                      <span
-                        title={item.title}
-                        className="min-w-0 flex-1 truncate text-muted-foreground"
-                      >
-                        {item.title}
-                      </span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        เร็วๆนี้
-                      </span>
-                    </>
-                  )}
-                </SidebarMenuButton>
-              )}
+              ) : null}
             </SidebarMenuItem>
           ))}
       </SidebarMenu>

@@ -30,7 +30,7 @@ export function createDevelopmentDatabase(
   makePool: (options: PoolConfig) => DatabasePool = (options) =>
     new Pool(options),
 ): DevelopmentDatabase {
-  // Revalidate caller-supplied config too: this Phase 1 utility must never target production.
+  // Revalidate caller-supplied config so the local proxy cannot be redirected elsewhere.
   readDatabaseConfig({
     NODE_ENV: process.env.NODE_ENV,
     FACTORY_DB_ENABLED: "true",
@@ -59,7 +59,7 @@ export function createDevelopmentDatabase(
       statement_timeout: config.statementTimeoutMillis,
       query_timeout: config.statementTimeoutMillis + 1000,
       lock_timeout: config.statementTimeoutMillis,
-      application_name: "ionflow-factory-development",
+      application_name: "foliar-fertilizer-app",
       ssl: false,
       options: "-c search_path=pg_catalog -c default_transaction_read_only=on",
     });
@@ -84,7 +84,7 @@ export function createDevelopmentDatabase(
     try {
       await client.query("BEGIN READ ONLY");
       await client.query(
-        "SET LOCAL search_path TO pg_catalog, inventory_sandbox",
+        "SET LOCAL search_path TO pg_catalog, foliar_fertilizer",
       );
       const result = await work({
         async query(text, values = []) {

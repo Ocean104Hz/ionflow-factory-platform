@@ -1,63 +1,44 @@
 import "server-only";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import {
   FactoryAuthError,
-  getCurrentFactoryUser,
-  requireFactoryPermission,
+  requireFactoryModule,
+  requireFactoryRole,
   type AuthenticatedFactoryUser,
 } from "./auth-service.ts";
 import { SESSION_COOKIE } from "./auth-http.ts";
-import { getFactoryAuthRepository } from "./postgres-auth-repository.ts";
-import { getTrustedLocalScopeResolver } from "./local-scope-resolver.ts";
-import {
-  assertDevelopmentRequestHost,
-  developmentAuthEnabled,
-  loginWithDevelopmentPassword,
-  readDevelopmentSession,
-} from "./development-auth.ts";
+import { verifyFirebaseSessionCookie } from "./firebase-admin.ts";
+import { findFactoryUserByUid } from "./access-repository.ts";
 
 export async function readCurrentFactoryUser(): Promise<AuthenticatedFactoryUser | null> {
   await connection();
-
-  const secret = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!secret) return null;
-
-  if (developmentAuthEnabled()) {
-    assertDevelopmentRequestHost(await headers());
-    return readDevelopmentSession(secret);
+  const session = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!session) return null;
+  try {
+    const decoded = await verifyFirebaseSessionCookie(session);
+    return await findFactoryUserByUid(decoded.uid);
+  } catch (error) {
+    if (error instanceof FactoryAuthError) return null;
+    throw error;
   }
-
-  return getCurrentFactoryUser(
-    getFactoryAuthRepository(),
-    secret,
-    getTrustedLocalScopeResolver(),
-  );
 }
 
 export async function requireAuthenticatedFactoryUser(): Promise<AuthenticatedFactoryUser> {
-  // shortcut: local development bypasses the login form, remove when PostgreSQL auth is ready.
-  if (developmentAuthEnabled())
-    return loginWithDevelopmentPassword({
-      email: process.env.FACTORY_DEV_AUTH_EMAIL,
-      password: process.env.FACTORY_DEV_AUTH_PASSWORD,
-    }).user;
-  try {
-    const user = await readCurrentFactoryUser();
-    if (user) return user;
-  } catch (error) {
-    if (!(error instanceof FactoryAuthError)) throw error;
-  }
-
+  const user = await readCurrentFactoryUser();
+  if (user) return user;
   redirect("/login");
 }
 
-export async function requireAuthenticatedFactoryPermission(
-  permission: string,
-  siteId?: string,
-): Promise<AuthenticatedFactoryUser> {
+export async function requireAuthenticatedFactoryModule(moduleKey: string) {
   const user = await requireAuthenticatedFactoryUser();
-  requireFactoryPermission(user, permission, siteId);
+  requireFactoryModule(user, moduleKey);
+  return user;
+}
+
+export async function requireAuthenticatedFactoryRole(roleCode: string) {
+  const user = await requireAuthenticatedFactoryUser();
+  requireFactoryRole(user, roleCode);
   return user;
 }

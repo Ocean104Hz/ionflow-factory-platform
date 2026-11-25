@@ -25,8 +25,18 @@ import {
 } from "@/src/components/ui/dialog";
 import { FactoryLogo } from "@/src/components/factory/factory-logo";
 import { useBranding } from "@/src/components/factory/branding-provider";
+import { getApp, getApps, initializeApp, type FirebaseOptions } from "firebase/app";
+import {
+  inMemoryPersistence,
+  getAuth,
+  sendPasswordResetEmail,
+  setPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { Checkbox } from "@/src/components/ui/checkbox";
 
-export function Login() {
+export function Login({ firebaseConfig }: { firebaseConfig: FirebaseOptions }) {
   const { branding } = useBranding();
   const id = useId();
   const router = useRouter();
@@ -94,7 +104,7 @@ export function Login() {
             </div>
             <Alert role="note" className="mb-6 border-info/20 bg-info/5">
               <AlertDescription className="text-xs text-info">
-                LOCAL LOGIN · ตรวจสอบบัญชีและ Session ผ่าน PostgreSQL Local
+                บัญชีกลาง · ยืนยันตัวตนผ่าน Google Cloud Identity Platform
               </AlertDescription>
             </Alert>
             <form
@@ -103,16 +113,43 @@ export function Login() {
                 event.preventDefault();
                 const form = event.currentTarget;
                 const values = new FormData(form);
+                let firebaseAuth: ReturnType<typeof getAuth> | null = null;
                 setPending(true);
                 setError("");
                 try {
+                  if (!firebaseConfig.apiKey || !firebaseConfig.projectId)
+                    throw new Error("ยังไม่ได้ตั้งค่า Identity Platform สำหรับโปรเจกต์นี้");
+                  const firebaseApp = getApps().length
+                    ? getApp()
+                    : initializeApp(firebaseConfig);
+                  const auth = getAuth(firebaseApp);
+                  firebaseAuth = auth;
+                  await setPersistence(auth, inMemoryPersistence);
+                  const email = String(values.get("email") ?? "").trim();
+                  const password = String(values.get("password") ?? "");
+                  const credential = await signInWithEmailAndPassword(
+                    auth,
+                    email,
+                    password,
+                  );
+                  const idToken = await credential.user.getIdToken(true);
+                  const csrfResponse = await fetch("/api/auth/csrf", {
+                    credentials: "same-origin",
+                    cache: "no-store",
+                  });
+                  const csrf = await csrfResponse.json().catch(() => null);
+                  if (!csrfResponse.ok || !csrf?.csrfToken)
+                    throw new Error("ไม่สามารถเริ่ม Session ที่ปลอดภัยได้");
                   const response = await fetch("/api/auth/login", {
                     method: "POST",
                     credentials: "same-origin",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-csrf-token": csrf.csrfToken,
+                    },
                     body: JSON.stringify({
-                      email: values.get("email"),
-                      password: values.get("password"),
+                      idToken,
+                      remember: values.get("remember") === "on",
                     }),
                   });
                   const result = await response.json().catch(() => null);
@@ -136,6 +173,7 @@ export function Login() {
                     password.focus();
                   }
                 } finally {
+                  if (firebaseAuth) await signOut(firebaseAuth).catch(() => undefined);
                   setPending(false);
                 }
               }}
@@ -175,7 +213,13 @@ export function Login() {
                   </Button>
                 </div>
               </div>
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox id={`${id}-remember`} name="remember" />
+                  <Label htmlFor={`${id}-remember`} className="text-sm font-normal">
+                    จดจำฉัน 14 วัน
+                  </Label>
+                </div>
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button type="button" variant="link" className="h-auto p-0">
@@ -186,10 +230,30 @@ export function Login() {
                     <DialogHeader>
                       <DialogTitle>การกู้คืนรหัสผ่าน</DialogTitle>
                       <DialogDescription>
-                        Local Login V1 ยังไม่มีระบบกู้คืนรหัสผ่าน
-                        กรุณาติดต่อผู้ดูแล Factory เพื่อดำเนินการอย่างปลอดภัย
+                        ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลที่กรอกในช่องด้านบน
                       </DialogDescription>
                     </DialogHeader>
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const emailInput = document.getElementById(`${id}-email`);
+                          const email = emailInput instanceof HTMLInputElement
+                            ? emailInput.value.trim()
+                            : "";
+                          if (!email) throw new Error("กรุณากรอกอีเมลก่อน");
+                          const firebaseApp = getApps().length
+                            ? getApp()
+                            : initializeApp(firebaseConfig);
+                          await sendPasswordResetEmail(getAuth(firebaseApp), email);
+                          setError("");
+                        } catch (reason) {
+                          setError(reason instanceof Error ? reason.message : "ส่งอีเมลไม่สำเร็จ");
+                        }
+                      }}
+                    >
+                      ส่งลิงก์ตั้งรหัสผ่านใหม่
+                    </Button>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -204,7 +268,7 @@ export function Login() {
               </Button>
             </form>
             <p className="mt-5 text-center text-xs text-muted-foreground">
-              Session มีอายุจำกัดและตรวจสอบสิทธิ์จาก Server ทุกครั้ง
+              Session เป็น HttpOnly Cookie และตรวจสอบ Role/Module จากฐานข้อมูลทุกครั้ง
             </p>
           </Card>
         </div>

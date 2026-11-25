@@ -1,59 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  FactoryAuthError,
-  createCsrfToken,
-  loginWithLocalPassword,
-} from "@/src/server/auth/auth-service.ts";
+import { FactoryAuthError, createCsrfToken } from "@/src/server/auth/auth-service.ts";
 import {
   CSRF_COOKIE,
   SESSION_COOKIE,
+  assertCsrf,
   assertTrustedAuthRequest,
   authErrorResponse,
   csrfCookieOptions,
   publicUser,
   sessionCookieOptions,
 } from "@/src/server/auth/auth-http.ts";
-import { getFactoryAuthRepository } from "@/src/server/auth/postgres-auth-repository.ts";
-import { getTrustedLocalScopeResolver } from "@/src/server/auth/local-scope-resolver.ts";
 import {
-  developmentAuthEnabled,
-  loginWithDevelopmentPassword,
-} from "@/src/server/auth/development-auth.ts";
+  createFirebaseSessionCookie,
+  verifyFirebaseIdToken,
+} from "@/src/server/auth/firebase-admin.ts";
+import { findFactoryUserByUid } from "@/src/server/auth/access-repository.ts";
+
+const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   try {
     assertTrustedAuthRequest(request);
+    assertCsrf(request);
     if (!request.headers.get("content-type")?.startsWith("application/json"))
       throw new FactoryAuthError("INVALID_REQUEST", 400);
-    const rawBody = await request.text();
-    if (Buffer.byteLength(rawBody, "utf8") > 4096)
-      throw new FactoryAuthError("INVALID_REQUEST", 400);
-    const body = (() => {
-      try {
-        return JSON.parse(rawBody);
-      } catch {
-        return null;
-      }
-    })();
-    const input = { email: body?.email, password: body?.password };
-    const result = developmentAuthEnabled()
-      ? loginWithDevelopmentPassword(input)
-      : await loginWithLocalPassword(getFactoryAuthRepository(), input, {
-          scopeResolver: getTrustedLocalScopeResolver(),
-        });
+    const body = await request.json().catch(() => null);
+    const idToken = body?.idToken;
+    const decoded = await verifyFirebaseIdToken(idToken);
+    if (!decoded.email || !decoded.email_verified)
+      throw new FactoryAuthError("INVALID_CREDENTIALS", 401);
+    const user = await findFactoryUserByUid(decoded.uid, {
+      email: decoded.email,
+      name: decoded.name,
+    });
+    if (!user) throw new FactoryAuthError("INVALID_CREDENTIALS", 401);
+    const expiresIn = body?.remember === true ? FOURTEEN_DAYS : EIGHT_HOURS;
+    const sessionCookie = await createFirebaseSessionCookie(idToken, expiresIn);
     const csrfToken = createCsrfToken();
     const response = NextResponse.json(
-      { ok: true, user: publicUser(result.user) },
+      { ok: true, user: publicUser(user) },
       { headers: { "Cache-Control": "no-store" } },
     );
-    const expires = new Date(result.user.sessionExpiresAt);
-    response.cookies.set(SESSION_COOKIE, result.sessionSecret, {
+    response.cookies.set(SESSION_COOKIE, sessionCookie, {
       ...sessionCookieOptions,
-      expires,
+      expires: new Date(Date.now() + expiresIn),
     });
     response.cookies.set(CSRF_COOKIE, csrfToken, {
       ...csrfCookieOptions,
-      expires,
+      expires: new Date(Date.now() + expiresIn),
     });
     return response;
   } catch (error) {

@@ -17,7 +17,9 @@ const expectedGroups = {
       "ตรวจคุณภาพปุ๋ยอินทรีย์เคมี",
       "ใบ NC",
       "ใบส่งตัวอย่าง",
-      "แบบบันทึกการส่งตัวอย่าง",
+      "แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์",
+      "i-Lab แบบบันทึกรับตัวอย่าง",
+      "QC ตรวจเช็คน้ำหนักผลิตภัณฑ์",
     ],
   ],
   WAREHOUSE: [
@@ -25,7 +27,12 @@ const expectedGroups = {
     [
       "รับวัตถุดิบและวัสดุ",
       "เบิกวัสดุ/วัตถุดิบ",
+      "ใบเบิกจ่ายวัสดุ",
       "สินค้าคงคลัง",
+      "สต็อกสินค้า",
+      "วัสดุคงเหลือ FF",
+      "สต็อก WIP FF",
+      "สต็อก RM FF",
     ],
   ],
   PRODUCTION: [
@@ -39,15 +46,26 @@ const expectedGroups = {
       "ใบรับยอดผลิต V2",
     ],
   ],
+  ORGANIC: [
+    "ชุดอินทรีย์",
+    [
+      "บันทึกการรับ-จ่าย WIP",
+      "ใบตรวจรับวัตถุดิบ/รับเข้าวัตถุดิบ",
+      "ใบบันทึกการใช้วัตถุสกัด/อุณหภูมิในการผลิต",
+      "บันทึกการรับ-จ่าย วัตถุดิบต้มสกัด",
+      "บันทึกการรับ-จ่ายวัตถุดิบเม็ดฟู่",
+    ],
+  ],
   PACKING: ["บรรจุสินค้า", ["รายงานการบรรจุ", "ใบแจ้งสั่งแพ็คสินค้า"]],
   LOGISTICS: ["จ่ายและขนส่ง", ["ใบส่งสินค้า", "ใบจ่ายสินค้า"]],
   "SALES DOCUMENTS": ["เอกสารขาย", ["ใบแจ้งหนี้"]],
-  MAINTENANCE: ["ซ่อมบำรุง", ["ใบแจ้งซ่อม", "รายการอุปกรณ์", "รายงานซ่อมบำรุง"]],
+  MAINTENANCE: ["ซ่อมบำรุง", ["ใบแจ้งซ่อม", "งานของช่าง", "รายการอุปกรณ์", "รายงานซ่อมบำรุง"]],
   "MASTER DATA": ["ข้อมูลหลัก", ["สินค้าและราคากลาง"]],
   SYSTEM: ["ระบบ", ["ตั้งค่าระบบ"]],
 };
 const routes = {
   ใบแจ้งซ่อม: "/repair-requests",
+  งานของช่าง: "/maintenance-work",
   รายการอุปกรณ์: "/equipment",
   รายงานซ่อมบำรุง: "/maintenance-reports",
   PO: "/purchase-orders",
@@ -71,7 +89,21 @@ const routes = {
   ใบแจ้งสั่งแพ็คสินค้า: "/packing-summary",
   "ใบ NC": "/nc-reports",
   ใบส่งตัวอย่าง: "/sample-submissions",
-  แบบบันทึกการส่งตัวอย่าง: "/sample-submission-log",
+  แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์: "/sample-submission-log",
+  "i-Lab แบบบันทึกรับตัวอย่าง": "/lab_sample_receiving",
+  "QC ตรวจเช็คน้ำหนักผลิตภัณฑ์": "/qc_product_weight_check",
+  ใบเบิกจ่ายวัสดุ: "/material-issues",
+  สต็อกสินค้า: "/stock_products",
+  "วัสดุคงเหลือ FF": "/stock_remaining_materials_ff",
+  "สต็อก WIP FF": "/stock_wip_ff",
+  "สต็อก RM FF": "/stock_rm_ff",
+  "บันทึกการรับ-จ่าย WIP": "/wip-receiving-issuing",
+  "ใบตรวจรับวัตถุดิบ/รับเข้าวัตถุดิบ": "/organic_raw_material_receiving",
+  "ใบบันทึกการใช้วัตถุสกัด/อุณหภูมิในการผลิต":
+    "/organic_extraction_temperature",
+  "บันทึกการรับ-จ่าย วัตถุดิบต้มสกัด":
+    "/organic_extraction_material_ledger",
+  "บันทึกการรับ-จ่ายวัตถุดิบเม็ดฟู่": "/effervescent_material_ledger",
   สูตรผสมวัตถุดิบ: "/bom",
   ใบส่งสินค้า: "/delivery-orders",
   ใบแจ้งหนี้: "/invoices",
@@ -102,10 +134,10 @@ function catalog() {
   ].map(([, key, title]) => ({ key, title }));
   return { items, groups };
 }
-test("sidebar has 31 canonical items in the approved business groups", () => {
+test("sidebar has 44 canonical items in the approved business groups", () => {
   const { items, groups } = catalog();
   const titles = items.map((item) => item.title);
-  assert.equal(items.length, 31);
+  assert.equal(items.length, 44);
   assert.equal(titles.length, new Set(titles).size);
   assert.deepEqual(
     groups,
@@ -148,10 +180,10 @@ test("production report variants collapse into one implemented production page",
   assert.ok(!items.some((item) => item.title === "รายงานการผลิตปุ๋ยเม็ด"));
   assert.ok(!items.some((item) => item.title === "ใบรายงานการผลิต"));
 });
-test("all thirty implemented routes remain accessible once, with no fabricated placeholder links", () => {
+test("all forty-three implemented routes remain accessible once, with no fabricated placeholder links", () => {
   const { items } = catalog();
   const linked = items.filter((item) => item.href);
-  assert.equal(linked.length, 30);
+  assert.equal(linked.length, 43);
   assert.equal(new Set(linked.map((item) => item.href)).size, linked.length);
   for (const [title, href] of Object.entries(routes)) {
     const item = items.find((item) => item.title === title);

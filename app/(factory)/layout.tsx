@@ -48,6 +48,7 @@ async function AuthenticatedFactory({
                           displayName: user.displayName,
                           email: user.email,
                           roles: user.roles,
+                          modules: user.modules,
                         }}
                       >
                         {children}

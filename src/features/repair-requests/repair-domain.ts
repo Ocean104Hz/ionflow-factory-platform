@@ -1,4 +1,4 @@
-import type { MasterRow } from "../master-data/master-domain";
+import type { MasterRow, Personnel } from "../master-data/master-domain";
 
 export const statuses = { DRAFT: "ร่าง", SUBMITTED: "ส่งแจ้งซ่อม", PENDING_ASSIGNMENT: "รอรับงาน", ASSIGNED: "มอบหมายแล้ว", IN_PROGRESS: "กำลังซ่อม", WAITING_PARTS: "รออะไหล่", PENDING_INSPECTION: "รอตรวจรับ", COMPLETED: "ซ่อมเสร็จ", CLOSED: "ปิดงาน", CANCELLED: "ยกเลิก" } as const;
 export type RepairStatus = keyof typeof statuses;
@@ -7,12 +7,18 @@ export type Priority = keyof typeof priorities;
 export const categories = ["เครื่องกล", "ไฟฟ้า", "ระบบควบคุม", "โครงสร้าง", "อื่น ๆ"];
 export const technicians = ["ช่างสาธิต ก", "ช่างสาธิต ข"];
 export const actor = "ผู้ดำเนินการ DEMO";
+export type Technician = { id: string; name: string; email: string };
 export type Photo = { id: string; name: string; url: string };
 export type Part = { id: string; name: string; quantity: string; unit: string; unitCost: string };
 export type Activity = { id: string; at: string; actor: string; text: string; status: RepairStatus };
 export type RepairForm = { requestDate: string; requester: string; department: string; site: string; area: string; equipmentId: string; title: string; category: string; description: string; priority: Priority; stopped: boolean; detectedAt: string; remarks: string; requestedDate: string; notes: string; photos: Photo[] };
 export type Repair = RepairForm & { id: string; number: string; status: RepairStatus; technician: string; acceptedAt: string; workStart: string; workEnd: string; diagnosis: string; method: string; technicianNotes: string; parts: Part[]; laborCost: string; activities: Activity[]; createdAt: string; updatedAt: string };
 export type Equipment = { id: string; code: string; name: string; type: string; site: string; location: string; line: string; active: boolean };
+export function technicianAdapter(personnel: Personnel[]): Technician[] {
+  return personnel
+    .filter(p => p.active && p.department === "ซ่อมบำรุง")
+    .map(p => ({ id: p.id, name: p.displayName, email: p.email }));
+}
 export function equipmentAdapter(rows: MasterRow[]): Equipment[] {
   return rows.filter(r => r.kind === "equipment").map(r => {
     const ancestry: MasterRow[] = []; const seen = new Set([r.id]); let parent = rows.find(p => p.id === r.parentId);
@@ -52,9 +58,9 @@ export function createRepair(records: Repair[], form: RepairForm, equipment: Equ
 export const transitions: Record<RepairStatus, RepairStatus[]> = {
   DRAFT:["SUBMITTED","CANCELLED"], SUBMITTED:["PENDING_ASSIGNMENT","CANCELLED"], PENDING_ASSIGNMENT:["ASSIGNED","CANCELLED"], ASSIGNED:["IN_PROGRESS","CANCELLED"], IN_PROGRESS:["WAITING_PARTS","PENDING_INSPECTION"], WAITING_PARTS:["IN_PROGRESS"], PENDING_INSPECTION:["COMPLETED","IN_PROGRESS"], COMPLETED:["CLOSED"], CLOSED:[], CANCELLED:[],
 };
-export function transitionRepair(r: Repair, target: RepairStatus, now: string, reason = "", technician = r.technician): Repair {
+export function transitionRepair(r: Repair, target: RepairStatus, now: string, reason = "", technician = r.technician, allowedTechnicians: readonly string[] = []): Repair {
   if (!transitions[r.status].includes(target)) throw new Error("เปลี่ยนสถานะข้ามขั้นตอนไม่ได้");
-  if (target === "ASSIGNED" && !technicians.includes(technician)) throw new Error("กรุณาเลือกช่างผู้รับผิดชอบ");
+  if (target === "ASSIGNED" && (!technician.trim() || !allowedTechnicians.includes(technician))) throw new Error("กรุณาเลือกช่างผู้รับผิดชอบจากบุคลากรซ่อมบำรุงที่เปิดใช้งาน");
   if (r.status === "ASSIGNED" && target === "IN_PROGRESS" && !r.acceptedAt) throw new Error("กรุณารับงานก่อนเริ่มซ่อม");
   if ((target === "CANCELLED" || (r.status === "PENDING_INSPECTION" && target === "IN_PROGRESS")) && !reason.trim()) throw new Error("กรุณาระบุเหตุผล");
   if (target === "PENDING_INSPECTION" && (!r.diagnosis.trim() || !r.method.trim())) throw new Error("กรุณาบันทึกผลวิเคราะห์และวิธีซ่อมก่อนส่งตรวจรับ");
