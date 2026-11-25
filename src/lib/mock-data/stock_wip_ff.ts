@@ -20,18 +20,18 @@ import {
 } from "@/src/features/stock_wip_ff/stock_wip_ff_domain";
 
 export const stockWipMockItems: readonly StockWipItem[] = [
-  { no: 1, code_new: "WIP-LQO-001", code_old: "WP-L001", name: "อะมิโน", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 2, code_new: "WIP-LQO-002", code_old: "WP-L006", name: "Stock (ไอ.เอส.)", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 3, code_new: "WIP-LQO-003", code_old: "WP-L003", name: "บูสเตอร์ สูตรสีเงิน", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 4, code_new: "WIP-LQO-004", code_old: "WP-L005", name: "บูสเตอร์ สูตรสีแดง", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 5, code_new: "WIP-LQO-005", code_old: "WP-L004", name: "บูสเตอร์ สูตรสีส้ม", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 6, code_new: "WIP-LQO-006", code_old: "WP-L007", name: "ไอ.เอส.ไรซ์", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 7, code_new: "WIP-LQO-007", code_old: "WP-L008", name: "มาคา", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 8, code_new: "WIP-LQO-008", code_old: "WP-L009", name: "ไอ.เอ็ม.โอ.", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 9, code_new: "WIP-LQO-009", code_old: null, name: "ไอเอส สเปเชียล", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 10, code_new: "WIP-LQO-010", code_old: null, name: "ไอเอส TL", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 11, code_new: "WIP-LQO-011", code_old: null, name: "กู๊ดโซค", category: "LIQUID_FERTILIZER", unit: "L" },
-  { no: 12, code_new: "WIP-LQO-012", code_old: null, name: "รับเบอร์แมกซ์", category: "LIQUID_FERTILIZER", unit: "L" },
+  { no: 1, code_new: "WIP-LQO-001", code_old: "WP-L001", name: "อะมิโน" },
+  { no: 2, code_new: "WIP-LQO-002", code_old: "WP-L006", name: "Stock (ไอ.เอส.)" },
+  { no: 3, code_new: "WIP-LQO-003", code_old: "WP-L003", name: "บูสเตอร์ สูตรสีเงิน" },
+  { no: 4, code_new: "WIP-LQO-004", code_old: "WP-L005", name: "บูสเตอร์ สูตรสีแดง" },
+  { no: 5, code_new: "WIP-LQO-005", code_old: "WP-L004", name: "บูสเตอร์ สูตรสีส้ม" },
+  { no: 6, code_new: "WIP-LQO-006", code_old: "WP-L007", name: "ไอ.เอส.ไรซ์" },
+  { no: 7, code_new: "WIP-LQO-007", code_old: "WP-L008", name: "มาคา" },
+  { no: 8, code_new: "WIP-LQO-008", code_old: "WP-L009", name: "ไอ.เอ็ม.โอ." },
+  { no: 9, code_new: "WIP-LQO-009", code_old: null, name: "ไอเอส สเปเชียล" },
+  { no: 10, code_new: "WIP-LQO-010", code_old: null, name: "ไอเอส TL" },
+  { no: 11, code_new: "WIP-LQO-011", code_old: null, name: "กู๊ดโซค" },
+  { no: 12, code_new: "WIP-LQO-012", code_old: null, name: "รับเบอร์แมกซ์" },
 ];
 
 type SourceSummary = readonly [

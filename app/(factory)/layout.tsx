@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { AppShell } from "@/src/components/factory/app-shell";
 import { DemoProvider } from "@/src/components/factory/demo-provider";
 import { PRProvider } from "@/src/features/purchase-requisitions/pr-provider";
@@ -24,7 +25,13 @@ export default function FactoryLayout({
   );
 }
 
-async function AuthenticatedFactory({ children }: { children: React.ReactNode }) {
+async function AuthenticatedFactory({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  await connection();
+
   const user = await requireAuthenticatedFactoryUser();
   return (
     <MasterDataProvider>
