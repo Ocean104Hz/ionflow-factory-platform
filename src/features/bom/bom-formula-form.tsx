@@ -238,13 +238,13 @@ export function BOMFormulaForm({
   return (
     <form
       className="space-y-5"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         const issues = formulaErrors(state, form, isDefault);
         setErrors(issues);
         if (Object.keys(issues).length) return;
         try {
-          onSaved(saveFormula(form, isDefault));
+          onSaved(await saveFormula(form, isDefault));
         } catch (error) {
           setErrors(
             error instanceof BOMValidationError

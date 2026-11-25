@@ -8,17 +8,15 @@ import {
   FactoryDataTable,
   type Column,
 } from "@/src/components/factory/patterns";
-import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { demoImportRows } from "@/src/lib/mock-data/bom";
 import { importFeedback, type ImportRow } from "./bom-domain";
 import { useBOM } from "./bom-provider";
 
 export function BOMImportPreview({ onClose }: { onClose: () => void }) {
-  const { state, importRows } = useBOM();
+  const { state } = useBOM();
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [fileMessage, setFileMessage] = useState("");
-  const [message, setMessage] = useState("");
   const errors = importFeedback(state, rows);
   const chosen = rows.filter((r) => selected.includes(r.key) && !errors[r.key]);
   const columns: Column<ImportRow>[] = [
@@ -83,7 +81,6 @@ export function BOMImportPreview({ onClose }: { onClose: () => void }) {
           accept=".xlsx,.xls"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            setMessage("");
             setRows([]);
             setSelected([]);
             if (!file) {
@@ -113,7 +110,6 @@ export function BOMImportPreview({ onClose }: { onClose: () => void }) {
           const issues = importFeedback(state, demo);
           setRows(demo);
           setSelected(demo.filter((r) => !issues[r.key]).map((r) => r.key));
-          setMessage("");
         }}
       >
         โหลดข้อมูลตัวอย่าง
@@ -128,39 +124,11 @@ export function BOMImportPreview({ onClose }: { onClose: () => void }) {
         เลือก {chosen.length} จาก {rows.length} แถว ·
         แถวผิดพลาดหรือรหัส/เวอร์ชันซ้ำจะไม่ถูกนำเข้า
       </p>
-      {message && (
-        <p role="status" className="text-sm">
-          {message}
-        </p>
-      )}
       <div className="sticky -bottom-5 flex justify-end gap-2 border-t bg-background py-4">
         <Button variant="outline" onClick={onClose}>
           ปิด
         </Button>
-        <ConfirmDialog
-          title="ยืนยันเพิ่มข้อมูลตัวอย่าง?"
-          description={`เพิ่ม ${chosen.length} แถวที่เลือกลง BOM demo เท่านั้น ไม่เขียนทับรายการเดิม`}
-          trigger={
-            <Button disabled={!chosen.length}>
-              ยืนยันนำเข้าข้อมูลตัวอย่าง ({chosen.length})
-            </Button>
-          }
-          onConfirm={() => {
-            try {
-              importRows(chosen);
-              setSelected([]);
-              setMessage(
-                `เพิ่มข้อมูลตัวอย่าง ${chosen.length} แถวแล้ว (ไม่ใช่ข้อมูลจากไฟล์ Excel)`,
-              );
-            } catch (error) {
-              setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "นำเข้าตัวอย่างไม่สำเร็จ ไม่มีข้อมูลถูกเปลี่ยนแปลง",
-              );
-            }
-          }}
-        />
+        <Button disabled>บันทึกจากไฟล์ยังไม่เปิดใช้งาน</Button>
       </div>
     </div>
   );

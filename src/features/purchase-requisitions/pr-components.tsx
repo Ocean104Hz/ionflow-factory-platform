@@ -1,7 +1,7 @@
 "use client";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
+import Link from "next/link";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Label } from "@/src/components/ui/label";
 import {
@@ -57,7 +57,7 @@ export function PRCommand({
   title: string;
   description: string;
   trigger?: ReactNode;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => void | Promise<unknown>;
   requiresReason?: boolean;
   children?: ReactNode;
   open?: boolean;
@@ -67,6 +67,7 @@ export function PRCommand({
   const [internalOpen, setInternalOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const id = useId();
   const open = controlledOpen ?? internalOpen;
   const changeOpen = (value: boolean) => {
@@ -76,7 +77,7 @@ export function PRCommand({
     if (value) setReason("");
   };
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
+    <Dialog open={open} onOpenChange={(value) => { if (!busy) changeOpen(value); }}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         className={
@@ -88,23 +89,25 @@ export function PRCommand({
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {description} · เปลี่ยนเฉพาะข้อมูลสาธิตในหน่วยความจำ
+            {description}
           </DialogDescription>
         </DialogHeader>
         <form
           className="flex min-h-0 flex-1 flex-col"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
+            if (busy) return;
+            setBusy(true);
             try {
               if (requiresReason && !reason.trim())
                 throw new Error("กรุณาระบุเหตุผล");
-              onConfirm(reason.trim());
+              await onConfirm(reason.trim());
               changeOpen(false);
             } catch (issue) {
               setError(
                 issue instanceof Error ? issue.message : "ดำเนินการไม่สำเร็จ",
               );
-            }
+            } finally { setBusy(false); }
           }}
         >
           <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto pr-1">
@@ -138,7 +141,7 @@ export function PRCommand({
                 ยกเลิก
               </Button>
             </DialogClose>
-            <Button type="submit">ยืนยัน</Button>
+            <Button type="submit" disabled={busy}>ยืนยัน</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -332,7 +335,7 @@ export function PRTotals({
           </div>
           <div className="flex items-center justify-between gap-6 py-1.5">
             <dt className="text-muted-foreground">
-              ภาษีสาธิต {pr.transactionType === "VAT" ? "7%" : "0%"}
+              ภาษี {pr.transactionType === "VAT" ? "7%" : "0%"}
             </dt>
             <dd className="whitespace-nowrap text-right font-medium tabular-nums">
               {money(totals.tax)} บาท
@@ -349,7 +352,7 @@ export function PRTotals({
           ราคาก่อนภาษี · ปัดเป็นสตางค์รายบรรทัด ·{" "}
           {totals.missing
             ? `ยังไม่ระบุราคา/ค่าไม่ถูกต้อง ${totals.missing} รายการ ไม่ถือว่ายอดบางส่วนเป็นยอดครบ`
-            : "ข้อมูลสาธิต ไม่ใช่เอกสารทางบัญชี"}
+            : "ยอดประมาณการสำหรับใบขอซื้อ"}
         </p>
       </div>
     );
@@ -361,7 +364,7 @@ export function PRTotals({
         <dd className="text-right tabular-nums">
           {money(totals.subtotal)} บาท
         </dd>
-        <dt>ภาษีสาธิต {pr.transactionType === "VAT" ? "7%" : "0%"}</dt>
+        <dt>ภาษี {pr.transactionType === "VAT" ? "7%" : "0%"}</dt>
         <dd className="text-right tabular-nums">{money(totals.tax)} บาท</dd>
         <dt className="font-semibold">ยอดสุทธิประมาณ</dt>
         <dd className="text-right font-semibold tabular-nums">
@@ -372,98 +375,22 @@ export function PRTotals({
         ราคาก่อนภาษี · ปัดเป็นสตางค์รายบรรทัด ·{" "}
         {totals.missing
           ? `ยังไม่ระบุราคา/ค่าไม่ถูกต้อง ${totals.missing} รายการ ไม่ถือว่ายอดบางส่วนเป็นยอดครบ`
-          : "ข้อมูลสาธิต ไม่ใช่เอกสารทางบัญชี"}
+          : "ยอดประมาณการสำหรับใบขอซื้อ"}
       </p>
     </div>
   );
 }
-export function PRCreatePO({
-  pr,
-  open,
-  onOpenChange,
-  trigger,
-}: {
-  pr: PR;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  trigger?: ReactNode | null;
+export function PRCreatePO({ pr, open, onOpenChange }: {
+  pr: PR; open?: boolean; onOpenChange?: (open: boolean) => void; trigger?: ReactNode | null;
 }) {
-  const { order } = usePR();
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  return (
-    <PRCommand
-      title="สร้าง PO สาธิตจาก PR"
-      description="เลือกจำนวนซื้อครั้งนี้ ไม่เกินยอดค้างซื้อ ไม่มีการสร้างใบสั่งซื้อจริงหรือส่งผู้ขาย"
-      size="wide"
-      trigger={
-        trigger === undefined ? <Button>สร้าง PO สาธิต</Button> : trigger
-      }
-      open={open}
-      onOpenChange={onOpenChange}
-      onConfirm={() =>
-        order(
-          pr.id,
-          Object.fromEntries(
-            pr.items.map((item) => [
-              item.id,
-              quantities[item.id] ?? remainingQuantity(item),
-            ]),
-          ),
-        )
-      }
-    >
-      <FactoryDataTable
-        rows={pr.items}
-        rowKey={(item) => item.id}
-        minWidth={720}
-        columns={[
-          {
-            key: "name",
-            label: "สินค้า",
-            render: (item) => (
-              <div className="min-w-64">
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">{item.code}</p>
-              </div>
-            ),
-          },
-          {
-            key: "remaining",
-            label: "ค้างซื้อ",
-            numeric: true,
-            render: (item) => (
-              <span className="whitespace-nowrap">
-                {remainingQuantity(item)} {item.unit}
-              </span>
-            ),
-          },
-          {
-            key: "quantity",
-            label: "ซื้อครั้งนี้",
-            numeric: true,
-            render: (item) => (
-              <Input
-                aria-label={`จำนวนออก PO ${item.code}`}
-                type="number"
-                min="0"
-                max={remainingQuantity(item)}
-                step="0.0001"
-                disabled={remainingQuantity(item) === 0}
-                className="ml-auto max-w-44 text-right tabular-nums"
-                value={quantities[item.id] ?? remainingQuantity(item)}
-                onChange={(event) =>
-                  setQuantities((current) => ({
-                    ...current,
-                    [item.id]: Number(event.target.value),
-                  }))
-                }
-              />
-            ),
-          },
-        ]}
-      />
-    </PRCommand>
-  );
+  const { user } = usePR();
+  if (!user.modules.includes("purchase_orders")) return null;
+  const link = <Button asChild><Link href={`/purchase-orders?pr=${encodeURIComponent(pr.id)}`}>สร้าง PO จาก PR</Link></Button>;
+  return open ? <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent><DialogHeader><DialogTitle>สร้าง PO จาก {pr.number}</DialogTitle>
+    <DialogDescription>เลือกผู้ขายและตรวจจำนวนในใบสั่งซื้อก่อนบันทึก</DialogDescription>
+    </DialogHeader><DialogFooter>{link}</DialogFooter></DialogContent>
+  </Dialog> : link;
 }
 export function PRPreview({
   records,
@@ -477,14 +404,14 @@ export function PRPreview({
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" disabled={!records.length}>
-          Export Excel (สาธิต)
+          พรีวิวข้อมูล Excel
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[94dvh] min-h-0 w-[min(96vw,1250px)] max-w-none flex-col overflow-hidden sm:max-w-none">
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>พรีวิวข้อมูลสำหรับ Excel</DialogTitle>
           <DialogDescription>
-            แสดง {records.length} เอกสารที่เลือกหรือผลกรอง · ข้อมูลสาธิตเท่านั้น
+            แสดง {records.length} เอกสารที่เลือกหรือผลกรอง
             ไม่สร้างหรือดาวน์โหลดไฟล์ Excel
           </DialogDescription>
         </DialogHeader>

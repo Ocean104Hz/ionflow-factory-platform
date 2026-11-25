@@ -14,6 +14,8 @@ import {
 } from "./material-issue-domain";
 
 type MaterialIssueHeaderProps = {
+    documentNo?: string;
+    onDocumentNoChange: (value: string) => void;
     values: MaterialIssueHeaderValues;
     onChange: (
         field: keyof MaterialIssueHeaderValues,
@@ -22,6 +24,8 @@ type MaterialIssueHeaderProps = {
 };
 
 export function MaterialIssueHeader({
+    documentNo = "",
+    onDocumentNoChange,
     values,
     onChange,
 }: MaterialIssueHeaderProps) {
@@ -61,9 +65,21 @@ export function MaterialIssueHeader({
     }
 
     return (
-        <SectionCard title="ข้อมูลใบเบิกจ่ายวัสดุ">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-
+        <SectionCard
+            title="ข้อมูลใบเบิกจ่ายวัสดุ"
+            className="relative z-20 overflow-visible"
+        >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+                {/* วันที่ */}
+                <div className="[&_label]:leading-none">
+                    <ThaiBuddhistDatePicker
+                        label="วันที่"
+                        value={values.issueDate}
+                        onChange={(value) =>
+                            onChange("issueDate", value)
+                        }
+                    />
+                </div>
                 {/* สถานที่ */}
                 <div className="space-y-2">
                     <Label htmlFor="issue-location">
@@ -238,6 +254,26 @@ export function MaterialIssueHeader({
                         )}
                     </div>
                 </div>
+                {/* เลขที่เอกสาร */}
+                <div className="space-y-2">
+                    <Label htmlFor="issue-document-no">
+                        เลขที่เอกสาร
+                    </Label>
+
+                    <Input
+                        id="issue-document-no"
+                        type="text"
+                        inputMode="numeric"
+                        value={documentNo}
+                        placeholder="กรอกเลขที่เอกสาร"
+                        maxLength={100}
+                        onChange={(event) =>
+                            onDocumentNoChange(
+                                event.target.value.replace(/[^0-9]/g, ""),
+                            )
+                        }
+                    />
+                </div>
 
                 {/* ชื่อผลิตภัณฑ์ */}
                 <div className="space-y-2">
@@ -258,8 +294,8 @@ export function MaterialIssueHeader({
                     >
                         <span
                             className={`min-w-0 flex-1 truncate px-3 ${values.productName
-                                    ? "text-foreground"
-                                    : "text-muted-foreground"
+                                ? "text-foreground"
+                                : "text-muted-foreground"
                                 }`}
                         >
                             {values.productName ||
@@ -313,16 +349,6 @@ export function MaterialIssueHeader({
                         }
                     />
                 </div>
-
-                {/* วันที่ */}
-                <ThaiBuddhistDatePicker
-                    label="วันที่"
-                    value={values.issueDate}
-                    onChange={(value) =>
-                        onChange("issueDate", value)
-                    }
-                />
-
                 {/* ฝ่าย */}
                 <div className="space-y-2">
                     <Label htmlFor="issue-department">

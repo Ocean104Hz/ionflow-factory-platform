@@ -1,5 +1,6 @@
 "use client";
 
+import { OrganicLoadStatus, useOrganicDocuments } from "../organic-documents/use-organic-documents";
 import { useRef, useState } from "react";
 
 import { Button } from "@/src/components/ui/button";
@@ -23,16 +24,12 @@ import {
 
 import {
   PageHeader,
-  StatusBadge,
 } from "@/src/components/factory/patterns";
 
-import { demoWipReceivingIssuingSheets } from "@/src/lib/mock-data/wip-receiving-issuing";
 
 import {
   blankWipSheet,
-  saveWipSheet,
   validateWipSheet,
-  deleteWipSheet,
   type WipReceivingIssuingSheet,
   type WipErrors,
 } from "./wip_receiving_issuing_domain";
@@ -57,10 +54,8 @@ type ActiveView = {
 export function WipReceivingIssuingWorkspace() {
   /* ---------------- document state ---------------- */
 
-  const [records, setRecords] = useState<
-    WipReceivingIssuingSheet[]
-  >(() => structuredClone(demoWipReceivingIssuingSheets));
-
+  const documents = useOrganicDocuments<WipReceivingIssuingSheet>("wip_receiving_issuing");
+  const { records, busy, loading, loadError } = documents;
   const [draft, setDraft] =
     useState<WipReceivingIssuingSheet>(() =>
       blankWipSheet(),
@@ -136,7 +131,8 @@ export function WipReceivingIssuingWorkspace() {
 
   /* ---------------- save ---------------- */
 
-  function handleSave() {
+  async function handleSave() {
+    if (busy || loading || loadError) return;
     const validationErrors = validateWipSheet(draft);
 
     setErrors(validationErrors);
@@ -153,23 +149,16 @@ export function WipReceivingIssuingWorkspace() {
     }
 
     try {
-      const result = saveWipSheet(
-        records,
-        draft,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
+      const saved = await documents.save(draft);
+      setDraft(saved);
 
-      setRecords(result.records);
-      setDraft(result.saved);
-
-      setBaseline(JSON.stringify(result.saved));
+      setBaseline(JSON.stringify(saved));
 
       setErrors({});
 
       setMessageKind("success");
       setMessage(
-        "บันทึกข้อมูลจำลองเรียบร้อยแล้ว",
+        "บันทึกเอกสารเรียบร้อยแล้ว",
       );
 
       setTab("history");
@@ -210,16 +199,20 @@ export function WipReceivingIssuingWorkspace() {
 
   /* ---------------- delete ---------------- */
 
-  function handleDeleteConfirm() {
-    if (!deleteSheet) {
+  async function handleDeleteConfirm() {
+    if (!deleteSheet || busy || loading || loadError) {
       return;
     }
 
     const deletedId = deleteSheet.id;
 
-    setRecords((current) =>
-      deleteWipSheet(current, deletedId),
-    );
+    try {
+      await documents.remove(deleteSheet);
+    } catch (error) {
+      setMessageKind("error");
+      setMessage(error instanceof Error ? error.message : "ไม่สามารถลบเอกสารได้");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = blankWipSheet();
@@ -238,7 +231,7 @@ export function WipReceivingIssuingWorkspace() {
 
     setMessageKind("success");
     setMessage(
-      "ลบข้อมูลจำลองเรียบร้อยแล้ว",
+      "ลบเอกสารออกจากประวัติแล้ว",
     );
   }
 
@@ -246,16 +239,12 @@ export function WipReceivingIssuingWorkspace() {
 
   return (
     <div className="min-w-0 space-y-5">
+      <OrganicLoadStatus {...documents} />
       {/* Page Header */}
 
       <PageHeader
         title="บันทึกการรับ-จ่าย WIP"
         description="จัดการเอกสารรับ-จ่าย WIP รายวัน"
-        actions={
-          <StatusBadge tone="info">
-            UI MOCK · ไม่เชื่อมระบบจริง
-          </StatusBadge>
-        }
       />
 
       {/* Tabs */}
@@ -344,16 +333,18 @@ export function WipReceivingIssuingWorkspace() {
 
           {/* Form Component */}
 
-          <WipReceivingIssuingForm
-            sheet={draft}
-            errors={errors}
-            onChange={(nextSheet) => {
-              setDraft(nextSheet);
-              setMessage("");
-            }}
-            onSave={handleSave}
-            onReset={handleNew}
-          />
+          <fieldset disabled={busy || loading || Boolean(loadError)} className="min-w-0">
+            <WipReceivingIssuingForm
+              sheet={draft}
+              errors={errors}
+              onChange={(nextSheet) => {
+                setDraft(nextSheet);
+                setMessage("");
+              }}
+              onSave={handleSave}
+              onReset={handleNew}
+            />
+          </fieldset>
         </TabsContent>
 
         {/* History Tab */}
@@ -434,7 +425,7 @@ export function WipReceivingIssuingWorkspace() {
             </AlertDialogTitle>
 
             <AlertDialogDescription>
-              ข้อมูลนี้จะถูกลบออกจากรายการจำลอง
+              เอกสารนี้จะไม่แสดงในประวัติ
               และไม่สามารถเรียกคืนจากสถานะปัจจุบันได้
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -445,7 +436,7 @@ export function WipReceivingIssuingWorkspace() {
             </AlertDialogCancel>
 
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
+              disabled={busy || loading || Boolean(loadError)} onClick={() => void handleDeleteConfirm()}
             >
               ยืนยันการลบ
             </AlertDialogAction>

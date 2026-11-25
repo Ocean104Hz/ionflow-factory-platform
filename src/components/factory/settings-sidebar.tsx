@@ -41,7 +41,7 @@ export const settingsGroups: {
   {
     title: "ข้อมูลสินค้า",
     icon: Package,
-    items: ["units", "categories", "brands", "processes"],
+    items: ["materials", "units", "categories", "brands", "processes"],
   },
   { title: "ผู้ขายภายใน", icon: Truck, items: ["suppliers"] },
   { title: "ตั้งค่าโรงงาน", icon: Factory, items: ["branding"] },

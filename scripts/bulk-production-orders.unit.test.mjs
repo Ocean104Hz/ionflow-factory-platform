@@ -402,14 +402,14 @@ test("internal production destinations are activated without a duplicate formula
   );
   assert.equal(
     (source.match(/href: "\/bulk-production-orders"/g) || []).length,
-    1,
+    0,
   );
   assert.match(source, /title: "ใบสั่งผลิตสินค้า V1"[\s\S]*?href: "\/product-production-orders-v1"/);
-  assert.match(source, /title: "ใบสั่งผลิตสินค้า V2"[\s\S]*?href: "\/bulk-production-orders"/);
+  assert.doesNotMatch(source, /title: "ใบสั่งผลิตสินค้า V2"/);
   assert.doesNotMatch(source, /title: "ใบสูตรผลิต"|title: "คลัง BOM"/);
-  assert.match(source, /title: "รายงานการผลิต", href: "\/production-reports"/);
+  assert.match(source, /title: "รายงานการผลิต",\s*href: "\/production-reports"/);
   assert.match(source, /title: "ใบรับยอดผลิต V1"[\s\S]*?href: "\/production-receipts-v1"/);
-  assert.match(source, /title: "ใบรับยอดผลิต V2"[\s\S]*?href: "\/production-receipts"/);
+  assert.doesNotMatch(source, /title: "ใบรับยอดผลิต V2"/);
   assert.ok(
     existsSync(
       path.join(root, "app/(factory)/bulk-production-orders/page.tsx"),

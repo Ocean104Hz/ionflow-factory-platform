@@ -280,15 +280,16 @@ test("mock import validates each row, changes fixtures only on commit and fails 
   assert.throws(() => d.importRows(s, [], at), /เลือก/);
 });
 
-test("BOM route/provider, shared controls and navigation stay isolated from backend", () => {
+test("BOM route and shared controls use the authenticated production provider", () => {
   const route = read("app/(factory)/bom/page.tsx");
   const layout = read("app/(factory)/layout.tsx");
   assert.match(route, /return\s+<BOMList\s*\/>/);
   assert.doesNotMatch(route, /BOMProvider/);
   assert.match(layout, /import\s*\{\s*BOMProvider\s*\}\s*from\s*"@\/src\/features\/bom\/bom-provider"/);
-  assert.equal((layout.match(/<BOMProvider>/g) ?? []).length, 1);
+  assert.equal((layout.match(/<BOMProvider enabled=/g) ?? []).length, 1);
   assert.equal((layout.match(/<\/BOMProvider>/g) ?? []).length, 1);
-  assert.match(layout, /<DemoProvider>\s*<PRProvider>\s*<BOMProvider>\s*<Suspense fallback=\{<LoadingState\s*\/>\}>\s*<AppShell>\{children\}<\/AppShell>\s*<\/Suspense>\s*<\/BOMProvider>\s*<\/PRProvider>\s*<\/DemoProvider>/);
+  assert.match(route, /requireAuthenticatedFactoryModule\("bom"\)/);
+  assert.match(read("src/features/bom/bom-provider.tsx"), /productionRequest<Snapshot>\("bom", command\)/);
   assert.match(
     read("src/lib/constants/navigation.ts"),
     /title: "สูตรผสมวัตถุดิบ",\s*href: "\/bom"/,
@@ -300,7 +301,7 @@ test("BOM route/provider, shared controls and navigation stay isolated from back
     "DialogContent",
     "PopoverContent",
     "loading",
-    "empty",
+    "rows={",
     "availability",
     "department",
   ])

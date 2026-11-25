@@ -1,5 +1,5 @@
 /**
- * UI MOCK domain for the organic-unit extraction-material / production-temperature log.
+ * Domain for the organic-unit extraction-material / production-temperature log.
  *
  * Confirmed paper layout:
  * - One date with two independently recorded production rounds (left/right).

@@ -21,17 +21,17 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 
-import { stockProductsMockWorkbook } from "@/src/lib/mock-data/stock_products";
-
 import {
-  filterStockProductsRows,
-  stockProductsRowKey,
-  type StockProductsStockRow,
-} from "@/src/features/stock_products/stock_products_domain";
+  createStockWipMockSheets,
+} from "@/src/lib/mock-data/stock_wip_ff";
+
+import type {
+  StockWipRow,
+} from "@/src/features/stock_wip_ff/stock_wip_ff_domain";
 
 type MaterialIssueProductPickerModalProps = {
   selectedName: string;
-  onSelect: (product: StockProductsStockRow) => void;
+  onSelect: (product: StockWipRow) => void;
   onClose: () => void;
 };
 
@@ -47,9 +47,26 @@ export function MaterialIssueProductPickerModal({
 
   const [search, setSearch] = useState("");
 
-  const filteredProducts = filterStockProductsRows(
-    stockProductsMockWorkbook.stock.rows,
-    search,
+  const [products] = useState<StockWipRow[]>(() => {
+    const sheets = createStockWipMockSheets();
+
+    const latestSheet = sheets
+      .filter((sheet) => sheet.period.view === "MONTH")
+      .sort((a, b) => b.id.localeCompare(a.id))[0];
+
+    return latestSheet?.rows ?? [];
+  });
+
+  const keyword = search.trim().toLowerCase();
+
+  const filteredProducts = products.filter((row) =>
+    [
+      row.item.code_new,
+      row.item.code_old ?? "",
+      row.item.name,
+    ].some((value) =>
+      value.toLowerCase().includes(keyword),
+    ),
   );
 
   useEffect(() => {
@@ -136,7 +153,7 @@ export function MaterialIssueProductPickerModal({
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            ข้อมูลจากสต็อกสินค้า (Mock Data)
+            ข้อมูลจากสต็อกสินค้า
           </p>
         </div>
 
@@ -176,7 +193,7 @@ export function MaterialIssueProductPickerModal({
                 {filteredProducts.length > 0 ? (
                   filteredProducts.map((row, index) => (
                     <TableRow
-                      key={stockProductsRowKey(row)}
+                      key={row.item.code_new}
                       className={
                         selectedName === row.item.name.trim()
                           ? "bg-primary/5"
@@ -188,7 +205,7 @@ export function MaterialIssueProductPickerModal({
                       </TableCell>
 
                       <TableCell className="font-medium">
-                        {row.item.code || "-"}
+                        {row.item.code_new || "-"}
                       </TableCell>
 
                       <TableCell className="whitespace-normal">
@@ -196,7 +213,7 @@ export function MaterialIssueProductPickerModal({
                       </TableCell>
 
                       <TableCell className="text-right tabular-nums">
-                        {row.summary.remaining_quantity || "-"}
+                        {row.summary.closing_balance || "-"}
                       </TableCell>
 
                       <TableCell className="text-center">

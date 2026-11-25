@@ -1,4 +1,4 @@
-import { BulkProductionWorkspace } from "@/src/features/bulk-production-orders/bulk-production-workspace";
+import { redirect } from "next/navigation";
 export default function Page() {
-  return <BulkProductionWorkspace />;
+  redirect("/product-production-orders-v1");
 }

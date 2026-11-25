@@ -1,4 +1,7 @@
 import { BOMList } from "@/src/features/bom/bom-list";
-export default function Page() {
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+
+export default async function Page() {
+  await requireAuthenticatedFactoryModule("bom");
   return <BOMList />;
 }

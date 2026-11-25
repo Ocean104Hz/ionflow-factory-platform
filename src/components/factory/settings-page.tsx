@@ -130,7 +130,7 @@ export function SettingsPage() {
           ) : selected === "branding" ? (
             <SectionCard
               title="อัตลักษณ์โรงงาน"
-              subtitle="ข้อมูลและรูปแบบการแสดงผล · บันทึกเฉพาะในเบราว์เซอร์นี้"
+              subtitle="ข้อมูลและรูปแบบการแสดงผลของโรงงานและหน้า Login"
             >
               <BrandingEditor onDirtyChange={setDirty} />
             </SectionCard>

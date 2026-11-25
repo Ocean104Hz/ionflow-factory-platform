@@ -1,2 +1,6 @@
 import { PREditor } from "@/src/features/purchase-requisitions/pr-editor";
-export default function Page(){ return <PREditor/>; }
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+export default async function Page() {
+  await requireAuthenticatedFactoryModule("pr");
+  return <PREditor />;
+}
