@@ -1,3 +1,4 @@
+
 export const MATERIAL_ISSUE_LOCATIONS = [
   "โรงงานกาญ 2",
 ] as const;
@@ -36,12 +37,21 @@ export type MaterialIssueRecord =
   MaterialIssueDraft & {
     id: string;
     documentNo: string;
+    version: string;
   };
 
 export type MaterialIssueHistoryFilters = {
   search: string;
   dateFrom: string;
   dateTo: string;
+};
+
+export type MaterialIssueStockItem = {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  unit: string;
+  remainingQuantity: string;
 };
 
 export const EMPTY_MATERIAL_ISSUE_FILTERS:
@@ -116,21 +126,29 @@ export function createEmptyMaterialIssueItem(
   };
 }
 
-export function createEmptyMaterialIssueDraft():
-  MaterialIssueDraft {
+export function createEmptyMaterialIssueDraft(): MaterialIssueDraft {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
   return {
     header: {
       location: "",
       productName: "",
       quantity: "",
-      issueDate: "",
+      issueDate: today,
       department: "",
     },
+
     items: [
       createEmptyMaterialIssueItem("row-1"),
       createEmptyMaterialIssueItem("row-2"),
       createEmptyMaterialIssueItem("row-3"),
     ],
+
     signers: {
       requestedBy: "",
       issuedBy: "",
@@ -151,10 +169,3 @@ export function hasMaterialIssueItemData(
     item.additionalQuantity,
   ].some((value) => value.trim() !== "");
 }
-export type MaterialIssueStockItem = {
-    id: string;
-    materialCode: string;
-    materialName: string;
-    unit: string;
-    remainingQuantity: string;
-};

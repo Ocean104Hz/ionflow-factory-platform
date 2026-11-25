@@ -1,17 +1,23 @@
+
 import "server-only";
+
+import { randomUUID } from "node:crypto";
 
 import {
   withMaterialIssueReadTransaction,
+  withMaterialIssueWriteTransaction,
   type MaterialIssueQueries,
 } from "./material-issue-database";
 
 import type {
+  MaterialIssueInput,
   MaterialIssueRecord,
   MaterialIssueHeaderRow,
   MaterialIssueItemRow,
   MaterialIssueHistoryRow,
 } from "./material-issue-types";
 
+const LOCATION = "โรงงานกาญ 2";
 
 const HEADER_COLUMNS = `
   id,
@@ -42,10 +48,20 @@ const ITEM_COLUMNS = `
   additional_quantity::text AS additional_quantity
 `;
 
+export interface MaterialIssueActor {
+  id: string;
+  displayName: string;
+}
 
-// ==========================================
-// แปลงข้อมูล Database เป็นข้อมูล Frontend
-// ==========================================
+export class MaterialIssueConflictError extends Error {
+  constructor() {
+    super(
+      "เอกสารถูกแก้ไขหรือถูกลบแล้ว กรุณาโหลดข้อมูลใหม่",
+    );
+
+    this.name = "MaterialIssueConflictError";
+  }
+}
 
 function mapMaterialIssueRecord(
   header: MaterialIssueHeaderRow,
@@ -53,8 +69,8 @@ function mapMaterialIssueRecord(
 ): MaterialIssueRecord {
   return {
     id: header.id,
-
     documentNo: header.document_number,
+    version: header.version,
 
     header: {
       location: header.location_snapshot,
@@ -83,14 +99,9 @@ function mapMaterialIssueRecord(
   };
 }
 
-
-// ==========================================
-// อ่านรายการวัสดุตาม ID เอกสาร
-// ==========================================
-
 async function findMaterialIssueItems(
   queries: MaterialIssueQueries,
-  materialIssueId: string,
+  documentId: string,
 ): Promise<MaterialIssueItemRow[]> {
   const result = await queries.query<
     MaterialIssueItemRow & Record<string, unknown>
@@ -101,15 +112,14 @@ async function findMaterialIssueItems(
       WHERE material_issue_id = $1
       ORDER BY line_no ASC
     `,
-    [materialIssueId],
+    [documentId],
   );
 
   return result.rows;
 }
 
-
 // ==========================================
-// อ่านเอกสารตาม ID
+// GET: อ่านเอกสารรายใบ
 // ==========================================
 
 export async function findMaterialIssueById(
@@ -118,16 +128,18 @@ export async function findMaterialIssueById(
   return withMaterialIssueReadTransaction(
     async (queries) => {
       const result = await queries.query<
-        MaterialIssueHeaderRow & Record<string, unknown>
+        MaterialIssueHeaderRow &
+          Record<string, unknown>
       >(
         `
           SELECT ${HEADER_COLUMNS}
           FROM foliar_fertilizer.m_material_issues
           WHERE id = $1
+            AND location_snapshot = $2
             AND archived_at IS NULL
           LIMIT 1
         `,
-        [id],
+        [id, LOCATION],
       );
 
       const header = result.rows[0];
@@ -141,17 +153,13 @@ export async function findMaterialIssueById(
         header.id,
       );
 
-      return mapMaterialIssueRecord(
-        header,
-        items,
-      );
+      return mapMaterialIssueRecord(header, items);
     },
   );
 }
 
-
 // ==========================================
-// อ่านประวัติเอกสาร
+// GET: อ่านรายการเอกสาร
 // ==========================================
 
 export async function findMaterialIssues(
@@ -171,16 +179,18 @@ export async function findMaterialIssues(
   return withMaterialIssueReadTransaction(
     async (queries) => {
       const headers = await queries.query<
-        MaterialIssueHeaderRow & Record<string, unknown>
+        MaterialIssueHeaderRow &
+          Record<string, unknown>
       >(
         `
           SELECT ${HEADER_COLUMNS}
           FROM foliar_fertilizer.m_material_issues
           WHERE archived_at IS NULL
+            AND location_snapshot = $1
           ORDER BY document_date DESC, id DESC
-          LIMIT $1 OFFSET $2
+          LIMIT $2 OFFSET $3
         `,
-        [limit, offset],
+        [LOCATION, limit, offset],
       );
 
       if (headers.rows.length === 0) {
@@ -196,7 +206,8 @@ export async function findMaterialIssues(
         .join(", ");
 
       const items = await queries.query<
-        MaterialIssueItemRow & Record<string, unknown>
+        MaterialIssueItemRow &
+          Record<string, unknown>
       >(
         `
           SELECT ${ITEM_COLUMNS}
@@ -207,20 +218,18 @@ export async function findMaterialIssues(
         ids,
       );
 
-      const itemsByDocument = new Map<
+      const groupedItems = new Map<
         string,
         MaterialIssueItemRow[]
       >();
 
       for (const item of items.rows) {
         const rows =
-          itemsByDocument.get(
-            item.material_issue_id,
-          ) ?? [];
+          groupedItems.get(item.material_issue_id) ?? [];
 
         rows.push(item);
 
-        itemsByDocument.set(
+        groupedItems.set(
           item.material_issue_id,
           rows,
         );
@@ -229,47 +238,469 @@ export async function findMaterialIssues(
       return headers.rows.map((header) =>
         mapMaterialIssueRecord(
           header,
-          itemsByDocument.get(header.id) ?? [],
+          groupedItems.get(header.id) ?? [],
         ),
       );
     },
   );
 }
 
-
 // ==========================================
-// อ่านประวัติการเปลี่ยนแปลงเอกสาร
+// GET: อ่านประวัติการเปลี่ยนแปลง
 // ==========================================
 
 export async function findMaterialIssueHistory(
-  materialIssueId: string,
+  documentId: string,
 ): Promise<MaterialIssueHistoryRow[]> {
   return withMaterialIssueReadTransaction(
     async (queries) => {
       const result = await queries.query<
-        MaterialIssueHistoryRow & Record<string, unknown>
+        MaterialIssueHistoryRow &
+          Record<string, unknown>
       >(
         `
           SELECT
-            id::text AS id,
-            material_issue_id,
-            record_version::text AS record_version,
-            action,
-            actor_id,
-            actor_display_name,
-            occurred_at::text AS occurred_at,
-            note,
-            changes,
-            request_id::text AS request_id
-          FROM foliar_fertilizer.r_material_issue_history
-          WHERE material_issue_id = $1
-          ORDER BY record_version DESC
+            h.id::text AS id,
+            h.material_issue_id,
+            h.record_version::text AS record_version,
+            h.action,
+            h.actor_id,
+            h.actor_display_name,
+            h.occurred_at::text AS occurred_at,
+            h.note,
+            h.changes,
+            h.request_id::text AS request_id
+
+          FROM foliar_fertilizer.r_material_issue_history h
+
+          INNER JOIN foliar_fertilizer.m_material_issues m
+            ON m.id = h.material_issue_id
+
+          WHERE h.material_issue_id = $1
+            AND m.location_snapshot = $2
+
+          ORDER BY h.record_version DESC
           LIMIT 100
         `,
-        [materialIssueId],
+        [documentId, LOCATION],
       );
 
       return result.rows;
+    },
+  );
+}
+
+// ==========================================
+// INSERT: รายการวัสดุ
+// ==========================================
+
+async function insertMaterialIssueItems(
+  queries: MaterialIssueQueries,
+  documentId: string,
+  items: MaterialIssueInput["items"],
+): Promise<void> {
+  for (const [index, item] of items.entries()) {
+    await queries.query(
+      `
+        INSERT INTO foliar_fertilizer.r_material_issue_items (
+          id,
+          material_issue_id,
+          line_no,
+          material_code_snapshot,
+          material_name_snapshot,
+          quantity,
+          unit_snapshot,
+          damaged_quantity,
+          additional_quantity
+        )
+
+        VALUES (
+          $1,$2,$3,$4,$5,
+          $6,$7,$8,$9
+        )
+      `,
+      [
+        randomUUID(),
+        documentId,
+        index + 1,
+        item.materialCode,
+        item.materialName,
+        item.quantity,
+        item.unit,
+        item.damagedQuantity || null,
+        item.additionalQuantity || null,
+      ],
+    );
+  }
+}
+
+// ==========================================
+// INSERT: ประวัติเอกสาร
+// ==========================================
+
+async function insertMaterialIssueHistory(
+  queries: MaterialIssueQueries,
+  documentId: string,
+  version: string,
+  action: "created" | "updated" | "archived",
+  actor: MaterialIssueActor,
+  before: MaterialIssueRecord | null,
+  after: MaterialIssueRecord | null,
+): Promise<void> {
+  const notes = {
+    created: "สร้างใบเบิกจ่ายวัสดุ",
+    updated: "แก้ไขใบเบิกจ่ายวัสดุ",
+    archived: "ลบใบเบิกจ่ายวัสดุ",
+  } as const;
+
+  await queries.query(
+    `
+      INSERT INTO foliar_fertilizer.r_material_issue_history (
+        id,
+        material_issue_id,
+        record_version,
+        action,
+        actor_id,
+        actor_display_name,
+        note,
+        changes
+      )
+
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8::jsonb
+      )
+    `,
+    [
+      randomUUID(),
+      documentId,
+      version,
+      action,
+      actor.id,
+      actor.displayName,
+      notes[action],
+      JSON.stringify([{ before, after }]),
+    ],
+  );
+}
+
+// ==========================================
+// POST: สร้างเอกสาร
+// ==========================================
+
+export async function createMaterialIssue(
+  input: MaterialIssueInput,
+  documentNo: string,
+  actor: MaterialIssueActor,
+): Promise<MaterialIssueRecord> {
+  if (input.header.location !== LOCATION) {
+    throw new Error("INVALID_MATERIAL_ISSUE_LOCATION");
+  }
+
+  return withMaterialIssueWriteTransaction(
+    async (queries) => {
+      const documentId = `mi-${randomUUID()}`;
+
+      const result = await queries.query<
+        MaterialIssueHeaderRow &
+          Record<string, unknown>
+      >(
+        `
+          INSERT INTO foliar_fertilizer.m_material_issues (
+            id,
+            document_number,
+            document_date,
+            location_snapshot,
+            product_name_snapshot,
+            product_quantity,
+            department_snapshot,
+            requested_by,
+            issued_by,
+            inspected_by
+          )
+
+          VALUES (
+            $1,$2,$3,$4,$5,
+            $6,$7,$8,$9,$10
+          )
+
+          RETURNING ${HEADER_COLUMNS}
+        `,
+        [
+          documentId,
+          documentNo,
+          input.header.issueDate,
+          input.header.location,
+          input.header.productName,
+          input.header.quantity,
+          input.header.department,
+          input.signers.requestedBy,
+          input.signers.issuedBy,
+          input.signers.inspectedBy,
+        ],
+      );
+
+      const header = result.rows[0];
+
+      if (!header) {
+        throw new Error("CREATE_MATERIAL_ISSUE_FAILED");
+      }
+
+      await insertMaterialIssueItems(
+        queries,
+        documentId,
+        input.items,
+      );
+
+      const items = await findMaterialIssueItems(
+        queries,
+        documentId,
+      );
+
+      const record = mapMaterialIssueRecord(
+        header,
+        items,
+      );
+
+      await insertMaterialIssueHistory(
+        queries,
+        documentId,
+        header.version,
+        "created",
+        actor,
+        null,
+        record,
+      );
+
+      return record;
+    },
+  );
+}
+
+// ==========================================
+// LOCK: ป้องกันแก้ไขเอกสารทับกัน
+// ==========================================
+
+async function lockMaterialIssue(
+  queries: MaterialIssueQueries,
+  id: string,
+  version: string,
+): Promise<MaterialIssueHeaderRow> {
+  const result = await queries.query<
+    MaterialIssueHeaderRow &
+      Record<string, unknown>
+  >(
+    `
+      SELECT ${HEADER_COLUMNS}
+      FROM foliar_fertilizer.m_material_issues
+
+      WHERE id = $1
+        AND version = $2::bigint
+        AND location_snapshot = $3
+        AND archived_at IS NULL
+
+      FOR UPDATE
+    `,
+    [id, version, LOCATION],
+  );
+
+  const header = result.rows[0];
+
+  if (!header) {
+    throw new MaterialIssueConflictError();
+  }
+
+  return header;
+}
+
+// ==========================================
+// PUT: แก้ไขเอกสาร
+// ==========================================
+
+export async function updateMaterialIssue(
+  id: string,
+  version: string,
+  input: MaterialIssueInput,
+  actor: MaterialIssueActor,
+  documentNo: string,
+): Promise<MaterialIssueRecord> {
+  if (input.header.location !== LOCATION) {
+    throw new Error("INVALID_MATERIAL_ISSUE_LOCATION");
+  }
+
+  return withMaterialIssueWriteTransaction(
+    async (queries) => {
+      const previousHeader =
+        await lockMaterialIssue(
+          queries,
+          id,
+          version,
+        );
+
+      const previousItems =
+        await findMaterialIssueItems(
+          queries,
+          id,
+        );
+
+      const before = mapMaterialIssueRecord(
+        previousHeader,
+        previousItems,
+      );
+
+      const result = await queries.query<
+        MaterialIssueHeaderRow &
+          Record<string, unknown>
+      >(
+        `
+          UPDATE foliar_fertilizer.m_material_issues
+
+          SET
+            document_number = $12,
+            document_date = $2,
+            location_snapshot = $3,
+            product_name_snapshot = $4,
+            product_quantity = $5,
+            department_snapshot = $6,
+            requested_by = $7,
+            issued_by = $8,
+            inspected_by = $9,
+
+            version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+
+          WHERE id = $1
+            AND version = $10::bigint
+            AND location_snapshot = $11
+            AND archived_at IS NULL
+
+          RETURNING ${HEADER_COLUMNS}
+        `,
+        [
+          id,
+          input.header.issueDate,
+          input.header.location,
+          input.header.productName,
+          input.header.quantity,
+          input.header.department,
+          input.signers.requestedBy,
+          input.signers.issuedBy,
+          input.signers.inspectedBy,
+          version,
+          LOCATION,
+          documentNo,
+        ],
+      );
+
+      const header = result.rows[0];
+
+      if (!header) {
+        throw new MaterialIssueConflictError();
+      }
+
+      await queries.query(
+        `
+          DELETE FROM foliar_fertilizer.r_material_issue_items
+          WHERE material_issue_id = $1
+        `,
+        [id],
+      );
+
+      await insertMaterialIssueItems(
+        queries,
+        id,
+        input.items,
+      );
+
+      const items = await findMaterialIssueItems(
+        queries,
+        id,
+      );
+
+      const after = mapMaterialIssueRecord(
+        header,
+        items,
+      );
+
+      await insertMaterialIssueHistory(
+        queries,
+        id,
+        header.version,
+        "updated",
+        actor,
+        before,
+        after,
+      );
+
+      return after;
+    },
+  );
+}
+
+// ==========================================
+// DELETE: Soft Delete
+// ==========================================
+
+export async function deleteMaterialIssue(
+  id: string,
+  version: string,
+  actor: MaterialIssueActor,
+): Promise<void> {
+  await withMaterialIssueWriteTransaction(
+    async (queries) => {
+      const previousHeader =
+        await lockMaterialIssue(
+          queries,
+          id,
+          version,
+        );
+
+      const previousItems =
+        await findMaterialIssueItems(
+          queries,
+          id,
+        );
+
+      const before = mapMaterialIssueRecord(
+        previousHeader,
+        previousItems,
+      );
+
+      const result = await queries.query<{
+        version: string;
+      }>(
+        `
+          UPDATE foliar_fertilizer.m_material_issues
+
+          SET
+            archived_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP,
+            version = version + 1
+
+          WHERE id = $1
+            AND version = $2::bigint
+            AND location_snapshot = $3
+            AND archived_at IS NULL
+
+          RETURNING version::text AS version
+        `,
+        [id, version, LOCATION],
+      );
+
+      const row = result.rows[0];
+
+      if (!row) {
+        throw new MaterialIssueConflictError();
+      }
+
+      await insertMaterialIssueHistory(
+        queries,
+        id,
+        row.version,
+        "archived",
+        actor,
+        before,
+        null,
+      );
     },
   );
 }

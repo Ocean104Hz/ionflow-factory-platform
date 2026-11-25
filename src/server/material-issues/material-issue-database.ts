@@ -369,3 +369,99 @@ export async function withMaterialIssueReadTransaction<T>(
         client.release(destroy);
     }
 }
+export async function withMaterialIssueWriteTransaction<T>(
+  work: (queries: MaterialIssueQueries) => Promise<T>,
+): Promise<T> {
+  await verifyMaterialIssueDatabase();
+
+  const pool = getPool();
+
+  const client = await pool.connect().catch(() => {
+    throw new MaterialIssueDatabaseError(
+      "DB_UNAVAILABLE",
+    );
+  });
+
+  let destroy = false;
+  let active = false;
+
+  try {
+    await client.query("BEGIN READ WRITE");
+
+    await client.query(
+      "SET LOCAL search_path TO pg_catalog",
+    );
+
+    const identity = await client.query<{
+      valid: boolean;
+    }>(`
+      SELECT (
+        current_database() = 'production'
+        AND current_user = 'foliar_fertilizer_app'
+        AND current_setting('transaction_read_only') = 'off'
+        AND has_schema_privilege(
+          current_user,
+          'foliar_fertilizer',
+          'USAGE'
+        )
+        AND NOT has_schema_privilege(
+          current_user,
+          'foliar_fertilizer',
+          'CREATE'
+        )
+      ) AS valid
+    `);
+
+    if (identity.rows[0]?.valid !== true) {
+      throw new MaterialIssueDatabaseError(
+        "DB_VERIFICATION_FAILED",
+      );
+    }
+
+    active = true;
+
+    const result = await work({
+      async query<
+        R extends Record<string, unknown>,
+      >(
+        text: string,
+        values: readonly MaterialIssueSqlValue[] = [],
+      ): Promise<MaterialIssueQueryResult<R>> {
+        if (!active) {
+          throw new MaterialIssueDatabaseError(
+            "DB_VERIFICATION_FAILED",
+          );
+        }
+
+        const response = await client.query<R>(
+          text,
+          [...values],
+        );
+
+        return {
+          rows: response.rows,
+          rowCount: response.rowCount,
+        };
+      },
+    });
+
+    active = false;
+
+    await client.query("COMMIT");
+
+    return result;
+  } catch (error: unknown) {
+    active = false;
+
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      destroy = true;
+    }
+
+    throw error;
+  } finally {
+    active = false;
+    client.release(destroy);
+  }
+}

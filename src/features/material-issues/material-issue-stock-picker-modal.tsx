@@ -24,8 +24,13 @@ import {
 import type {
   MaterialIssueStockItem,
 } from "./material-issue-domain";
+import {
+  createStockMaterialMockSheets,
+} from "@/src/lib/mock-data/stock_remaining_materials_ff";
 
-const materials: MaterialIssueStockItem[] = [];
+import {
+  stockMaterialRowRef,
+} from "@/src/features/stock_remaining_materials_ff/stock_remaining_materials_ff_domain";
 
 type MaterialIssueStockPickerModalProps = {
   selectedCode: string;
@@ -43,6 +48,26 @@ export function MaterialIssueStockPickerModal({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
+  const [materials] = useState<MaterialIssueStockItem[]>(() => {
+    const sheets = createStockMaterialMockSheets();
+
+    const latestSheet = sheets
+      .sort((a, b) => b.id.localeCompare(a.id))[0];
+
+    if (!latestSheet) {
+      return [];
+    }
+
+    return latestSheet.rows
+      .filter((row) => Boolean(row.item.code?.trim()))
+      .map((row) => ({
+        id: `${latestSheet.id}-${stockMaterialRowRef(row)}`,
+        materialCode: row.item.code?.trim() ?? "",
+        materialName: row.item.name.trim(),
+        unit: row.item.unit?.trim() ?? "",
+        remainingQuantity: row.summary.closing_quantity,
+      }));
+  });
 
   const keyword = search.trim().toLowerCase();
 
@@ -143,7 +168,7 @@ export function MaterialIssueStockPickerModal({
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            ยังไม่ได้เชื่อมต่อฐานข้อมูลสต็อกวัสดุ
+            ข้อมูลจากสต็อกวัสดุคงเหลือ FF
           </p>
         </div>
 
