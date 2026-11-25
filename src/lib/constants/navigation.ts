@@ -28,6 +28,10 @@ export function isNavigationActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+export function navigationModuleKey(href: string): string {
+  return href.replace(/^\//, "").replaceAll("-", "_").replaceAll("/", "_");
+}
+
 // Business navigation consolidated from verified iCON/iTech/iFoam module identities.
 // Missing href means this template does not yet implement that module.
 export const navigation: FactoryNavigationItem[] = [
@@ -154,19 +158,19 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "WAREHOUSE",
-    title: "วัสดุคงเหลือ FF",
+    title: "วัสดุคงเหลือ Foliar Fertilizer",
     href: "/stock_remaining_materials_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก WIP FF",
+    title: "สต็อก WIP Foliar Fertilizer",
     href: "/stock_wip_ff",
     icon: Boxes,
   },
   {
     group: "WAREHOUSE",
-    title: "สต็อก RM FF",
+    title: "สต็อก RM Foliar Fertilizer",
     href: "/stock_rm_ff",
     icon: Boxes,
   },
@@ -255,6 +259,12 @@ export const navigation: FactoryNavigationItem[] = [
     group: "MAINTENANCE",
     title: "ใบแจ้งซ่อม",
     href: "/repair-requests",
+    icon: Wrench,
+  },
+  {
+    group: "MAINTENANCE",
+    title: "งานของช่าง",
+    href: "/maintenance-work",
     icon: Wrench,
   },
   {

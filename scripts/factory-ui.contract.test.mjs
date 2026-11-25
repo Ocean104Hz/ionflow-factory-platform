@@ -336,6 +336,20 @@ test("status palette, horizontal table overflow, and dialog safety are shared", 
   assert.match(dialog, /setOpen\(false\)/);
 });
 
+test("unsaved changes use themed AlertDialog instead of browser confirms", () => {
+  for (const path of [
+    "src/features/repair-requests/repair-form.tsx",
+    "src/features/production-orders/production-order-editor.tsx",
+    "src/features/production-orders/production-order-form-dialog.tsx",
+  ]) {
+    const source = read(path);
+    assert.doesNotMatch(source, /window\.confirm/);
+    assert.match(source, /<AlertDialog/);
+    assert.match(source, /<AlertDialogCancel/);
+    assert.match(source, /<AlertDialogAction/);
+  }
+});
+
 test("Login submits only to the local auth API and never stores credentials", () => {
   const login = read("src/features/login/login.tsx");
   assert.match(login, /fetch\("\/api\/auth\/login"/);

@@ -18,6 +18,24 @@ export const internalMasters: MasterState = {
   used: [],
   personnel: [
     ...demoUsers.map((p) => ({ ...p })),
+    {
+      id: "DEMO-M001",
+      displayName: "ช่างสาธิต ก",
+      email: "technician-a@example.test",
+      department: "ซ่อมบำรุง",
+      role: "พนักงาน",
+      active: true,
+      modules: [],
+    },
+    {
+      id: "DEMO-M002",
+      displayName: "ช่างสาธิต ข",
+      email: "technician-b@example.test",
+      department: "ซ่อมบำรุง",
+      role: "พนักงาน",
+      active: true,
+      modules: [],
+    },
     ...prUsers.map((p, i) => ({
       id: `internal-person-${i}`,
       displayName: p.name,

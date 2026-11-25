@@ -48,10 +48,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Separator } from "../ui/separator";
 import { useBranding } from "./branding-provider";
 import { FactoryLogo } from "./factory-logo";
+import { FactoryFooter } from "./patterns";
 import {
   navigation,
   navigationGroups,
   isNavigationActive,
+  navigationModuleKey,
 } from "@/src/lib/constants/navigation";
 import { Alert, AlertDescription } from "../ui/alert";
 
@@ -59,6 +61,7 @@ type CurrentUser = Readonly<{
   displayName: string;
   email: string;
   roles: readonly string[];
+  modules: readonly string[];
 }>;
 
 const SIDEBAR_STORAGE_KEY = "ionflow.sidebar.open";
@@ -145,6 +148,7 @@ function FactoryShell({
 }) {
   const pathname = usePathname();
   const { branding } = useBranding();
+  const isSettingsPage = pathname === "/settings";
   const current = navigation.find(
     (item) =>
       !item.alias && item.href && isNavigationActive(pathname, item.href),
@@ -170,7 +174,7 @@ function FactoryShell({
         />
         <div
           id="main-content"
-          className="factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 lg:px-4"
+          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""}`}
         >
           {previewMenu && (
             <Alert role="status">
@@ -191,10 +195,7 @@ function FactoryShell({
             </Alert>
           )}
           {children}
-          <footer className="no-print flex flex-wrap justify-between gap-2 pt-4 text-[10px] tracking-wide text-muted-foreground">
-            <span>{branding.shortName} FACTORY · UI STANDARD / 01</span>
-            <span>ข้อมูลสมมติเท่านั้น · ไม่ใช้เป็นเอกสารทางธุรกิจ</span>
-          </footer>
+          {!isSettingsPage && <FactoryFooter />}
         </div>
       </SidebarInset>
     </>
@@ -215,7 +216,12 @@ function AppSidebar({
     return (
       <SidebarMenu>
         {navigation
-          .filter((item) => item.group === group)
+          .filter(
+            (item) =>
+              item.group === group &&
+              item.href &&
+              currentUser.modules.includes(navigationModuleKey(item.href)),
+          )
           .map((item) => (
             <SidebarMenuItem key={item.title}>
               {item.href ? (
@@ -244,32 +250,7 @@ function AppSidebar({
                     {!compact && <span>{item.title}</span>}
                   </Link>
                 </SidebarMenuButton>
-              ) : (
-                <SidebarMenuButton
-                  tooltip={`${item.title} · ยังไม่มีหน้าสาธิต`}
-                  aria-label={`${item.title} · ยังไม่มีหน้าสาธิต`}
-                  className="h-9"
-                  onClick={() => {
-                    onPreview(item.title);
-                    setOpenMobile(false);
-                  }}
-                >
-                  <item.icon aria-hidden="true" />
-                  {!compact && (
-                    <>
-                      <span
-                        title={item.title}
-                        className="min-w-0 flex-1 truncate text-muted-foreground"
-                      >
-                        {item.title}
-                      </span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        เร็วๆนี้
-                      </span>
-                    </>
-                  )}
-                </SidebarMenuButton>
-              )}
+              ) : null}
             </SidebarMenuItem>
           ))}
       </SidebarMenu>

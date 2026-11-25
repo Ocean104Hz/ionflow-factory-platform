@@ -6,11 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate:access": "node --env-file=.env.local scripts/migrate-foliar-access.mjs",
+    "auth:bootstrap-admin": "node --env-file=.env.local scripts/bootstrap-factory-admin.mjs",
+    "db:check:access": "node --env-file=.env.local scripts/check-access-database.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^13.10.0",
     "lucide-react": "^1.73.0",
     "next": "16.4.6",
     "pg": "^8.23.1",
@@ -30,6 +35,6 @@
     "eslint": "^10",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
-    "typescript": "^7"
+    "typescript": "6.0.2"
   }
 }

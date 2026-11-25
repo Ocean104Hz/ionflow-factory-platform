@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, ListFilter } from "lucide-react";
-import { SectionCard } from "./patterns";
+import { FactoryFooter, SectionCard } from "./patterns";
 import { BrandingEditor } from "./branding-editor";
 import { UserSettings } from "./user-settings";
 import { MasterSettings } from "./master-settings";
@@ -13,6 +13,7 @@ import {
   type SettingsDestination,
 } from "./settings-sidebar";
 import { Button } from "../ui/button";
+import { Sidebar, SidebarContent, SidebarHeader } from "../ui/sidebar";
 import {
   Sheet,
   SheetContent,
@@ -53,22 +54,21 @@ export function SettingsPage() {
   }
   return (
     <>
-      {/* <PageHeader
-        title="ตั้งค่า"
-        description="จัดการข้อมูลหลัก ผู้ใช้งาน และการตั้งค่าโรงงาน"
-      /> */}
-      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-6">
-        <aside className="hidden min-w-0 rounded-lg border bg-card lg:sticky lg:top-20 lg:block">
-          <p className="border-b px-5 py-3 text-xs font-medium tracking-wide text-muted-foreground">
+      <div className="grid min-w-0 items-start lg:grid-cols-[260px_minmax(0,1fr)]">
+        <Sidebar
+          collapsible="none"
+          className="hidden w-full min-w-0 border-r border-sidebar-border lg:sticky lg:top-14 lg:flex lg:h-[calc(100dvh-3.5rem)]"
+        >
+          <SidebarHeader className="shrink-0 border-b border-sidebar-border px-4 py-3 text-xs font-medium text-muted-foreground">
             หมวดการตั้งค่า
-          </p>
-          <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto">
+          </SidebarHeader>
+          <SidebarContent>
             <SettingsSidebar selected={selected} onSelect={select} />
-          </div>
-        </aside>
+          </SidebarContent>
+        </Sidebar>
         <section
           aria-labelledby="settings-section-title"
-          className="min-w-0 space-y-4"
+          className="min-w-0 space-y-4 lg:flex lg:min-h-[calc(100dvh-3.5rem)] lg:flex-col lg:px-4 lg:py-5"
         >
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -113,7 +113,7 @@ export function SettingsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">
               {selected === "users"
-                ? "จัดการข้อมูลผู้ใช้ บทบาท และการมองเห็นเมนูในระบบสาธิต"
+                ? "จัดการผู้ใช้ Role และ Module ที่บังคับใช้จริงใน Foliar Fertilizer"
                 : selected === "branding"
                   ? "ปรับชื่อ โลโก้ ภาพประกอบ และสีธีมของโรงงาน"
                   : `จัดการข้อมูล${title}สำหรับการใช้งานภายในโรงงาน`}
@@ -141,6 +141,7 @@ export function SettingsPage() {
               onDirtyChange={setDirty}
             />
           )}
+          <FactoryFooter className="lg:mt-auto" />
         </section>
       </div>
       <AlertDialog
