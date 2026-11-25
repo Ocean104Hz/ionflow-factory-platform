@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PageHeader, StatusBadge } from "@/src/components/factory/patterns";
+import { PageHeader } from "@/src/components/factory/patterns";
 import {
   Tabs,
   TabsList,
@@ -17,12 +17,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import { demoNCReports } from "@/src/lib/mock-data/nc-reports";
+import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import {
   blankNC,
   validateNC,
-  saveNC,
-  deleteNC,
 } from "./nc-report-mock-helpers";
 import type { NCReport, NCErrors } from "./nc-report-types";
 import { NCReportForm } from "./nc-report-form";
@@ -31,7 +29,7 @@ import { NCReportDetail } from "./nc-report-detail";
 import { NCReportPrintPreview } from "./nc-report-print-preview";
 
 export function NCReportWorkspace() {
-  const [records, setRecords] = useState(() => structuredClone(demoNCReports));
+  const { records, persist, remove, loading, loadError, busy } = useQcDocuments<NCReport>("nc_reports");
   const [report, setReport] = useState(blankNC),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankNC()));
   const [tab, setTab] = useState("form"),
@@ -52,7 +50,7 @@ export function NCReportWorkspace() {
     if (dirty) setPending(r);
     else open(r);
   }
-  function save() {
+  async function save() {
     const nextErrors = validateNC(report, records);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -60,15 +58,14 @@ export function NCReportWorkspace() {
       return;
     }
     try {
-      const result = saveNC(records, report, crypto.randomUUID());
-      setRecords(result.records);
-      setReport(result.saved);
-      setBaseline(JSON.stringify(result.saved));
+      const saved = await persist(report);
+      setReport(saved);
+      setBaseline(JSON.stringify(saved));
       setMessage(
-        "บันทึกข้อมูลตัวอย่างแล้ว · ไม่มีการส่งข้อมูลหรือเปลี่ยนสต็อก",
+        "บันทึกเอกสารแล้ว",
       );
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "บันทึกข้อมูลตัวอย่างไม่ได้");
+      setMessage(e instanceof Error ? e.message : "บันทึกเอกสารไม่ได้");
     }
   }
   return (
@@ -76,10 +73,10 @@ export function NCReportWorkspace() {
       <PageHeader
         title="ใบ NC"
         description="บันทึกและติดตามรายงานข้อบกพร่องของสินค้าและกระบวนการผลิต"
-        actions={
-          <StatusBadge tone="info">UI MOCK · ไม่เชื่อมระบบจริง</StatusBadge>
-        }
       />
+      {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
+      <fieldset disabled={busy} className="min-w-0">
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
         <TabsList aria-label="มุมมองใบ NC">
           <TabsTrigger value="form">สร้างใบ NC</TabsTrigger>
@@ -107,16 +104,21 @@ export function NCReportWorkspace() {
             onEdit={request}
             onView={(r) => setViewId(r.id)}
             onPrint={(r) => setPrintId(r.id)}
-            onDelete={(r) => {
-              setRecords((current) => deleteNC(current, r.id));
+            onDelete={async (r) => {
+              try { await remove(r.id); }
+              catch (error) {
+                setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+                return;
+              }
               if (report.id === r.id) open(blankNC());
               if (viewId === r.id) setViewId(null);
               if (printId === r.id) setPrintId(null);
-              setMessage("ลบข้อมูลตัวอย่างแล้ว · ไม่เปลี่ยนสต็อก");
+              setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
         </TabsContent>
       </Tabs>
+      </fieldset>
       <AlertDialog
         open={!!pending}
         onOpenChange={(v) => {

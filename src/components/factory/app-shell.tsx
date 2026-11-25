@@ -195,7 +195,7 @@ function FactoryShell({
             </Alert>
           )}
           {children}
-          {!isSettingsPage && <FactoryFooter live={current?.group === "ORGANIC"} />}
+          {!isSettingsPage && <FactoryFooter live={current?.group === "ORGANIC" || current?.group === "PACKING" || ["/production-orders", "/delivery-orders", "/invoices", "/products", "/audit_log", "/qc-organic-fertilizer", "/nc-reports", "/sample-submissions", "/sample-submission-log", "/lab_sample_receiving", "/qc_product_weight_check", "/raw-material-receiving", "/material-requisitions", "/material-issues"].some(path => pathname === path || pathname.startsWith(`${path}/`))} />}
         </div>
       </SidebarInset>
     </>
@@ -285,7 +285,7 @@ function AppSidebar({
       <SidebarSeparator />
       <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         <nav aria-label="เมนูโรงงาน">
-          {navigationGroups.map((group) => (
+          {navigationGroups.filter((group) => group.key !== "MAINTENANCE").map((group) => (
             <SidebarGroup key={group.key}>
               {!compact && (
                 <SidebarGroupLabel className="text-[11px] tracking-wide text-muted-foreground">

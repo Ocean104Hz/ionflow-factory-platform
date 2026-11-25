@@ -128,7 +128,7 @@ export function NCReportForm({
     >
       {report.id && (
         <p className="text-sm text-primary">
-          กำลังแก้ไขข้อมูลตัวอย่าง: {report.doc_no}
+          กำลังแก้ไขเอกสาร: {report.doc_no}
         </p>
       )}
       <SectionCard title="ข้อมูลเอกสาร">
@@ -205,7 +205,7 @@ export function NCReportForm({
             ยกเลิกการแก้ไข
           </Button>
         )}
-        <Button type="submit">บันทึกข้อมูลตัวอย่าง</Button>
+        <Button type="submit">บันทึกเอกสาร</Button>
       </div>
     </form>
   );

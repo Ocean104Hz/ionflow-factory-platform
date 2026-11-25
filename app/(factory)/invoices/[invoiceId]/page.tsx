@@ -1,15 +1,7 @@
-import { notFound } from "next/navigation";
-import { invoices } from "@/src/lib/mock-data";
-import { InvoiceDetail } from "@/src/features/invoices/invoice-detail";
-export function generateStaticParams() {
-  return invoices.map((p) => ({ invoiceId: p.id }));
-}
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ invoiceId: string }>;
-}) {
-  const { invoiceId } = await params;
-  if (!invoices.some((p) => p.id === invoiceId)) notFound();
-  return <InvoiceDetail key={invoiceId} id={invoiceId} />;
+import { FoliarDocumentDetail } from "@/src/features/documents/foliar-document-detail";
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+
+export default async function Page({ params }: { params: Promise<{ invoiceId: string }> }) {
+  await requireAuthenticatedFactoryModule("invoices");
+  return <FoliarDocumentDetail id={(await params).invoiceId} kind="INVOICE" />;
 }

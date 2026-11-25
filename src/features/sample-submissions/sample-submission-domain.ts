@@ -102,7 +102,7 @@ export function validateSubmission(
         r.doc_no.trim().toLowerCase() === report.doc_no.trim().toLowerCase(),
     )
   )
-    errors.doc_no = "เลขที่เอกสารนี้มีอยู่ในข้อมูลตัวอย่างแล้ว";
+    errors.doc_no = "เลขที่เอกสารนี้มีอยู่แล้ว";
   if (!report.rows.length) errors.rows = "ต้องมีตัวอย่างอย่างน้อย 1 แถว";
   const ids = new Set<string>();
   for (const row of report.rows) {
@@ -135,7 +135,7 @@ export function saveSubmission(
   if (report.id && !records.some((r) => r.id === report.id))
     throw new Error("ไม่พบเอกสารที่ต้องการแก้ไข");
   if (!report.id && (!newId || records.some((r) => r.id === newId)))
-    throw new Error("รหัสเอกสารตัวอย่างซ้ำ กรุณาลองใหม่");
+    throw new Error("รหัสเอกสารซ้ำ กรุณาลองใหม่");
   const saved = structuredClone({
     ...report,
     id: report.id || newId,

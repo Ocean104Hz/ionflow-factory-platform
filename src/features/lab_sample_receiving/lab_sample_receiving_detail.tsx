@@ -128,7 +128,7 @@ export function LabSampleReceivingDetail({
               ? "พรีวิวเอกสาร A4 แนวนอน"
               : "แสดงข้อมูลแบบอ่านอย่างเดียว"}
             {" · "}
-            UI MOCK ไม่เชื่อมฐานข้อมูลจริง
+            รายละเอียดเอกสารที่บันทึก
           </DialogDescription>
         </DialogHeader>
 

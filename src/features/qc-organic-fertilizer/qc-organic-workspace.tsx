@@ -32,21 +32,18 @@ import {
 import {
   PageHeader,
   SectionCard,
-  StatusBadge,
   FactoryDataTable,
   Pagination,
   SelectField,
   type Column,
 } from "@/src/components/factory/patterns";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
-import { organicReports } from "@/src/lib/mock-data/qc-organic-fertilizer";
+import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import { OrganicFormSections } from "./qc-organic-form";
 import {
   blankReport,
   profiles,
   validateReport,
-  saveReport,
-  deleteReport,
   filterReports,
   type OrganicReport,
   type Errors,
@@ -54,7 +51,7 @@ import {
 } from "./qc-organic-domain";
 const initialFilters = { search: "", profile: "all", from: "", to: "" };
 export function OrganicWorkspace() {
-  const [records, setRecords] = useState(() => structuredClone(organicReports));
+  const { records, persist, remove, loading, loadError, busy } = useQcDocuments<OrganicReport>("qc_organic_fertilizer");
   const [row, setRow] = useState(() => blankReport());
   const [baseline, setBaseline] = useState(() => JSON.stringify(blankReport()));
   const [tab, setTab] = useState("form"),
@@ -87,7 +84,7 @@ export function OrganicWorkspace() {
     if (profile === row.profile) return;
     guarded(() => openEditor(blankReport(profile)));
   }
-  function save() {
+  async function save() {
     const nextErrors = validateReport(row, records);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -95,16 +92,15 @@ export function OrganicWorkspace() {
       return;
     }
     try {
-      const result = saveReport(records, row, crypto.randomUUID());
-      setRecords(result.records);
-      setRow(result.saved);
-      setBaseline(JSON.stringify(result.saved));
+      const saved = await persist(row);
+      setRow(saved);
+      setBaseline(JSON.stringify(saved));
       setMessage(
-        "บันทึกข้อมูลตัวอย่างแล้ว · ไม่ใช่ผลอนุมัติ QC และไม่เปลี่ยนสต็อก",
+        "บันทึกเอกสารแล้ว",
       );
     } catch (e) {
       setErrors({
-        general: e instanceof Error ? e.message : "บันทึกตัวอย่างไม่สำเร็จ",
+        general: e instanceof Error ? e.message : "บันทึกเอกสารไม่สำเร็จ",
       });
       errorRef.current?.focus();
     }
@@ -183,7 +179,7 @@ export function OrganicWorkspace() {
             พรีวิวพิมพ์
           </Button>
           <ConfirmDialog
-            title="ลบรายงานตัวอย่าง?"
+            title="ลบรายงาน?"
             description={`${r.doc_no} จะถูกลบจากรายการในหน้านี้${row.id === r.id && dirty ? " และละทิ้งแบบฟอร์มที่แก้ไขค้างอยู่" : ""}`}
             trigger={
               <Button variant="outline" size="sm" aria-label={`ลบ ${r.doc_no}`}>
@@ -191,10 +187,14 @@ export function OrganicWorkspace() {
                 ลบ
               </Button>
             }
-            onConfirm={() => {
-              setRecords((prev) => deleteReport(prev, r.id));
+            onConfirm={async () => {
+              try { await remove(r.id); }
+              catch (error) {
+                setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+                return;
+              }
               if (row.id === r.id) openEditor(blankReport(row.profile));
-              setMessage("ลบข้อมูลตัวอย่างแล้ว");
+              setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
         </div>
@@ -206,9 +206,6 @@ export function OrganicWorkspace() {
       <PageHeader
         title="ตรวจคุณภาพปุ๋ยอินทรีย์เคมี"
         description="บันทึกและติดตามผลการตรวจสอบคุณภาพระหว่างกระบวนการผลิต"
-        actions={
-          <StatusBadge tone="info">UI MOCK · ไม่เชื่อมระบบจริง</StatusBadge>
-        }
       />
       {message && (
         <p
@@ -218,6 +215,9 @@ export function OrganicWorkspace() {
           {message}
         </p>
       )}
+      {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
+      <fieldset disabled={busy} className="min-w-0">
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
         <TabsList aria-label="มุมมองตรวจคุณภาพปุ๋ยอินทรีย์เคมี">
           <TabsTrigger value="form">บันทึกการตรวจสอบ</TabsTrigger>
@@ -269,14 +269,14 @@ export function OrganicWorkspace() {
               >
                 {row.id ? "ยกเลิกการแก้ไข / เริ่มใหม่" : "ล้างข้อมูล"}
               </Button>
-              <Button type="submit">บันทึกข้อมูลตัวอย่าง</Button>
+              <Button type="submit">บันทึกเอกสาร</Button>
             </div>
           </form>
         </TabsContent>
         <TabsContent value="history" className="min-w-0 space-y-4">
           <SectionCard
             title="ประวัติการตรวจสอบ"
-            subtitle={`พบ ${filtered.length} จาก ${records.length} รายงานตัวอย่าง`}
+            subtitle={`พบ ${filtered.length} จาก ${records.length} รายงาน`}
           >
             <form
               className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
@@ -385,6 +385,7 @@ export function OrganicWorkspace() {
           />
         </TabsContent>
       </Tabs>
+      </fieldset>
       <AlertDialog
         open={!!pending}
         onOpenChange={(v) => {
@@ -424,8 +425,7 @@ export function OrganicWorkspace() {
               {opened?.print ? "พรีวิวพิมพ์ A4 แนวนอน" : "รายละเอียดการตรวจสอบ"}
             </DialogTitle>
             <DialogDescription>
-              MOCK / DEMO · อ่านอย่างเดียว ไม่ใช่เอกสารอนุมัติจริง · ไม่สร้าง
-              PDF หรือสั่งพิมพ์จริง
+              รายละเอียดรายงานที่บันทึกไว้
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 overflow-auto rounded-lg border bg-muted/20 p-3">
@@ -448,7 +448,7 @@ export function OrganicWorkspace() {
                         {profiles[opened.row.profile].name}
                       </h2>
                       <p>
-                        {opened.row.doc_no} · {opened.row.date} · MOCK / DEMO
+                        {opened.row.doc_no} · {opened.row.date}
                       </p>
                     </header>
                   </>

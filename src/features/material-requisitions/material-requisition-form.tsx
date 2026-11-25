@@ -99,7 +99,7 @@ export function MaterialRequisitionForm({
       )}
       <SectionCard
         title="ข้อมูลเอกสาร"
-        subtitle="ข้อมูลตัวอย่างเท่านั้น · ช่องที่มี * จำเป็นต้องกรอก"
+        subtitle="ช่องที่มี * จำเป็นต้องกรอก"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {row.id ? (
@@ -485,7 +485,7 @@ export function MaterialRequisitionForm({
         <Button type="button" variant="outline" onClick={onReset}>
           ยกเลิก
         </Button>
-        <Button type="submit">บันทึกข้อมูลตัวอย่าง</Button>
+        <Button type="submit">บันทึกใบเบิก</Button>
       </div>
     </form>
   );

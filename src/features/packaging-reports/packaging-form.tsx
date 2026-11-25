@@ -638,9 +638,10 @@ export function PackagingForm({
   onChange: (r: PackagingReport) => void;
   onSaved: (r: PackagingReport) => void;
 }) {
-  const { records, save } = usePackaging();
+  const { records, save, busy, loading, error } = usePackaging();
   const [errors, setErrors] = useState<Record<string, string>>({}),
     [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [profileChange, setProfileChange] = useState<PackagingProfileId | null>(
     null,
   );
@@ -654,19 +655,23 @@ export function PackagingForm({
     setMessage("");
     onChange({ ...report, ...v });
   };
-  function submit(status: PackagingReport["status"]) {
+  async function submit(status: PackagingReport["status"]) {
+    if (busy || loading || error) return;
     const candidate = { ...report, status },
       e = validateReport(candidate, records);
     setErrors(e);
     if (Object.keys(e).length) {
+      setFailed(true);
       setMessage("กรุณาแก้ข้อมูลที่ระบุด้านบนก่อนบันทึก");
       return;
     }
     try {
-      const saved = save(candidate);
+      const saved = await save(candidate);
       onSaved(saved);
-      setMessage("บันทึกข้อมูลสาธิตแล้ว · ไม่เปลี่ยนสต็อก");
+      setFailed(false);
+      setMessage("บันทึกเอกสารเรียบร้อยแล้ว");
     } catch (e) {
+      setFailed(true);
       setMessage(e instanceof Error ? e.message : "บันทึกไม่ได้");
     }
   }
@@ -675,15 +680,16 @@ export function PackagingForm({
       className="min-w-0 space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(report.status);
+        void submit(report.status);
       }}
     >
+      <fieldset disabled={busy} className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge tone={report.status === "DRAFT" ? "neutral" : "info"}>
           {recordLabel(report)}
         </StatusBadge>
         <span className="text-xs text-muted-foreground">
-          Mock · ยังไม่มีการประเมินผลอนุมัติรวม
+          ยังไม่มีการประเมินผลอนุมัติรวม
         </span>
       </div>
       {Object.keys(errors).length > 0 && (
@@ -804,7 +810,7 @@ export function PackagingForm({
         ))}
       <SectionCard
         title="ผู้ลงชื่อ"
-        subtitle="ชื่อสาธิต ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์หรือการอนุมัติ"
+        subtitle="ชื่อผู้ลงนามสำหรับบันทึกเอกสาร"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {report.signers.map((s, i) => (
@@ -847,18 +853,19 @@ export function PackagingForm({
         />
       </SectionCard>
       <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-3 rounded-lg border bg-card p-3 shadow-sm">
-        <p role="status" className="mr-auto text-sm">
+        <p role={failed ? "alert" : "status"} className={failed ? "mr-auto text-sm text-danger" : "mr-auto text-sm"}>
           {message}
         </p>
         {report.status === "DRAFT" && (
-          <Button type="submit" variant="outline">
+          <Button type="submit" variant="outline" disabled={loading || Boolean(error)}>
             บันทึกแบบร่าง
           </Button>
         )}
-        <Button type="button" onClick={() => submit("RECORDED")}>
+        <Button type="button" disabled={loading || Boolean(error)} onClick={() => void submit("RECORDED")}>
           {report.status === "DRAFT" ? "บันทึกรายงาน" : "บันทึกการแก้ไข"}
         </Button>
       </div>
+      </fieldset>
       <AlertDialog
         open={profileChange !== null}
         onOpenChange={(open) => {

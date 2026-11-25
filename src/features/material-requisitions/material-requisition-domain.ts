@@ -153,7 +153,7 @@ export function validateRequisition(
           documentNumber(row.doc_no).toLocaleLowerCase(),
     )
   )
-    errors.doc_no = "เลขที่เอกสารซ้ำกับข้อมูลตัวอย่าง";
+    errors.doc_no = "เลขที่เอกสารนี้มีอยู่แล้ว";
   const check = (
     id: string,
     name: string,

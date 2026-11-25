@@ -48,7 +48,7 @@ export function NCReportPrintPreview({
             <header className="space-y-2 border-b border-black pb-4 text-center">
               <h2 className="text-xl font-semibold">ใบรายงานข้อบกพร่อง (NC)</h2>
               <p className="text-sm">
-                ข้อมูลตัวอย่าง · ไม่ใช่หลักฐานอนุมัติหรือคำสั่งเปลี่ยนสต็อก
+                รายละเอียดใบ NC
               </p>
               <p className="break-all text-sm">เลขที่เอกสาร {report?.doc_no}</p>
             </header>

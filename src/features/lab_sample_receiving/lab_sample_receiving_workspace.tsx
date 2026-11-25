@@ -24,16 +24,13 @@ import {
 
 import {
   PageHeader,
-  StatusBadge,
 } from "@/src/components/factory/patterns";
 
-import { demoLabSampleReceivingSheets } from "@/src/lib/mock-data/lab-sample-receiving";
+import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 
 import {
   blankLabSheet,
-  saveLabSheet,
   validateLabSheet,
-  deleteLabSheet,
   type LabSampleReceivingSheet,
   type LabSampleErrors,
 } from "./lab_sample_receiving_domain";
@@ -60,9 +57,7 @@ const INITIAL_ROW_ID = "initial-lab-row";
 export function LabSampleReceivingWorkspace() {
   /* ---------------- document state ---------------- */
 
-  const [records, setRecords] = useState<
-    LabSampleReceivingSheet[]
-  >(() => structuredClone(demoLabSampleReceivingSheets));
+  const { records, persist, remove, loading, loadError, busy } = useQcDocuments<LabSampleReceivingSheet>("lab_sample_receiving");
 
   const [draft, setDraft] =
     useState<LabSampleReceivingSheet>(() =>
@@ -140,7 +135,7 @@ export function LabSampleReceivingWorkspace() {
 
   /* ---------------- save ---------------- */
 
-  function handleSave() {
+  async function handleSave() {
     const validationErrors = validateLabSheet(draft);
 
     setErrors(validationErrors);
@@ -156,22 +151,15 @@ export function LabSampleReceivingWorkspace() {
     }
 
     try {
-      const result = saveLabSheet(
-        records,
-        draft,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
+      const saved = await persist(draft);
+      setDraft(saved);
 
-      setRecords(result.records);
-      setDraft(result.saved);
-
-      setBaseline(JSON.stringify(result.saved));
+      setBaseline(JSON.stringify(saved));
 
       setErrors({});
 
       setMessage(
-        "บันทึกข้อมูลจำลองเรียบร้อยแล้ว",
+        "บันทึกเอกสารแล้ว",
       );
 
       setTab("history");
@@ -211,16 +199,18 @@ export function LabSampleReceivingWorkspace() {
 
   /* ---------------- delete ---------------- */
 
-  function handleDeleteConfirm() {
+  async function handleDeleteConfirm() {
     if (!deleteSheet) {
       return;
     }
 
     const deletedId = deleteSheet.id;
 
-    setRecords((current) =>
-      deleteLabSheet(current, deletedId),
-    );
+    try { await remove(deletedId); }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = blankLabSheet(
@@ -240,7 +230,7 @@ export function LabSampleReceivingWorkspace() {
     setDeleteSheet(null);
 
     setMessage(
-      "ลบข้อมูลจำลองเรียบร้อยแล้ว",
+      "ลบเอกสารจากรายการแล้ว",
     );
   }
 
@@ -253,15 +243,13 @@ export function LabSampleReceivingWorkspace() {
       <PageHeader
         title="i-Lab แบบบันทึกรับตัวอย่าง"
         description="จัดการข้อมูลการรับตัวอย่างเพื่อตรวจวิเคราะห์"
-        actions={
-          <StatusBadge tone="info">
-            UI MOCK · ไม่เชื่อมระบบจริง
-          </StatusBadge>
-        }
       />
 
       {/* Tabs */}
 
+      {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
+      <fieldset disabled={busy} className="min-w-0">
       <Tabs
         value={tab}
         onValueChange={(value) =>
@@ -375,6 +363,7 @@ export function LabSampleReceivingWorkspace() {
           />
         </TabsContent>
       </Tabs>
+      </fieldset>
 
       {/* Confirm Unsaved Changes */}
 
@@ -436,7 +425,7 @@ export function LabSampleReceivingWorkspace() {
             </AlertDialogTitle>
 
             <AlertDialogDescription>
-              ข้อมูลนี้จะถูกลบออกจากรายการจำลอง
+              ข้อมูลนี้จะถูกลบออกจากรายการเอกสาร
               และไม่สามารถเรียกคืนจากสถานะปัจจุบันได้
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -391,12 +391,13 @@ export async function createMaterialIssue(
   input: MaterialIssueInput,
   documentNo: string,
   actor: MaterialIssueActor,
+  transaction = withMaterialIssueWriteTransaction,
 ): Promise<MaterialIssueRecord> {
   if (input.header.location !== LOCATION) {
     throw new Error("INVALID_MATERIAL_ISSUE_LOCATION");
   }
 
-  return withMaterialIssueWriteTransaction(
+  return transaction(
     async (queries) => {
       const documentId = `mi-${randomUUID()}`;
 
@@ -522,12 +523,13 @@ export async function updateMaterialIssue(
   input: MaterialIssueInput,
   actor: MaterialIssueActor,
   documentNo: string,
+  transaction = withMaterialIssueWriteTransaction,
 ): Promise<MaterialIssueRecord> {
   if (input.header.location !== LOCATION) {
     throw new Error("INVALID_MATERIAL_ISSUE_LOCATION");
   }
 
-  return withMaterialIssueWriteTransaction(
+  return transaction(
     async (queries) => {
       const previousHeader =
         await lockMaterialIssue(
@@ -644,8 +646,9 @@ export async function deleteMaterialIssue(
   id: string,
   version: string,
   actor: MaterialIssueActor,
+  transaction = withMaterialIssueWriteTransaction,
 ): Promise<void> {
-  await withMaterialIssueWriteTransaction(
+  await transaction(
     async (queries) => {
       const previousHeader =
         await lockMaterialIssue(

@@ -154,7 +154,7 @@ export function LabSampleReceivingHistory({
 
       <SectionCard
         title="ประวัติแบบบันทึกรับตัวอย่าง"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสารจำลอง`}
+        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
         <form
           className="space-y-4"

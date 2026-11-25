@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Pool } from "pg";
+import { BackendError, readDatabaseConfig } from "../database/config.ts";
 
 const DATABASE_NAME = "production";
 const DATABASE_SCHEMA = "foliar_fertilizer";
@@ -23,45 +24,28 @@ export class MaterialIssueDatabaseError extends Error {
 }
 
 function readConfig() {
-    if (process.env.FACTORY_DB_ENABLED !== "true") {
-        throw new MaterialIssueDatabaseError("DB_DISABLED");
+    try {
+        const config = readDatabaseConfig();
+        return {
+            host: config.host,
+            port: config.port,
+            database: config.database,
+            user: config.user,
+            password: config.password,
+            max: Math.min(3, config.max),
+            connectionTimeoutMillis: config.connectionTimeoutMillis,
+            idleTimeoutMillis: config.idleTimeoutMillis,
+            statement_timeout: config.statementTimeoutMillis,
+            query_timeout: config.statementTimeoutMillis + 1000,
+            lock_timeout: config.statementTimeoutMillis,
+            application_name: "foliar-material-issues",
+            ssl: false,
+            options: "-c search_path=pg_catalog -c default_transaction_read_only=on",
+        };
+    } catch (error) {
+        const code = error instanceof BackendError && error.code === "DB_DISABLED" ? "DB_DISABLED" : "DB_CONFIG_INVALID";
+        throw new MaterialIssueDatabaseError(code);
     }
-
-    const password = process.env.FACTORY_DB_PASSWORD;
-
-    if (
-        process.env.NODE_ENV === "production" ||
-        process.env.FACTORY_DB_HOST !== "127.0.0.1" ||
-        process.env.FACTORY_DB_PORT !== "5433" ||
-        process.env.FACTORY_DB_NAME !== DATABASE_NAME ||
-        process.env.FACTORY_DB_SCHEMA !== DATABASE_SCHEMA ||
-        process.env.FACTORY_DB_USER !== DATABASE_USER ||
-        !password ||
-        password.includes("\0")
-    ) {
-        throw new MaterialIssueDatabaseError(
-            "DB_CONFIG_INVALID",
-        );
-    }
-
-    return {
-        host: "127.0.0.1",
-        port: 5433,
-        database: DATABASE_NAME,
-        user: DATABASE_USER,
-        password,
-        max: 3,
-        connectionTimeoutMillis: 5000,
-        idleTimeoutMillis: 10000,
-        statement_timeout: 5000,
-        query_timeout: 6000,
-        lock_timeout: 5000,
-        application_name: "nan-material-issues",
-        ssl: false,
-        options:
-            "-c search_path=pg_catalog " +
-            "-c default_transaction_read_only=on",
-    };
 }
 
 const cache = globalThis as typeof globalThis & {

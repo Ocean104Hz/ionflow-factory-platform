@@ -25,20 +25,21 @@ import { date, dateTime } from "@/src/lib/formatters";
 import type { ProductionOrder } from "@/src/lib/mock-data";
 
 export function ProductionOrderDetail({ id }: { id: string }) {
-  const { orders, updateOrder, history, loading, busy, error, refresh, remove } = useProductionOrders();
+  const { orders, versions, updateOrder, history, loading, busy, error, refresh, remove } = useProductionOrders();
   const order = orders.find((row) => row.id === id);
+  const fromHub = versions[id]?.startsWith("hub:") === true;
   const [editing, setEditing] = useState(false);
   const events = history[id] ?? [];
   const [notice, setNotice] = useState("");
   const change = async (
     patch: Partial<ProductionOrder>,
     title: string,
-    reason = "บันทึกใน PostgreSQL Local เท่านั้น",
+    reason = "",
   ) => {
     const at = new Date().toISOString();
     try {
       await updateOrder(id, { ...patch, updated: at }, `${title}: ${reason}`);
-      setNotice(`${title} · PostgreSQL Local · ไม่ส่งไปต้นทาง`);
+      setNotice(fromHub ? `${title} · บันทึกแล้ว รอซิงค์กับ Sales Hub` : `${title} · บันทึกในเครื่องแล้ว`);
       return true;
     } catch (e) { setNotice(e instanceof Error ? e.message : reason); return false; }
   };
@@ -46,7 +47,8 @@ export function ProductionOrderDetail({ id }: { id: string }) {
   if (error && !order) return <Alert><AlertDescription><p role="alert">{error}</p><Button onClick={refresh}>ลองโหลดใหม่</Button></AlertDescription></Alert>;
   if (!order) return <EmptyState title="ไม่พบคำสั่งการผลิต" description="เอกสารอาจไม่มีในฐานข้อมูลหรือถูกเก็บถาวรแล้ว" action={<BackButton href="/production-orders" />} />;
   const active = !busy && order.document !== "ยกเลิกแล้ว";
-  const canReview = active && order.production === "ยังไม่เริ่มผลิต";
+  const canReview = active && order.production === "ยังไม่เริ่มผลิต" && (!fromHub || order.approval !== "โรงงานปฏิเสธ");
+  const canReviewMaterial = canReview && (!fromHub || order.approval === "รอการอนุมัติจากโรงงาน");
   const approveReady =
     canReview &&
     order.material === "วัตถุดิบพร้อม" &&
@@ -56,13 +58,13 @@ export function ProductionOrderDetail({ id }: { id: string }) {
     <>
       <PageHeader
         title={order.number}
-        description={`${order.source} · รับข้อมูล ${dateTime(order.received)} · PostgreSQL Local`}
+        description={`${order.source} · รับข้อมูล ${dateTime(order.received)}`}
         parent={{ title: "คำสั่งการผลิต", href: "/production-orders" }}
         actions={
           <>
             <BackButton href="/production-orders" />
-            <Button disabled={busy} variant="outline" onClick={() => setEditing(true)}>แก้ไขเอกสาร Local</Button>
-            <ConfirmDialog title="เก็บเอกสารถาวร" description="นำออกจากรายการ แต่คง identity และประวัติใน PostgreSQL" trigger={<Button variant="outline" disabled={busy || order.production !== "ยังไม่เริ่มผลิต"}>เก็บถาวร</Button>} onConfirm={() => remove(id)} />
+            {!fromHub && <Button disabled={busy} variant="outline" onClick={() => setEditing(true)}>แก้ไขเอกสาร Local</Button>}
+            {!fromHub && <ConfirmDialog title="เก็บเอกสารถาวร" description="นำออกจากรายการ แต่คง identity และประวัติใน PostgreSQL" trigger={<Button variant="outline" disabled={busy || order.production !== "ยังไม่เริ่มผลิต"}>เก็บถาวร</Button>} onConfirm={() => remove(id)} />}
             <RefreshButton onClick={refresh} />
           </>
         }
@@ -96,7 +98,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
       <SectionCard
         title={productionSections[1]}
         subtitle="คำขอเดิมจะยังคงอยู่เมื่อเสนอวันใหม่"
-        action={
+        action={!fromHub &&
           <FormDialog
             title="เสนอวันใหม่"
             description="กำหนดการของโรงงาน · บันทึก PostgreSQL Local ไม่ส่งไปต้นทาง"
@@ -191,7 +193,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
       </SectionCard>
       <SectionCard
         title={productionSections[2]}
-        subtitle="ทุกการยืนยันบันทึกเฉพาะ PostgreSQL Local · ไม่ตัด stock หรือสร้างใบเบิก"
+        subtitle={fromHub ? "สถานะที่บันทึกจะเข้าคิวซิงค์กับ Sales Hub" : "บันทึกสถานะในฐานข้อมูล Local"}
       >
         <div className="grid gap-4 md:grid-cols-3">
           {[
@@ -215,7 +217,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
             trigger={
               <Button
                 variant="outline"
-                disabled={!canReview || order.material === "วัตถุดิบพร้อม"}
+                disabled={!canReviewMaterial || order.material === "วัตถุดิบพร้อม"}
               >
                 <Check />
                 วัตถุดิบพร้อม
@@ -307,7 +309,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
             }
             onConfirm={() => change({ production: "กำลังผลิต" }, "เริ่มผลิต")}
           />
-          {order.production === "กำลังผลิต" && (
+          {!fromHub && order.production === "กำลังผลิต" && (
             <ConfirmDialog
               title="ผลิตเสร็จแล้ว"
               description="บันทึกสถานะผลิตเสร็จใน Local ไม่รับสินค้าเข้าคลัง"
@@ -486,7 +488,7 @@ export function ProductionOrderDetail({ id }: { id: string }) {
             </p>
             <p className="mt-3 font-semibold">
               {order.approval === "โรงงานอนุมัติ"
-                ? "บันทึกสถานะ Local — ยังไม่มี verified approver"
+                ? (fromHub ? "อนุมัติโดยผู้ใช้โรงงาน" : "บันทึกสถานะ Local")
                 : "ยังไม่มีผู้อนุมัติ"}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">

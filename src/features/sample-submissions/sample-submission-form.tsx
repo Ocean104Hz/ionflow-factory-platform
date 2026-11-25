@@ -60,7 +60,7 @@ export function SampleSubmissionForm({
     >
       {report.id && (
         <p className="break-all text-sm text-primary">
-          กำลังแก้ไขข้อมูลตัวอย่าง: {report.doc_no}
+          กำลังแก้ไขเอกสาร: {report.doc_no}
         </p>
       )}
       <SectionCard
@@ -238,7 +238,7 @@ export function SampleSubmissionForm({
           {report.id ? "ยกเลิกการแก้ไข / เริ่มใหม่" : "ล้างข้อมูล"}
         </Button>
         <Button type="submit" className="min-h-11">
-          บันทึกข้อมูลตัวอย่าง
+          บันทึกเอกสาร
         </Button>
       </div>
     </form>

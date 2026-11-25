@@ -29,7 +29,7 @@ export function PackagingHistory({
   onEdit: (r: PackagingReport) => void;
   onView: (r: PackagingReport) => void;
 }) {
-  const { records, remove } = usePackaging();
+  const { records, remove, busy } = usePackaging();
   const [filters, setFilters] = useState({ ...emptyHistoryFilters }),
     [page, setPage] = useState(1),
     [size, setSize] = useState(10),
@@ -44,7 +44,7 @@ export function PackagingHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติรายงาน"
-        subtitle={`พบ ${rows.length} จาก ${records.length} รายงานสาธิต`}
+        subtitle={`พบ ${rows.length} จาก ${records.length} รายงาน`}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
@@ -188,21 +188,22 @@ export function PackagingHistory({
             label: "จัดการ",
             render: (r) => (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => onEdit(r)}>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => onEdit(r)}>
                   แก้ไข
                 </Button>
                 <PackagingPrintPreview report={r} />
                 <ConfirmDialog
+                  live
                   title="ลบรายงานนี้?"
-                  description="ลบเฉพาะรายงานสาธิต ไม่เปลี่ยน Inventory"
+                  description="รายงานนี้จะถูกนำออกจากประวัติ"
                   trigger={
-                    <Button variant="ghost" size="sm" className="text-danger">
+                    <Button variant="ghost" size="sm" disabled={busy} className="text-danger">
                       ลบ
                     </Button>
                   }
-                  onConfirm={() => {
+                  onConfirm={async () => {
                     try {
-                      remove(r.id);
+                      await remove(r);
                       setError("");
                     } catch (e) {
                       setError(e instanceof Error ? e.message : "ลบไม่ได้");

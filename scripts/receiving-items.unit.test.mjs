@@ -21,6 +21,7 @@ const files = [
   "receiving-items.tsx",
   "receiving-signers.tsx",
   "receiving-header.tsx",
+  "receiving-history.tsx",
 ];
 const read = (name) =>
   readFileSync(
@@ -337,7 +338,7 @@ test("visible item section includes every screenshot column, note and controls",
   assert.match(s, /readOnly/);
 });
 
-test("all four signer roles and mock save button are wired into the workspace", () => {
+test("all four signer roles are included in the live receipt save", () => {
   const signers = read("receiving-signers.tsx");
   for (const role of [
     "ผู้ออก/วันที่",
@@ -359,7 +360,7 @@ test("all four signer roles and mock save button are wired into the workspace", 
   for (const name of [
     "ReceivingItemsSection",
     "ReceivingSignersSection",
-    "saveMockReceivingDocument",
+    "warehouseRequest",
     "saveDocument",
     "openSavedDocument",
   ]) {
@@ -593,6 +594,13 @@ test("UI lifecycle starts empty, opens saved receipts explicitly and disables ge
   );
   assert.match(source, /disabled=\{generatingDocNo \|\| isEditing\}/);
   assert.ok(source.includes("เปิดใบรับเดิม"));
+  assert.match(source, /<TabsContent value="history"/);
+  assert.match(source, /<ReceivingHistory onOpen=\{openSavedDocument\}/);
+  assert.match(source, /setVersion\(opened.savedAt\)/);
+  const history = read("receiving-history.tsx");
+  assert.match(history, /warehouseRequest<SavedReceivingDocument\[\]>\("receiving"/);
+  assert.match(history, /<FactoryDataTable/);
+  assert.match(history, /onConfirm=\{\(\) => onOpen\(row\)/);
   assert.ok(source.includes("ใช้เลขนี้"));
   assert.match(source, /field === "receiveDate" && value !== form.receiveDate/);
   assert.match(source, /setPreview\(null\)/);

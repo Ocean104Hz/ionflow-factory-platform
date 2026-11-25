@@ -217,7 +217,7 @@ export function MaterialIssueProductPickerModal({
                       </TableCell>
 
                       <TableCell className="text-center">
-                        {row.item.unit || "-"}
+                        —
                       </TableCell>
 
                       <TableCell className="text-center">

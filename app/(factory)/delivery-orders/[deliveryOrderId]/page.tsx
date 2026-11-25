@@ -1,15 +1,7 @@
-import { notFound } from "next/navigation";
-import { deliveryOrders } from "@/src/lib/mock-data";
-import { DeliveryOrderDetail } from "@/src/features/delivery-orders/delivery-order-detail";
-export function generateStaticParams() {
-  return deliveryOrders.map((p) => ({ deliveryOrderId: p.id }));
-}
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ deliveryOrderId: string }>;
-}) {
-  const { deliveryOrderId } = await params;
-  if (!deliveryOrders.some((p) => p.id === deliveryOrderId)) notFound();
-  return <DeliveryOrderDetail key={deliveryOrderId} id={deliveryOrderId} />;
+import { FoliarDocumentDetail } from "@/src/features/documents/foliar-document-detail";
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+
+export default async function Page({ params }: { params: Promise<{ deliveryOrderId: string }> }) {
+  await requireAuthenticatedFactoryModule("delivery_orders");
+  return <FoliarDocumentDetail id={(await params).deliveryOrderId} kind="DELIVERY_ORDER" />;
 }

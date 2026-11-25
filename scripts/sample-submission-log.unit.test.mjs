@@ -13,17 +13,17 @@ const js = (s) =>
 const url = (s) =>
   `data:text/javascript;base64,${Buffer.from(s).toString("base64")}`;
 const domainURL = url(
-  js(read("src/features/sample-submission-log/submission-log-domain.ts")),
+  js(read("src/features/sample_submission_log/submission_log_domain.ts")),
 );
 const d = await import(domainURL);
 const address = await import(
-  url(js(read("src/features/sample-submission-log/submission-log-address.ts")))
+  url(js(read("src/features/sample_submission_log/submission_log_address.ts")))
 );
 const fixtures = (
   await import(
     url(
       js(read("src/lib/mock-data/sample-submission-log.ts")).replace(
-        /from ["']@\/src\/features\/sample-submission-log\/submission-log-domain["']/g,
+        /from ["']@\/src\/features\/sample_submission_log\/submission_log_domain["']/g,
         `from "${domainURL}"`,
       ),
     )
@@ -300,16 +300,13 @@ const formFields = [
   ["requester_district", "address.district", "district"],
   ["requester_subdistrict", "address.subdistrict", "subdistrict"],
   ["requester_zipcode", "address.zipcode", "zipcode"],
-  ["sample_code_info", "row.sample_code", "sample_code"],
-  ["sample_name", "row.sample_name", "sample_name"],
+  ["sample_name", "row.sample_name", "sample_name", true],
   [
     "sample_characteristics",
     "row.sample_characteristics",
     "sample_characteristics",
     true,
   ],
-  ["sample_type_other", "row.sample_type.other_detail", "sample_type"],
-  ["sample_form_other", "row.sample_form.other_detail", "sample_form"],
   ["analysis_other", "row.requested_items.other_detail", "requested_items"],
   ["quantity_amount", "q.amount", "quantity"],
   ["quantity_packaging", "q.packaging", "quantity"],
@@ -333,9 +330,9 @@ const formFields = [
   ["accepted_date", "staff.accepted_date", "accepted_date"],
 ];
 
-test("visible UI contract: 26 fields, 6 choice groups, conditional controls and shared detail/print mapping", () => {
+test("visible UI contract: 23 direct fields, 6 choice groups, conditional controls and shared detail/print mapping", () => {
   const source = read(
-    "src/features/sample-submission-log/submission-log-form.tsx",
+    "src/features/sample_submission_log/submission_log_form.tsx",
   );
   const ast = ts.createSourceFile(
     "form.tsx",
@@ -348,14 +345,14 @@ test("visible UI contract: 26 fields, 6 choice groups, conditional controls and 
   function visit(node) {
     if (
       ts.isCallExpression(node) &&
-      ["field", "choice"].includes(node.expression.getText(ast))
+      ["field", "choice", "sampleChoice"].includes(node.expression.getText(ast))
     )
       calls.push(node);
     ts.forEachChild(node, visit);
   }
   visit(ast);
   const fields = calls.filter((n) => n.expression.getText(ast) === "field");
-  assert.equal(fields.length, 26);
+  assert.equal(fields.length, 23);
   for (const [key, value, target, multiline = false] of formFields) {
     const matches = fields.filter((n) => n.arguments[0]?.text === key);
     assert.equal(matches.length, 1, key);
@@ -379,7 +376,7 @@ test("visible UI contract: 26 fields, 6 choice groups, conditional controls and 
   }
   assert.deepEqual(
     calls
-      .filter((n) => n.expression.getText(ast) === "choice")
+      .filter((n) => ["choice", "sampleChoice"].includes(n.expression.getText(ast)))
       .map((n) => n.arguments[0].text),
     [
       "sample_type",
@@ -390,9 +387,14 @@ test("visible UI contract: 26 fields, 6 choice groups, conditional controls and 
       "job_acceptance",
     ],
   );
+  for (const key of ["sample_type", "sample_form"]) {
+    const call = calls.find(node => node.expression.getText(ast) === "sampleChoice" && node.arguments[0].text === key);
+    assert.equal(call.arguments[5].getText(ast), `row.${key}.other_detail`);
+    assert.ok(call.arguments[6].getText(ast).includes(`${key}: { ...row.${key}, other_detail }`));
+  }
+  assert.match(source, /option === "other" &&\s*value === "other"/);
+  assert.match(source, /setOtherDetail\(event.target.value\)/);
   for (const [key, condition] of [
-    ["sample_type_other", "row.sample_type.other_detail !== null"],
-    ["sample_form_other", "row.sample_form.other_detail !== null"],
     ["analysis_other", "row.requested_items.other"],
     ["abnormal_detail", "staff.sample_condition.abnormal"],
     ["reject_reason", "staff.job_acceptance.rejected"],
@@ -432,7 +434,7 @@ test("visible UI contract: 26 fields, 6 choice groups, conditional controls and 
   ])
     assert.ok(source.replace(/\s+/g, " ").includes(note));
   assert.match(
-    read("src/features/sample-submission-log/submission-log-detail.tsx"),
+    read("src/features/sample_submission_log/submission_log_detail.tsx"),
     /<SubmissionLogSections row=\{row\} \/>/,
   );
 });

@@ -104,7 +104,7 @@ export function NCReportDetail({
             รายละเอียดใบ NC · {report?.doc_no}
           </DialogTitle>
           <DialogDescription>
-            อ่านอย่างเดียว · ข้อมูลตัวอย่าง ไม่ใช่เอกสารอนุมัติจริง
+            รายละเอียดรายงานที่บันทึกไว้
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 overflow-y-auto pr-1">

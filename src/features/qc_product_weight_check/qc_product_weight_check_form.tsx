@@ -77,7 +77,7 @@ export function QcProductWeightCheckForm({
   function updateHeader(field: QcWeightHeaderField, value: string) {
     onChange({
       ...document,
-      doc_no: document.doc_no.trim() || `QC-W-MOCK-${crypto.randomUUID()}`,
+      doc_no: document.doc_no.trim() || `QC-W-${crypto.randomUUID()}`,
       [field]: value,
     });
   }
@@ -557,9 +557,6 @@ export function QcProductWeightCheckForm({
         </Button>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        UI MOCK เท่านั้น ข้อมูลยังไม่ถูกบันทึกลงฐานข้อมูลจริง
-      </p>
     </form>
   );
 }

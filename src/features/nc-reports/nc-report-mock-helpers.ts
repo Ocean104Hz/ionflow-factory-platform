@@ -105,7 +105,7 @@ export function validateNC(
           report.doc_no.trim().toLocaleLowerCase(),
     )
   )
-    errors.doc_no = "เลขที่เอกสารนี้มีอยู่ในข้อมูลตัวอย่างแล้ว";
+    errors.doc_no = "เลขที่เอกสารนี้มีอยู่แล้ว";
   if (
     ncDecisions.some(([key]) => typeof report.decisions[key] !== "boolean") ||
     !ncDecisions.some(([key]) => report.decisions[key])
@@ -123,7 +123,7 @@ export function saveNC(
   if (report.id && !records.some((r) => r.id === report.id))
     throw new Error("ไม่พบเอกสารที่ต้องการแก้ไข กรุณาเปิดรายการอีกครั้ง");
   if (!report.id && (!newId || records.some((r) => r.id === newId)))
-    throw new Error("รหัสข้อมูลตัวอย่างซ้ำ กรุณาลองใหม่");
+    throw new Error("รหัสข้อมูลซ้ำ กรุณาลองใหม่");
   const saved = structuredClone({
     ...report,
     id: report.id || newId,

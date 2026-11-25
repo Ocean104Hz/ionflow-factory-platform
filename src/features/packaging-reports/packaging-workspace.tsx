@@ -45,8 +45,9 @@ import { PackagingForm, PackagingSetContent } from "./packaging-form";
 import { PackagingHistory } from "./packaging-history";
 import { PackagingPrintPreview } from "./packaging-print-preview";
 import { usePackaging } from "./packaging-provider";
+import { PackagingLoadStatus } from "./packaging-client";
 export function PackagingWorkspace() {
-  const { records } = usePackaging();
+  const { records, loading, error, retry, busy } = usePackaging();
   const [tab, setTab] = useState("form"),
     [editorSession, setEditorSession] = useState(0),
     [report, setReport] = useState(newReport),
@@ -70,14 +71,15 @@ export function PackagingWorkspace() {
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="ใบรายงานการบรรจุปุ๋ยอินทรีย์"
-        description="บันทึกผลตรวจบรรจุ Load Cell และเทียบเครื่องชั่ง · Mock เท่านั้น ไม่ใช่ Packing Summary และไม่เปลี่ยนสต็อก"
+        description="บันทึกผลตรวจบรรจุ Load Cell และเทียบเครื่องชั่ง"
         actions={
-          <Button onClick={() => request(newReport())}>
+          <Button disabled={busy} onClick={() => request(newReport())}>
             <Plus />
             สร้างรายงานใหม่
           </Button>
         }
       />
+      <PackagingLoadStatus loading={loading} error={error} retry={retry} />
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
         <TabsList>
           <TabsTrigger value="form">แบบฟอร์มรายงาน</TabsTrigger>
@@ -145,7 +147,7 @@ export function PackagingWorkspace() {
               รายละเอียด {viewed?.documentNumber || "แบบร่าง"}
             </DialogTitle>
             <DialogDescription>
-              ข้อมูลสาธิต อ่านอย่างเดียว ไม่มีการอนุมัติหรือเปลี่ยนสต็อก
+              ผลตรวจและข้อมูลการบรรจุตามที่บันทึก
             </DialogDescription>
           </DialogHeader>
           {viewed && (
@@ -181,8 +183,7 @@ export function PackagingWorkspace() {
                   {viewed.remarks || "—"}
                 </p>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  สร้าง {viewed.createdAt} · แก้ไข {viewed.updatedAt} ·
-                  ชื่อสาธิต ไม่ใช่ลายมือชื่ออิเล็กทรอนิกส์
+                  สร้าง {viewed.createdAt} · แก้ไข {viewed.updatedAt}
                 </p>
               </SectionCard>
             </div>

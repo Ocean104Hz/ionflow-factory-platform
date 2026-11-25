@@ -32,7 +32,7 @@ export function RequisitionDocument({ row }: { row: Requisition }) {
     >
       <header className="space-y-2 border-b pb-4 text-center">
         <h2 className="text-xl font-semibold">ใบเบิกวัสดุ/วัตถุดิบ</h2>
-        <p>ข้อมูลตัวอย่าง · ไม่มีการตัดสต็อกหรืออนุมัติจริง</p>
+        <p>รายละเอียดใบเบิกวัสดุและวัตถุดิบ</p>
       </header>
       <dl className="grid gap-3 sm:grid-cols-2">
         {[
@@ -127,7 +127,7 @@ export function RequisitionDocument({ row }: { row: Requisition }) {
       </section>
       <section>
         <h3 className="mb-3 font-semibold">
-          รายชื่อผู้ลงนาม (ข้อความตัวอย่าง)
+          รายชื่อผู้ลงนาม
         </h3>
         <dl className="grid gap-5 lg:grid-cols-3">
           {signerFields.map(([key, label]) => (

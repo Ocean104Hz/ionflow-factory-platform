@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import { ReceivingHistory } from "./receiving-history";
 import { Label } from "@/src/components/ui/label";
 import { PageHeader, SectionCard } from "@/src/components/factory/patterns";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
@@ -37,13 +39,8 @@ import {
   type ReceivingSigners,
   type ReceivingValidation,
 } from "./receiving-domain";
-import {
-  previewMockInboundNumber,
-  reserveMockInboundNumber,
-  listMockReceivingDocuments,
-  saveMockReceivingDocument,
-  type SavedReceivingDocument,
-} from "./receiving-mock-store";
+import type { SavedReceivingDocument } from "./receiving-mock-store";
+import { warehouseRequest } from "@/src/features/inventory/warehouse-client";
 import { ReceivingItemsSection } from "./receiving-items";
 import { ReceivingSignersSection } from "./receiving-signers";
 
@@ -124,10 +121,6 @@ function TextField({
   );
 }
 
-/**
- * Phase 2 mock prototype; records can be saved to this browser only.
- * It does not select live PO/QC, import Excel or post inventory movements.
- */
 export function ReceivingHeaderWorkspace() {
   const [form, setForm] = useState<ReceivingHeaderValues>(emptyReceivingHeader);
   const [notice, setNotice] = useState("");
@@ -153,10 +146,9 @@ export function ReceivingHeaderWorkspace() {
     null,
   );
   const [generatingDocNo, setGeneratingDocNo] = useState(false);
-  const [savedDocuments, setSavedDocuments] = useState<
-    SavedReceivingDocument[]
-  >([]);
-  const [savedOpen, setSavedOpen] = useState(false);
+  const [tab, setTab] = useState("form");
+  const [version, setVersion] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const isEditing = editingDocumentNo !== null;
 
   function clearSaveFeedback() {
@@ -193,13 +185,11 @@ export function ReceivingHeaderWorkspace() {
     clearSaveFeedback();
   }
 
-  function generateNumber() {
+  async function generateNumber() {
     if (isEditing || generatingDocNo) return;
     setGeneratingDocNo(true);
     try {
-      setPreview(
-        previewMockInboundNumber(window.localStorage, form.receiveDate),
-      );
+      setPreview(await warehouseRequest<InboundNumberPreview>("receiving", undefined, form.receiveDate));
       clearSaveFeedback();
       setError("");
     } catch (cause) {
@@ -207,23 +197,20 @@ export function ReceivingHeaderWorkspace() {
       setError(
         cause instanceof Error
           ? cause.message
-          : "ไม่สามารถสร้างเลขเอกสารทดลองได้",
+          : "ไม่สามารถสร้างเลขเอกสารได้",
       );
     } finally {
       setGeneratingDocNo(false);
     }
   }
 
-  function confirmNumber() {
+  async function confirmNumber() {
     if (!preview || isEditing || generatingDocNo) return;
     setGeneratingDocNo(true);
     try {
-      const result = reserveMockInboundNumber(
-        window.localStorage,
-        form.receiveDate,
-        preview.documentNo,
-        crypto.randomUUID(),
-      );
+      const result = await warehouseRequest<
+        { ok: true; reservation: InboundReservation } | { ok: false; preview: InboundNumberPreview; message: string }
+      >("receiving", { action: "reserve", date: form.receiveDate, expected: preview.documentNo });
       if (!result.ok) {
         setPreview(result.preview);
         setError(result.message);
@@ -239,54 +226,37 @@ export function ReceivingHeaderWorkspace() {
       setError("");
       clearSaveFeedback();
       setNotice(
-        `ยืนยันเลขจำลอง ${result.reservation.documentNo} แล้ว หมดอายุ ${new Date(result.reservation.expiresAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}${old ? ` · เลขเดิม ${old} ยังจองอยู่จนหมดอายุ` : ""}`,
+        `ยืนยันเลข ${result.reservation.documentNo} แล้ว หมดอายุ ${new Date(result.reservation.expiresAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}${old ? ` · เลขเดิม ${old} ยังจองอยู่จนหมดอายุ` : ""}`,
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "จองเลขทดลองไม่สำเร็จ");
+      setError(cause instanceof Error ? cause.message : "จองเลขไม่สำเร็จ");
     } finally {
       setGeneratingDocNo(false);
     }
   }
 
-  function showSavedDocuments() {
-    try {
-      setSavedDocuments(listMockReceivingDocuments(window.localStorage));
-      setSavedOpen(true);
-      setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "เปิดเอกสารไม่สำเร็จ");
-    }
-  }
-
-  function openSavedDocument(documentNo: string) {
-    try {
-      const saved = listMockReceivingDocuments(window.localStorage).find(
-        (doc) => doc.header.documentNo === documentNo,
-      );
-      if (!saved) throw new Error("ไม่พบเอกสารเดิม กรุณาเปิดรายการใหม่");
-      const opened = structuredClone(saved);
-      setForm(opened.header);
-      setItems(opened.items);
-      setSigners(opened.signers);
-      setNote(opened.note);
-      nextRowId.current = Math.max(
-        2,
-        ...opened.items.map((item) =>
-          /^row-\d+$/.test(item.id) ? Number(item.id.slice(4)) + 1 : 2,
-        ),
-      );
-      setEditingDocumentNo(opened.header.documentNo);
-      setReservation(null);
-      setPreview(null);
-      setSavedOpen(false);
-      clearSaveFeedback();
-      setError("");
-      setNotice(
-        `กำลังแก้ไข ${opened.header.documentNo} · ไม่สามารถเปลี่ยนเลขเอกสารหรือวันที่รับเข้าได้`,
-      );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "เปิดเอกสารไม่สำเร็จ");
-    }
+  function openSavedDocument(saved: SavedReceivingDocument) {
+    const opened = structuredClone(saved);
+    setForm(opened.header);
+    setItems(opened.items);
+    setSigners(opened.signers);
+    setNote(opened.note);
+    nextRowId.current = Math.max(
+      2,
+      ...opened.items.map((item) =>
+        /^row-\d+$/.test(item.id) ? Number(item.id.slice(4)) + 1 : 2,
+      ),
+    );
+    setEditingDocumentNo(opened.header.documentNo);
+    setVersion(opened.savedAt);
+    setReservation(null);
+    setPreview(null);
+    setTab("form");
+    clearSaveFeedback();
+    setError("");
+    setNotice(
+      `กำลังแก้ไข ${opened.header.documentNo} · ไม่สามารถเปลี่ยนเลขเอกสารหรือวันที่รับเข้าได้`,
+    );
   }
 
   function resetHeader() {
@@ -297,6 +267,7 @@ export function ReceivingHeaderWorkspace() {
     setNote("");
     setError("");
     setEditingDocumentNo(null);
+    setVersion(null);
     setReservation(null);
     setPreview(null);
     clearSaveFeedback();
@@ -319,7 +290,8 @@ export function ReceivingHeaderWorkspace() {
     clearSaveFeedback();
   }
 
-  function saveDocument() {
+  async function saveDocument() {
+    if (saving) return;
     const nextValidation = validateReceivingDraft(form, items);
     setValidation(nextValidation.valid ? null : nextValidation);
     setSaveNotice("");
@@ -329,29 +301,21 @@ export function ReceivingHeaderWorkspace() {
       );
       return;
     }
+    setSaving(true);
     try {
-      const saved = saveMockReceivingDocument(
-        window.localStorage,
-        {
-          header: form,
-          items,
-          note,
-          signers,
-        },
-        new Date(),
-        isEditing
-          ? { editingDocumentNo: editingDocumentNo! }
-          : { reservationToken: reservation?.token },
-      );
+      const saved = await warehouseRequest<SavedReceivingDocument>("receiving", {
+        action: "save", document: { header: form, items, note, signers }, version, token: reservation?.token,
+      });
+      setVersion(saved.savedAt);
       setEditingDocumentNo(saved.header.documentNo);
       setReservation(null);
       setSaveError("");
       setSaveNotice(
-        `บันทึกเอกสาร Mock ${saved.header.documentNo} แล้ว (${saved.items.length} รายการ, ${saved.amountTotal} บาท) เก็บไว้ในเบราว์เซอร์นี้เท่านั้น`,
+        `บันทึกเอกสาร ${saved.header.documentNo} แล้ว (${saved.items.length} รายการ, ${saved.amountTotal} บาท)`,
       );
     } catch (cause) {
       setSaveError(
-        cause instanceof Error ? cause.message : "บันทึกเอกสารทดลองไม่ได้",
+        cause instanceof Error ? cause.message : "บันทึกเอกสารไม่ได้",
       );
     }
   }
@@ -362,9 +326,16 @@ export function ReceivingHeaderWorkspace() {
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="รับวัตถุดิบและวัสดุ"
-        description="บันทึกเอกสารรับวัตถุดิบและวัสดุแบบ Mock โดยยังไม่เชื่อม PO, QC หรือคลังสินค้าจริง"
+        description="บันทึกและเปิดใบรับวัตถุดิบและวัสดุ"
       />
 
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList aria-label="มุมมองใบรับวัตถุดิบและวัสดุ">
+          <TabsTrigger value="form" disabled={saving || generatingDocNo}>กรอกใบรับ</TabsTrigger>
+          <TabsTrigger value="history" disabled={saving || generatingDocNo}>ประวัติใบรับ</TabsTrigger>
+        </TabsList>
+        <TabsContent value="form">
+      <fieldset disabled={saving || generatingDocNo} className="min-w-0 space-y-5">
       <SectionCard
         title="ส่วนหัวเอกสาร"
         subtitle="กรอกข้อมูลเอกสารและกดสร้างเลข INB ก่อนดำเนินการขั้นตอนถัดไป"
@@ -374,7 +345,7 @@ export function ReceivingHeaderWorkspace() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={showSavedDocuments}
+              onClick={() => setTab("history")}
             >
               เปิดใบรับเดิม
             </Button>
@@ -415,12 +386,12 @@ export function ReceivingHeaderWorkspace() {
               id="inbound-location"
               label="สถานที่"
               placeholder="เลือก/พิมพ์คลัง/สถานที่จัดเก็บ"
-              list="inbound-mock-location-options"
+              list="inbound-location-options"
               value={form.location}
               onValueChange={(value) => change("location", value)}
               error={validation?.header.location}
             />
-            <datalist id="inbound-mock-location-options">
+            <datalist id="inbound-location-options">
               <option value="โรงงานกาญ 1" />
               <option value="โรงงานกาญ 3" />
             </datalist>
@@ -487,7 +458,7 @@ export function ReceivingHeaderWorkspace() {
               className="text-xs leading-relaxed text-muted-foreground"
             >
               เลขเอกสารจำลองสำหรับทดสอบ ยังไม่ใช่การจองเลขกลางระหว่างผู้ใช้งาน ·
-              พรีวิวไม่ใช้เลข ยืนยันแล้วจำลองจอง 24 ชั่วโมงในเบราว์เซอร์นี้
+              เลขจะจองไว้ 24 ชั่วโมงเมื่อกดยืนยัน
             </p>
             {validation?.header.documentNo ? (
               <p role="alert" className="text-xs text-destructive">
@@ -603,8 +574,7 @@ export function ReceivingHeaderWorkspace() {
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            บันทึกเอกสารได้เฉพาะ Mock ในเบราว์เซอร์นี้ ไม่เชื่อม PO/QC
-            ไม่รับเข้าสต็อก และยังไม่มีการอัปโหลด Excel
+            เลข PO และ QC เป็นข้อมูลอ้างอิงที่กรอกเอง
           </p>
           <ConfirmDialog
             title="เริ่มเอกสารใหม่?"
@@ -621,11 +591,12 @@ export function ReceivingHeaderWorkspace() {
       </SectionCard>
 
       {/* รูปภาพประกอบ */}
-      <SectionCard title="รูปภาพประกอบ" subtitle="แนบรูปภาพประกอบเอกสาร">
+      <SectionCard title="รูปภาพประกอบ" subtitle="ยังไม่เปิดบันทึกรูปภาพประกอบ">
         <div className="rounded-xl border border-dashed border-border bg-surface p-6">
           <Input
             type="file"
             accept="image/*"
+            disabled
             multiple
             className="cursor-pointer"
           />
@@ -666,19 +637,24 @@ export function ReceivingHeaderWorkspace() {
           ) : null}
           {!saveNotice && !saveError ? (
             <p className="text-xs leading-relaxed text-muted-foreground">
-              บันทึกลงเบราว์เซอร์นี้เพื่อทดลองใช้งานเท่านั้น
-              ไม่ใช่การรับสินค้าเข้าคลังจริง
+              การบันทึกใบรับยังไม่เพิ่มยอดสต็อก
             </p>
           ) : null}
         </div>
-        <Button type="button" onClick={saveDocument} className="sm:min-w-32">
+        <Button type="button" onClick={saveDocument} disabled={saving} className="sm:min-w-32">
           <Save className="size-4" /> บันทึก
         </Button>
       </div>
+      </fieldset>
+        </TabsContent>
+        <TabsContent value="history" className="mt-4">
+          <ReceivingHistory onOpen={openSavedDocument} />
+        </TabsContent>
+      </Tabs>
       <Dialog
         open={!!preview}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !generatingDocNo) {
             setPreview(null);
             setError("");
           }
@@ -686,10 +662,9 @@ export function ReceivingHeaderWorkspace() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>ยืนยันเลข INB จำลอง</DialogTitle>
+            <DialogTitle>ยืนยันเลข INB</DialogTitle>
             <DialogDescription>
-              พรีวิวยังไม่จองเลข กดใช้เลขนี้เพื่อจำลองจอง 24 ชั่วโมง
-              เฉพาะเบราว์เซอร์นี้ ไม่รับประกันเลขกลางหรือหลายแท็บ
+              กดใช้เลขนี้เพื่อจองหมายเลขเอกสารกลางเป็นเวลา 24 ชั่วโมง
             </DialogDescription>
           </DialogHeader>
           {preview && (
@@ -731,55 +706,6 @@ export function ReceivingHeaderWorkspace() {
             >
               ใช้เลขนี้
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={savedOpen} onOpenChange={setSavedOpen}>
-        <DialogContent className="flex max-h-[85dvh] flex-col">
-          <DialogHeader>
-            <DialogTitle>เปิดใบรับเดิม</DialogTitle>
-            <DialogDescription>
-              เลือกเอกสาร Mock เพื่อแก้ไขอย่างชัดเจน ไม่สร้างเลขใหม่
-              และไม่ลบใบเดิม
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 space-y-3 overflow-y-auto">
-            {savedDocuments.length === 0 ? (
-              <p>ยังไม่มีใบรับที่บันทึกไว้</p>
-            ) : (
-              savedDocuments.map((doc) => (
-                <div
-                  key={doc.header.documentNo}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="break-all font-medium">
-                      {doc.header.documentNo}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {doc.header.receiveDate} · {doc.header.supplierName}
-                    </p>
-                  </div>
-                  <ConfirmDialog
-                    title="เปิดใบรับเดิมเพื่อแก้ไข?"
-                    description="ข้อมูลที่ยังไม่บันทึกในแบบฟอร์มปัจจุบันจะถูกแทนที่ เลขจองเดิมยังอยู่จนหมดอายุ"
-                    onConfirm={() => openSavedDocument(doc.header.documentNo)}
-                    trigger={
-                      <Button type="button" variant="outline" size="sm">
-                        เปิด {doc.header.documentNo}
-                      </Button>
-                    }
-                  />
-                </div>
-              ))
-            )}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                ปิดรายการ
-              </Button>
-            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>

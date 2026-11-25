@@ -282,14 +282,13 @@ test("detail and A4 preview share every original field and all selected/unselect
     r.problem_defect,
   );
 });
-test("workspace retains editor on tab changes, confirms reset and remains page-local without a Provider", () => {
+test("workspace retains editor on tab changes, confirms reset and uses the scoped QC API", () => {
   const workspace = read(root + "nc-report-workspace.tsx");
   assert.match(workspace, /onValueChange=\{setTab\}/);
   assert.match(workspace, /if \(dirty\) setPending/);
-  assert.match(
-    workspace,
-    /useState\(\(\) => structuredClone\(demoNCReports\)\)/,
-  );
+  assert.match(workspace, /useQcDocuments<NCReport>\("nc_reports"\)/);
+  assert.match(workspace, /await persist\(report\)/);
+  assert.match(workspace, /await remove\(r.id\)/);
   assert.doesNotMatch(read("app/(factory)/layout.tsx"), /NCReport|NCProvider/);
   assert.doesNotMatch(
     read(root + "nc-report-form.tsx"),

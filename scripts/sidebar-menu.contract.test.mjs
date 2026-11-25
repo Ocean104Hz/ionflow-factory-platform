@@ -219,7 +219,7 @@ test("sidebar keeps shared shadcn navigation and filters unavailable modules", (
   for (const token of [
     "SidebarMenuButton",
     "SidebarGroupLabel",
-    "navigationGroups.map",
+    'navigationGroups.filter((group) => group.key !== "MAINTENANCE").map',
     "menu(group.key)",
     "currentUser.modules.includes(navigationModuleKey(item.href))",
     "!item.alias",

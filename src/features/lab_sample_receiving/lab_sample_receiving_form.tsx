@@ -637,9 +637,6 @@ export function LabSampleReceivingForm({
         </Button>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        UI MOCK เท่านั้น ข้อมูลนี้ยังไม่ถูกบันทึกลงฐานข้อมูลจริง
-      </p>
     </form>
   );
 }

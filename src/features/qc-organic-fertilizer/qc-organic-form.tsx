@@ -102,7 +102,7 @@ export function OrganicFormSections({
     <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
       <SectionCard
         title="ข้อมูลเอกสาร"
-        subtitle="ข้อมูลตัวอย่างเท่านั้น ไม่ใช่ผลอนุมัติ QC"
+        subtitle="ข้อมูลประกอบการตรวจคุณภาพ"
       >
         <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {readOnly || row.id ? (
@@ -448,7 +448,7 @@ export function OrganicFormSections({
       </SectionCard>
       <SectionCard
         title="หมายเหตุและผู้เกี่ยวข้อง"
-        subtitle="ชื่อและวันที่เป็นข้อความสาธิต ไม่ใช่ลายมือชื่อหรือการอนุมัติจริง"
+        subtitle="ระบุชื่อและวันที่ของผู้เกี่ยวข้อง"
       >
         <div className="mb-4 grid gap-2">
           <Label htmlFor={`${prefix}-remark`}>หมายเหตุ</Label>

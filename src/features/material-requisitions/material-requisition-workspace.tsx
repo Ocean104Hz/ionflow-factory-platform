@@ -1,11 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, Pencil, Printer, Plus, Trash2 } from "lucide-react";
 import {
   PageHeader,
   SectionCard,
   SelectField,
-  StatusBadge,
   FactoryDataTable,
   Pagination,
 } from "@/src/components/factory/patterns";
@@ -29,14 +28,13 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/src/components/ui/alert-dialog";
-import { materialRequisitions } from "@/src/lib/mock-data/material-requisitions";
+import { warehouseRequest } from "@/src/features/inventory/warehouse-client";
 import {
   blankRequisition,
-  deleteRequisition,
+  validateRequisition,
   documentNumber,
   filterRequisitions,
   profiles,
-  saveRequisition,
   type Requisition,
   type Errors,
   type HistoryFilters,
@@ -51,9 +49,21 @@ const emptyFilters: HistoryFilters = {
   profile: "",
 };
 export function MaterialRequisitionWorkspace() {
-  const [records, setRecords] = useState(() =>
-    structuredClone(materialRequisitions),
-  );
+  const [records, setRecords] = useState<Requisition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const working = useRef(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    warehouseRequest<Requisition[]>("requisition", undefined, undefined, controller.signal)
+      .then(setRecords)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "โหลดใบเบิกไม่สำเร็จ");
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, []);
   const [row, setRow] = useState(blankRequisition);
   const [baseline, setBaseline] = useState(() =>
     JSON.stringify(blankRequisition()),
@@ -86,29 +96,36 @@ export function MaterialRequisitionWorkspace() {
     if (JSON.stringify(row) !== baseline) setPending(next);
     else open(next);
   }
-  function save() {
-    const result = saveRequisition(
-      records,
-      row,
-      crypto.randomUUID(),
-      new Date().toISOString(),
-    );
-    setErrors(result.errors);
-    if (!result.row) {
+  async function save() {
+    if (loading || loadError || working.current) return;
+    const issues = validateRequisition(row, records);
+    setErrors(issues);
+    if (Object.keys(issues).length) {
       setMessage("ยังบันทึกไม่ได้ กรุณาตรวจสอบข้อมูลที่ระบุ");
       return;
     }
-    setRecords(result.records);
-    open(result.row);
-    setMessage(
-      "บันทึกข้อมูลตัวอย่างแล้ว · ไม่มีการตัดสต็อก · รีเฟรชหน้าจะคืนข้อมูลเริ่มต้น",
-    );
+    working.current = true;
+    setBusy(true);
+    try {
+      const saved = await warehouseRequest<Requisition>("requisition", { action: "save", document: row, version: row.updatedAt });
+      setRecords(previous => [saved, ...previous.filter(entry => entry.id !== saved.id)]);
+      open(saved);
+      setMessage("บันทึกใบเบิกแล้ว");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "บันทึกใบเบิกไม่สำเร็จ"); }
+    finally { working.current = false; setBusy(false); }
   }
-  function remove(id: string) {
-    setRecords((previous) => deleteRequisition(previous, id));
-    if (row.id === id) open(blankRequisition(row.profile));
-    if (view?.id === id) setView(null);
-    setMessage("ลบใบเบิกตัวอย่างแล้ว ไม่เปลี่ยนข้อมูลคลังสินค้า");
+  async function remove(record: Requisition) {
+    if (working.current) return;
+    working.current = true;
+    setBusy(true);
+    try {
+      await warehouseRequest("requisition", { action: "delete", id: record.id, version: record.updatedAt });
+      setRecords(previous => previous.filter(entry => entry.id !== record.id));
+      if (row.id === record.id) open(blankRequisition(row.profile));
+      if (view?.id === record.id) setView(null);
+      setMessage("ลบใบเบิกจากรายการแล้ว");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "ลบใบเบิกไม่สำเร็จ"); }
+    finally { working.current = false; setBusy(false); }
   }
   return (
     <div className="min-w-0 space-y-5">
@@ -117,8 +134,7 @@ export function MaterialRequisitionWorkspace() {
         description="จัดการเอกสารเบิกวัสดุ วัตถุดิบ และวัตถุดิบระหว่างการผลิต"
         actions={
           <>
-            <StatusBadge tone="info">UI MOCK · ไม่ตัดสต็อก</StatusBadge>
-            <Button onClick={() => request(blankRequisition(row.profile))}>
+            <Button disabled={busy} onClick={() => request(blankRequisition(row.profile))}>
               <Plus />
               สร้างใบเบิกใหม่
             </Button>
@@ -130,6 +146,9 @@ export function MaterialRequisitionWorkspace() {
           {message}
         </p>
       )}
+      {loading && <p role="status">กำลังโหลดใบเบิก…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้า</p>}
+      <fieldset disabled={loading || !!loadError || busy} className="min-w-0">
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
         <TabsList aria-label="มุมมองใบเบิก">
           <TabsTrigger value="form">บันทึกใบเบิก</TabsTrigger>
@@ -148,7 +167,7 @@ export function MaterialRequisitionWorkspace() {
         <TabsContent value="history" className="min-w-0 space-y-5">
           <SectionCard
             title="ประวัติใบเบิก"
-            subtitle="เอกสารตัวอย่างในหน้านี้เท่านั้น ไม่ใช่ประวัติการเคลื่อนไหวสต็อก"
+            subtitle="เอกสารเบิกวัสดุและวัตถุดิบที่บันทึกไว้"
           >
             <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <div className="grid gap-2">
@@ -301,9 +320,9 @@ export function MaterialRequisitionWorkspace() {
                         <Printer />
                       </Button>
                       <ConfirmDialog
-                        title="ลบใบเบิกตัวอย่าง?"
+                        title="ลบใบเบิก?"
                         description={`ลบ ${r.doc_no} ออกจากข้อมูลในหน้านี้เท่านั้น`}
-                        onConfirm={() => remove(r.id)}
+                        onConfirm={() => remove(r)}
                         trigger={
                           <Button
                             variant="ghost"
@@ -331,6 +350,7 @@ export function MaterialRequisitionWorkspace() {
           </SectionCard>
         </TabsContent>
       </Tabs>
+      </fieldset>
       <p className="text-xs text-muted-foreground">
         Excel import/export ไม่อยู่ในระยะนี้ · ใบเบิกนี้แยกจาก Formula BOM
         และใบเบิกวัตถุดิบการผลิตของ iCON

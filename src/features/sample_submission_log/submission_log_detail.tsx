@@ -34,7 +34,7 @@ export function SubmissionLogDetail({
             {print ? "พรีวิว A4 แนวตั้ง" : "รายละเอียดแบบบันทึกการส่งตัวอย่าง"}
           </DialogTitle>
           <DialogDescription>
-            ข้อมูลสาธิต อ่านอย่างเดียว · ไม่ใช่การอนุมัติห้องปฏิบัติการ
+            รายละเอียดแบบบันทึกที่บันทึกไว้
             {print ? " · ไม่สร้าง PDF หรือสั่งพิมพ์จริง" : ""}
           </DialogDescription>
         </DialogHeader>
@@ -58,10 +58,6 @@ export function SubmissionLogDetail({
                 </h2>
                 <p className="break-all text-sm">
                   เลขที่คำขอ {row.doc_no} · รหัสตัวอย่าง {row.sample_code}
-                </p>
-                <p className="text-xs">
-                  MOCK / DEMO · ชื่อและการเลือกทั้งหมดเป็นข้อมูลตัวอย่าง
-                  ไม่ใช่ลายมือชื่อหรือผลอนุมัติจริง
                 </p>
               </header>
               <SubmissionLogSections row={row} />

@@ -357,7 +357,7 @@ export function SubmissionLogSections({
         <div className="grid gap-4 sm:grid-cols-2">
           {/* {field(
             "sample_code_info",
-            "รหัสตัวอย่าง (ข้อมูลตัวอย่าง)",
+            "รหัสตัวอย่าง",
             row.sample_code,
             (sample_code) => patch({ sample_code }),
             true,
@@ -565,7 +565,7 @@ export function SubmissionLogSections({
       </SectionCard>
       <SectionCard
         title="สำหรับเจ้าหน้าที่"
-        subtitle="ข้อความตัวอย่างเท่านั้น ไม่ใช่การรับงานจริง การลงนาม หรือผลอนุมัติห้องปฏิบัติการ"
+        subtitle="กรอกเมื่อเจ้าหน้าที่รับตัวอย่างหรือตรวจรับงาน"
         className="border-primary/20 bg-muted/20"
       >
         <div className="grid gap-5 lg:grid-cols-2">

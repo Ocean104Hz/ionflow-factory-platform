@@ -17,7 +17,7 @@ const url = (s) =>
 const profilesUrl = url(compile(read(root + "packaging-profiles.ts")));
 const domainUrl = url(
   compile(read(root + "packaging-domain.ts")).replace(
-    /from ["']\.\/packaging-profiles["']/g,
+    /from ["']\.\/packaging-profiles(?:\.ts)?["']/g,
     `from "${profilesUrl}"`,
   ),
 );
@@ -57,7 +57,7 @@ function freeze(o) {
   return o;
 }
 
-test("new Packaging sources parse and satisfy scoped strict TypeScript without backend/inventory dependencies", () => {
+test("Packaging sources satisfy scoped strict TypeScript with HTTP isolated from the form and history", () => {
   const files = readdirSync(new URL(`../${root}`, import.meta.url)).filter(
     (f) => /\.tsx?$/.test(f),
   );
@@ -65,9 +65,10 @@ test("new Packaging sources parse and satisfy scoped strict TypeScript without b
     const source = read(root + file);
     assert.doesNotMatch(
       source,
-      /\bany\b|\bfetch\s*\(|localStorage|sessionStorage|from ["'][^"']*(?:inventory|production-quality|purchase-requisitions|master-data|firebase|\bpg\b)/,
+      /\bany\b|localStorage|sessionStorage|from ["'][^"']*(?:inventory|production-quality|purchase-requisitions|master-data|firebase|\bpg\b)/,
       file,
     );
+    if (file !== "packaging-client.tsx") assert.doesNotMatch(source, /\bfetch\s*\(/, file);
     const result = ts.transpileModule(source, {
       fileName: file,
       reportDiagnostics: true,
@@ -501,7 +502,7 @@ test("one stable provider, existing route activation, no per-SET vertical scroll
     "MixingProvider",
     "MasterDataProvider",
   ])
-    assert.ok(layout.includes(`<${provider}>`));
+    assert.match(layout, new RegExp(`<${provider}(?:\\s|>)`));
   const nav = read("src/lib/constants/navigation.ts");
   assert.match(nav, /title: "รายงานการบรรจุ",\s+href: "\/packaging-report"/);
   assert.doesNotMatch(

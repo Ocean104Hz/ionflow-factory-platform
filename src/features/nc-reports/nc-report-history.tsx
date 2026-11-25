@@ -156,7 +156,7 @@ export function NCReportHistory({
       {records.length === 0 ? (
         <EmptyState
           title="ยังไม่มีใบ NC ตัวอย่าง"
-          description="กลับไปที่สร้างใบ NC เพื่อบันทึกข้อมูลตัวอย่าง"
+          description="กลับไปที่สร้างใบ NC เพื่อบันทึกเอกสาร"
         />
       ) : (
         <FactoryDataTable
@@ -235,7 +235,7 @@ export function NCReportHistory({
                   )}
                   <ConfirmDialog
                     title={`ลบ ${r.doc_no}?`}
-                    description="ลบเฉพาะข้อมูลตัวอย่าง หากกำลังแก้ไขเอกสารนี้ แบบฟอร์มจะถูกล้าง ไม่เปลี่ยนสต็อก"
+                    description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
                     trigger={
                       <Button
                         variant="ghost"

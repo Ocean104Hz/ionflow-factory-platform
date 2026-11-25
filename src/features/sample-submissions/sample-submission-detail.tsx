@@ -64,7 +64,7 @@ export function SampleSubmissionDetail({
                   {sampleDate(report.doc_date)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  เอกสารตัวอย่าง · ผลวิเคราะห์ไม่ใช่การอนุมัติ QA
+                  เอกสาร · ผลวิเคราะห์ไม่ใช่การอนุมัติ QA
                 </p>
               </header>
               {report.rows.map((row, index) => (

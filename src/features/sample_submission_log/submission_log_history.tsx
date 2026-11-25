@@ -45,7 +45,7 @@ export function SubmissionLogHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติแบบบันทึก"
-        subtitle={`พบ ${filtered.length} จาก ${records.length} เอกสารสาธิต · วันที่ส่งใช้วันที่ลงชื่อผู้ส่ง`}
+        subtitle={`พบ ${filtered.length} จาก ${records.length} เอกสาร · วันที่ส่งใช้วันที่ลงชื่อผู้ส่ง`}
       >
         <form
           onSubmit={(e) => {
@@ -221,7 +221,7 @@ export function SubmissionLogHistory({
                 </Button>
                 <ConfirmDialog
                   title={`ลบ ${r.doc_no}?`}
-                  description="ลบข้อมูลสาธิตเท่านั้น หากกำลังแก้ไขเอกสารนี้ แบบฟอร์มจะถูกล้าง ไม่มีผลต่อระบบจริง"
+                  description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
                   trigger={
                     <Button variant="ghost" size="sm" className="text-danger">
                       ลบ

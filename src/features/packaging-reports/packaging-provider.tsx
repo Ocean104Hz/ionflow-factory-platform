@@ -2,46 +2,36 @@
 import {
   createContext,
   useContext,
-  useRef,
-  useState,
   type ReactNode,
 } from "react";
-import { demoPackagingReports } from "@/src/lib/mock-data/packaging-reports";
-import {
-  saveReport,
-  deleteReport,
-  type PackagingReport,
-} from "./packaging-domain";
+import { usePathname } from "next/navigation";
+import type { PackagingReport } from "./packaging-domain";
+import { usePackagingData } from "./packaging-client";
 const Context = createContext<{
   records: PackagingReport[];
-  save: (r: PackagingReport) => PackagingReport;
-  remove: (id: string) => void;
+  save: (r: PackagingReport) => Promise<PackagingReport>;
+  remove: (r: PackagingReport) => Promise<void>;
+  loading: boolean;
+  error: string;
+  busy: boolean;
+  retry: () => void;
 } | null>(null);
 export function PackagingProvider({ children }: { children: ReactNode }) {
-  const [records, setRecords] = useState(() =>
-    structuredClone(demoPackagingReports),
-  );
-  const current = useRef(records);
-  function commit(rows: PackagingReport[]) {
-    current.current = rows;
-    setRecords(rows);
-  }
+  const pathname = usePathname();
+  const state = usePackagingData<{ records: PackagingReport[] }>("packaging_report", pathname === "/packaging-report");
   return (
     <Context.Provider
       value={{
-        records,
-        save(input) {
-          const next = saveReport(
-            current.current,
-            input,
-            crypto.randomUUID(),
-            new Date().toISOString(),
-          );
-          commit(next.records);
-          return structuredClone(next.record);
+        records: state.data?.records ?? [],
+        loading: state.loading, error: state.error, busy: state.busy, retry: state.retry,
+        async save(document) {
+          const saved = await state.mutate<PackagingReport>({ action: "save", document });
+          state.setData((current) => ({ records: [saved, ...(current?.records ?? []).filter((r) => r.id !== saved.id)] }));
+          return saved;
         },
-        remove(id) {
-          commit(deleteReport(current.current, id));
+        async remove(report) {
+          await state.mutate({ action: "delete", id: report.id, updatedAt: report.updatedAt });
+          state.setData((current) => ({ records: (current?.records ?? []).filter((r) => r.id !== report.id) }));
         },
       }}
     >

@@ -229,7 +229,7 @@ export function validateLog(
         x.doc_no.trim().toLowerCase() === r.doc_no.trim().toLowerCase(),
     )
   )
-    e.doc_no = "เลขที่คำขอนี้มีอยู่ในข้อมูลตัวอย่างแล้ว";
+    e.doc_no = "เลขที่คำขอนี้มีอยู่แล้ว";
   const t = r.sample_type,
     f = r.sample_form,
     q = r.quantity,
@@ -304,7 +304,7 @@ export function saveLog(
   if (r.id && !records.some((x) => x.id === r.id))
     throw new Error("ไม่พบเอกสารที่ต้องการแก้ไข");
   if (!r.id && (!id || records.some((x) => x.id === id)))
-    throw new Error("รหัสตัวอย่างซ้ำ กรุณาลองใหม่");
+    throw new Error("รหัสแถวซ้ำ กรุณาลองใหม่");
   const saved = structuredClone({
     ...r,
     id: r.id || id,

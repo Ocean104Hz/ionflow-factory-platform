@@ -1,6 +1,9 @@
 import { PackingSummaryWorkspace } from
   "@/src/features/packing-summary/packing-summary-workspace";
 
-export default function Page() {
+import { requireAuthenticatedFactoryModule } from "@/src/server/auth/server-auth";
+
+export default async function Page() {
+  await requireAuthenticatedFactoryModule("packing_summary");
   return <PackingSummaryWorkspace />;
 }

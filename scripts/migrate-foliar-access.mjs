@@ -19,7 +19,19 @@ const client = new pg.Client({
 
 try {
   await client.connect();
-  const migration = process.argv[2] === "--organic"
+  const migration = process.argv[2] === "--warehouse"
+    ? ["warehouse_receipts", "0010_factory_warehouse_documents"]
+    : process.argv[2] === "--qc"
+    ? ["qc_documents", "0009_factory_qc"]
+    : process.argv[2] === "--delivery-evidence"
+    ? ["hub_delivery_evidence", "0008_factory_delivery_evidence"]
+    : process.argv[2] === "--sales-documents"
+    ? ["hub_documents", "0007_factory_sales_documents"]
+    : process.argv[2] === "--sales-hub"
+    ? ["hub_orders", "0006_factory_sales_hub"]
+    : process.argv[2] === "--packaging"
+    ? ["packaging_reports", "0005_factory_packaging"]
+    : process.argv[2] === "--organic"
     ? ["organic_documents", "0004_factory_organic"]
     : process.argv[2] === "--production-v1"
     ? ["production_v1_documents", "0003_factory_production_v1"]

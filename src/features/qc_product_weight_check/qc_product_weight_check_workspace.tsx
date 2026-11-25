@@ -25,15 +25,12 @@ import {
 
 import {
   PageHeader,
-  StatusBadge,
 } from "@/src/components/factory/patterns";
 
-import { demoQcProductWeightCheckDocuments } from "@/src/lib/mock-data/qc-product-weight-check";
+import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 
 import {
   blankQcWeightDocument,
-  deleteQcWeightDocument,
-  saveQcWeightDocument,
   validateQcWeightDocument,
   type QcProductWeightCheckDocument,
   type QcWeightErrors,
@@ -61,11 +58,7 @@ const INITIAL_ROW_ID = "qc-weight-initial-row";
 export function QcProductWeightCheckWorkspace() {
   /* ---------------- document state ---------------- */
 
-  const [records, setRecords] = useState<
-    QcProductWeightCheckDocument[]
-  >(() =>
-    structuredClone(demoQcProductWeightCheckDocuments),
-  );
+  const { records, persist, remove, loading, loadError, busy } = useQcDocuments<QcProductWeightCheckDocument>("qc_product_weight_check");
 
   const [draft, setDraft] =
     useState<QcProductWeightCheckDocument>(() =>
@@ -151,7 +144,7 @@ export function QcProductWeightCheckWorkspace() {
 
   /* ---------------- save document ---------------- */
 
-  function handleSave() {
+  async function handleSave() {
     const validationErrors =
       validateQcWeightDocument(draft, records);
 
@@ -167,21 +160,14 @@ export function QcProductWeightCheckWorkspace() {
     }
 
     try {
-      const result = saveQcWeightDocument(
-        records,
-        draft,
-        crypto.randomUUID(),
-        new Date().toISOString(),
-      );
+      const saved = await persist(draft);
+      setDraft(saved);
 
-      setRecords(result.records);
-      setDraft(result.saved);
-
-      setBaseline(JSON.stringify(result.saved));
+      setBaseline(JSON.stringify(saved));
 
       setErrors({});
       setMessage(
-        "บันทึกเอกสาร QC จำลองเรียบร้อยแล้ว",
+        "บันทึกเอกสารแล้ว",
       );
 
       setTab("history");
@@ -227,16 +213,18 @@ export function QcProductWeightCheckWorkspace() {
 
   /* ---------------- delete document ---------------- */
 
-  function handleDeleteConfirm() {
+  async function handleDeleteConfirm() {
     if (!documentToDelete) {
       return;
     }
 
     const deletedId = documentToDelete.id;
 
-    setRecords((current) =>
-      deleteQcWeightDocument(current, deletedId),
-    );
+    try { await remove(deletedId); }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+      return;
+    }
 
     if (draft.id === deletedId) {
       const next = blankQcWeightDocument(
@@ -253,7 +241,7 @@ export function QcProductWeightCheckWorkspace() {
     }
 
     setDocumentToDelete(null);
-    setMessage("ลบเอกสาร QC จำลองเรียบร้อยแล้ว");
+    setMessage("ลบเอกสารจากรายการแล้ว");
   }
 
   /* ---------------- render ---------------- */
@@ -265,15 +253,13 @@ export function QcProductWeightCheckWorkspace() {
       <PageHeader
         title="ใบบันทึกการตรวจเช็ค QC น้ำหนักของผลิตภัณฑ์"
         description="บันทึกผลการตรวจสอบน้ำหนักผลิตภัณฑ์ตามรอบการตรวจ"
-        actions={
-          <StatusBadge tone="info">
-            UI MOCK · ไม่เชื่อมระบบจริง
-          </StatusBadge>
-        }
       />
 
       {/* Tabs */}
 
+      {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
+      <fieldset disabled={busy} className="min-w-0">
       <Tabs
         value={tab}
         onValueChange={(value) =>
@@ -391,6 +377,7 @@ export function QcProductWeightCheckWorkspace() {
           />
         </TabsContent>
       </Tabs>
+      </fieldset>
 
       {/* Confirm Unsaved Changes */}
 
@@ -455,7 +442,7 @@ export function QcProductWeightCheckWorkspace() {
               เอกสาร{" "}
               {documentToDelete?.doc_no || "-"}
               {" "}
-              จะถูกลบออกจากข้อมูลจำลอง
+              จะถูกนำออกจากรายการและเก็บประวัติการลบ
               และไม่สามารถเรียกคืนจากสถานะปัจจุบันได้
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -163,11 +163,13 @@ export function ConfirmDialog({
   description,
   trigger,
   onConfirm,
+  live = false,
 }: {
   title: string;
   description: string;
   trigger: ReactNode;
   onConfirm: () => void;
+  live?: boolean;
 }) {
   return (
     <AlertDialog>
@@ -176,7 +178,7 @@ export function ConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            {description} · เปลี่ยนเฉพาะ demo state
+            {description}{!live && " · เปลี่ยนเฉพาะ demo state"}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

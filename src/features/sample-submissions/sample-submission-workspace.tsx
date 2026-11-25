@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PageHeader, StatusBadge } from "@/src/components/factory/patterns";
+import { PageHeader } from "@/src/components/factory/patterns";
 import {
   Tabs,
   TabsList,
@@ -17,12 +17,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import { demoSampleSubmissions } from "@/src/lib/mock-data/sample-submissions";
+import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import {
   newSubmission,
-  saveSubmission,
   validateSubmission,
-  deleteSubmission,
   type SampleSubmission,
   type SampleErrors,
 } from "./sample-submission-domain";
@@ -31,9 +29,8 @@ import { SampleSubmissionHistory } from "./sample-submission-history";
 import { SampleSubmissionDetail } from "./sample-submission-detail";
 
 export function SampleSubmissionWorkspace() {
-  const [records, setRecords] = useState(() =>
-      structuredClone(demoSampleSubmissions),
-    ),
+  const { records, persist, remove, loading, loadError, busy } = useQcDocuments<SampleSubmission>("sample_submissions");
+  const
     [report, setReport] = useState(newSubmission);
   const [baseline, setBaseline] = useState(() =>
       JSON.stringify(newSubmission()),
@@ -54,7 +51,7 @@ export function SampleSubmissionWorkspace() {
     if (JSON.stringify(report) !== baseline) setPending(r);
     else open(r);
   }
-  function save() {
+  async function save() {
     const nextErrors = validateSubmission(report, records);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -62,11 +59,10 @@ export function SampleSubmissionWorkspace() {
       return;
     }
     try {
-      const result = saveSubmission(records, report, crypto.randomUUID());
-      setRecords(result.records);
-      setReport(result.saved);
-      setBaseline(JSON.stringify(result.saved));
-      setMessage("บันทึกข้อมูลตัวอย่างแล้ว · ไม่ส่งข้อมูลหรือเปลี่ยนสต็อก");
+      const saved = await persist(report);
+      setReport(saved);
+      setBaseline(JSON.stringify(saved));
+      setMessage("บันทึกเอกสารแล้ว");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "บันทึกไม่ได้");
     }
@@ -76,10 +72,10 @@ export function SampleSubmissionWorkspace() {
       <PageHeader
         title="ใบส่งตัวอย่าง"
         description="จัดการตัวอย่างที่นำส่งวิเคราะห์และบันทึกผลรายตัวอย่าง"
-        actions={
-          <StatusBadge tone="info">UI MOCK · ไม่เชื่อมระบบจริง</StatusBadge>
-        }
       />
+      {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
+      {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
+      <fieldset disabled={busy} className="min-w-0">
       <Tabs value={tab} onValueChange={setTab} className="min-w-0">
         <div className="max-w-full overflow-x-auto">
           <TabsList aria-label="มุมมองใบส่งตัวอย่าง">
@@ -108,15 +104,20 @@ export function SampleSubmissionWorkspace() {
             onEdit={request}
             onView={(r) => setView({ id: r.id, print: false })}
             onPrint={(r) => setView({ id: r.id, print: true })}
-            onDelete={(r) => {
-              setRecords((current) => deleteSubmission(current, r.id));
+            onDelete={async (r) => {
+              try { await remove(r.id); }
+              catch (error) {
+                setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+                return;
+              }
               if (report.id === r.id) open(newSubmission());
               if (view?.id === r.id) setView(null);
-              setMessage("ลบข้อมูลตัวอย่างแล้ว");
+              setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
         </TabsContent>
       </Tabs>
+      </fieldset>
       <AlertDialog
         open={!!pending}
         onOpenChange={(v) => {

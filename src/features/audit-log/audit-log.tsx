@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, History, Search, SlidersHorizontal } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Eye, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
 import { Card, CardContent } from "@/src/components/ui/card";
 import {
   Popover,
@@ -25,20 +25,19 @@ import {
   InfoRow,
   PageHeader,
   Pagination,
+  RefreshButton,
   SelectField,
   StatusBadge,
   type Column,
 } from "@/src/components/factory/patterns";
 import {
   auditActions,
-  auditEntries,
   emptyAuditFilters,
   filterAuditEntries,
   type AuditEntry,
   type AuditFilters,
 } from "@/src/lib/mock-data/audit-log";
 import type { Tone } from "@/src/lib/constants/status";
-import { usePR } from "@/src/features/purchase-requisitions/pr-provider";
 
 const actionTones: Record<AuditEntry["action"], Tone> = {
   CREATE: "success",
@@ -56,9 +55,8 @@ const formatTime = (value: string) =>
   }).format(new Date(value));
 const allOption = { value: "all", label: "ทั้งหมด" };
 
-export function AuditLog() {
-  const { audit } = usePR();
-  const entries = [...audit, ...auditEntries];
+export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadError?: string }) {
+  const router = useRouter();
   const [draft, setDraft] = useState<AuditFilters>(emptyAuditFilters);
   const [filters, setFilters] = useState<AuditFilters>(emptyAuditFilters);
   const [page, setPage] = useState(1);
@@ -139,16 +137,10 @@ export function AuditLog() {
     <div className="space-y-5">
       <PageHeader
         title="ประวัติการแก้ไข"
-        description="ตรวจสอบว่าใครทำอะไร เมื่อไร และข้อมูลใดเปลี่ยนแปลง"
+        description="ประวัติเอกสาร QC และจัดซื้อ 1,000 เหตุการณ์ล่าสุด"
+        actions={<RefreshButton onClick={() => router.refresh()} />}
       />
-      <Alert>
-        <History aria-hidden="true" />
-        <AlertTitle>ประวัติสาธิต · อ่านอย่างเดียว</AlertTitle>
-        <AlertDescription>
-          ข้อมูลสมมติ พร้อมกิจกรรม PR ที่ทำในรอบใช้งานนี้ · ไม่ใช่ audit จริง
-          และจะหายเมื่อโหลดแอปใหม่ ไม่บันทึกกิจกรรมจากโมดูลอื่น
-        </AlertDescription>
-      </Alert>
+      {loadError && <p role="alert" className="text-danger">{loadError}</p>}
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           { label: "รายการที่พบ", value: rows.length, unit: "รายการ" },
@@ -356,7 +348,7 @@ export function AuditLog() {
               </SheetClose>
             </div>
             <SheetDescription>
-              ข้อมูลสาธิตแบบอ่านอย่างเดียว ไม่สามารถแก้ไขหรือลบประวัติได้
+              ข้อมูลก่อนและหลังการทำรายการ
             </SheetDescription>
           </SheetHeader>
           {selected && (
@@ -375,7 +367,6 @@ export function AuditLog() {
                 <InfoRow label="วันและเวลา (ไทย)">
                   {formatTime(selected.occurredAt)}
                 </InfoRow>
-                <InfoRow label="IP สาธิต">{selected.ipAddress}</InfoRow>
                 <InfoRow label="หมวดข้อมูล">{selected.module}</InfoRow>
                 <InfoRow label="เอกสารอ้างอิง">{selected.reference}</InfoRow>
               </dl>
@@ -400,7 +391,7 @@ export function AuditLog() {
                         key: "before",
                         label: "ก่อนแก้ไข",
                         render: (change) => (
-                          <span className="break-words text-muted-foreground">
+                          <span className="max-w-96 break-all text-muted-foreground">
                             {change.before}
                           </span>
                         ),
@@ -409,7 +400,7 @@ export function AuditLog() {
                         key: "after",
                         label: "หลังแก้ไข",
                         render: (change) => (
-                          <span className="break-words font-medium">
+                          <span className="max-w-96 break-all font-medium">
                             {change.after}
                           </span>
                         ),

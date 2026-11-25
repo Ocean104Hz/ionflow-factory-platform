@@ -3,7 +3,7 @@ import {
   packagingTimes,
   packagingUnits,
   type PackagingProfileId,
-} from "./packaging-profiles";
+} from "./packaging-profiles.ts";
 export type PackagingContext = {
   id: string;
   fertilizerName: string;

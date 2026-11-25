@@ -44,7 +44,7 @@ export function SampleSubmissionHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติใบส่งตัวอย่าง"
-        subtitle={`พบ ${rows.length} จาก ${records.length} เอกสารตัวอย่าง`}
+        subtitle={`พบ ${rows.length} จาก ${records.length} เอกสาร`}
       >
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
@@ -119,7 +119,7 @@ export function SampleSubmissionHistory({
       {records.length === 0 ? (
         <EmptyState
           title="ยังไม่มีใบส่งตัวอย่าง"
-          description="สร้างเอกสารตัวอย่างได้จากแท็บสร้างใบส่งตัวอย่าง"
+          description="สร้างเอกสารได้จากแท็บสร้างใบส่งตัวอย่าง"
         />
       ) : (
         <FactoryDataTable
@@ -186,7 +186,7 @@ export function SampleSubmissionHistory({
                   </Button>
                   <ConfirmDialog
                     title={`ลบ ${r.doc_no}?`}
-                    description="ลบเฉพาะข้อมูลตัวอย่าง รวมแบบฟอร์มที่กำลังแก้ไขเอกสารนี้ ไม่มีผลต่อระบบอื่น"
+                    description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
                     trigger={
                       <Button size="sm" variant="ghost" className="text-danger">
                         ลบ

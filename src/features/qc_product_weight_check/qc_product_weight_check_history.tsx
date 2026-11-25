@@ -176,7 +176,7 @@ export function QcProductWeightCheckHistory({
 
       <SectionCard
         title="ประวัติการตรวจเช็ค QC น้ำหนักผลิตภัณฑ์"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสารจำลอง`}
+        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
         <form
           className="space-y-4"

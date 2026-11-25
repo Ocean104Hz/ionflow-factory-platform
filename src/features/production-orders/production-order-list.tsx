@@ -151,7 +151,7 @@ export function ProductionOrderList() {
       <PageHeader
         title="คำสั่งการผลิต"
         description="รายการคำสั่งการผลิตจาก Sales Hub และ Datalink"
-        actions={<><Button disabled={busy} onClick={() => setCreating(true)}>เพิ่มคำสั่ง Local</Button><RefreshButton onClick={refresh} /></>}
+        actions={<>{process.env.NODE_ENV === "development" && <Button disabled={busy} onClick={() => setCreating(true)}>เพิ่มคำสั่ง Local</Button>}<RefreshButton onClick={refresh} /></>}
       />
       {creating && <ProductionOrderEditor onClose={() => setCreating(false)} />}
       {error && <p role="alert" className="text-danger">{error}</p>}
@@ -203,7 +203,7 @@ export function ProductionOrderList() {
         }
       />
       <p className="text-xs text-muted-foreground">
-        PostgreSQL Local · ไม่มี Mock fallback · จำนวนต่างหน่วยไม่ใช่ยอดวัตถุดิบรวม
+        รายการจาก Sales Hub อัปเดตเมื่อรีเฟรช
       </p>
     </>
   );
