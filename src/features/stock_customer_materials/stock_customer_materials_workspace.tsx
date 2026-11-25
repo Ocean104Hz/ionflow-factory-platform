@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
   CalendarDays,
@@ -8,6 +8,9 @@ import {
   Eye,
   Pencil,
   Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
   Search,
   Trash2,
 } from "lucide-react";
@@ -31,48 +34,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/components/ui/table";
-import { stockCustomerMaterialsMockWorkbook } from "@/src/lib/mock-data/stock_customer_materials";
 
 import { CustomerMaterialsForm } from "./stock_customer_materials_form";
 import { CustomerMaterialsDailyForm } from "./stock_customer_materials_daily_form";
 import { CustomerMaterialsCountForm } from "./stock_customer_materials_count_form";
 import { CustomerMaterialsDetail } from "./stock_customer_materials_detail";
 import {
-  applyCustomerMaterialsSheetChanges,
   blankCustomerMaterialsRow,
-  blankCustomerMaterialsStoredData,
-  buildCustomerMaterialsSheetChanges,
+  buildCustomerMaterialsSaveRequest,
   CUSTOMER_MATERIALS_DEFAULT_SHEET,
   CUSTOMER_MATERIALS_PERIODS,
   CUSTOMER_MATERIALS_SHEET_NAMES,
   CUSTOMER_MATERIALS_SO_SHEET_NAMES,
-  CUSTOMER_MATERIALS_STORAGE_KEY,
   CUSTOMER_MATERIALS_SUMMARY_FIELDS,
   CUSTOMER_MATERIALS_SUMMARY_LABELS,
   customerMaterialsDaysInPeriod,
   customerMaterialsRowKey,
   filterCustomerMaterialsRows,
   isCustomerMaterialsSoSheetName,
-  isCustomerMaterialsStoredData,
+  readCustomerMaterialsSaveResponse,
+  readCustomerMaterialsSnapshot,
   removeCustomerMaterialsRow,
   replaceCustomerMaterialsRow,
   updateCustomerMaterialsCount,
   upsertCustomerMaterialsRow,
-  validateCustomerMaterialsSheetCoverage,
   type CustomerMaterialsFormMode,
   type CustomerMaterialsRow,
   type CustomerMaterialsSheet,
   type CustomerMaterialsSheetName,
   type CustomerMaterialsSoFilter,
-  type CustomerMaterialsStoredData,
-  type CustomerMaterialsWorkbook,
+  type CustomerMaterialsSnapshot,
 } from "./stock_customer_materials_domain";
 
 /* ---------------- configuration ---------------- */
 
 const PAGE_SIZE = 25;
-const STORAGE_EVENT = "ionflow:customer-materials:changed";
-const STORAGE_UNAVAILABLE = Symbol("customer-materials-storage-unavailable");
+const STOCK_API = "/api/stock/customer-materials";
+const CSRF_COOKIE = "ionflow_factory_csrf";
+const MAX_CHANGED_ROWS = 2000;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 const SHEET_OPTIONS = CUSTOMER_MATERIALS_SHEET_NAMES.map((name) => ({
   value: name,
@@ -96,84 +96,134 @@ const ITEM_COLUMNS = [
   { field: "unit", label: "หน่วยนับ" },
 ] as const;
 
-/* ---------------- browser storage ---------------- */
+/* ---------------- API and snapshot state ---------------- */
 
-type StorageSnapshot = string | null | typeof STORAGE_UNAVAILABLE;
+const LOAD_FAILED = "ไม่สามารถโหลดข้อมูลวัสดุคงเหลือลูกค้าจากฐานข้อมูลได้";
+const UNCERTAIN_SAVE =
+  "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาโหลดข้อมูลใหม่และตรวจสอบก่อนบันทึกซ้ำ";
 
-interface StorageResult {
-  workbook: CustomerMaterialsWorkbook;
-  stored: CustomerMaterialsStoredData;
-  error: string;
+class CustomerMaterialsApiError extends Error {
+  constructor(message: string, readonly reloadRequired = false) {
+    super(message);
+    this.name = "CustomerMaterialsApiError";
+  }
 }
 
-function subscribeStorage(callback: () => void): () => void {
-  window.addEventListener("storage", callback);
-  window.addEventListener(STORAGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(STORAGE_EVENT, callback);
-  };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function getStorageSnapshot(): StorageSnapshot {
+function getCsrfToken(): string {
   try {
-    return window.localStorage.getItem(CUSTOMER_MATERIALS_STORAGE_KEY);
+    const cookie = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${CSRF_COOKIE}=`));
+    const token = cookie
+      ? decodeURIComponent(cookie.slice(CSRF_COOKIE.length + 1))
+      : "";
+    if (token) return token;
   } catch {
-    return STORAGE_UNAVAILABLE;
+    // Never send a write request without the CSRF token.
   }
+  throw new CustomerMaterialsApiError("กรุณาเข้าสู่ระบบใหม่ ไม่พบ CSRF Token");
 }
 
-function getServerSnapshot(): null {
-  return null;
-}
-
-function decodeStorage(snapshot: StorageSnapshot): StorageResult {
-  const source = stockCustomerMaterialsMockWorkbook;
-  const empty = blankCustomerMaterialsStoredData();
-  const fallback = (error: string): StorageResult => ({
-    workbook: source,
-    stored: empty,
-    error,
-  });
-
-  if (validateCustomerMaterialsSheetCoverage(source.sheets).length > 0) {
-    return fallback(
-      "ข้อมูลต้นฉบับมีชีตไม่ครบหรือชื่อชีตซ้ำ ระบบระงับการบันทึกไว้ก่อน",
-    );
-  }
-  if (snapshot === STORAGE_UNAVAILABLE) {
-    return fallback(
-      "ไม่สามารถเข้าถึง Local Storage ได้ ขณะนี้แสดงข้อมูลต้นฉบับแบบอ่านอย่างเดียว",
-    );
-  }
-  if (snapshot === null) {
-    return { workbook: source, stored: empty, error: "" };
-  }
-
+async function requestJson(
+  url: string,
+  init: RequestInit,
+  writing = false,
+): Promise<unknown> {
+  let response: Response;
   try {
-    const stored: unknown = JSON.parse(snapshot);
-    if (!isCustomerMaterialsStoredData(stored)) {
-      throw new Error("Invalid stored data");
-    }
-    const workbook: CustomerMaterialsWorkbook = {
-      sheets: source.sheets.map((sheet) =>
-        applyCustomerMaterialsSheetChanges(sheet, stored.changes[sheet.name]),
-      ),
-    };
-    return { workbook, stored, error: "" };
-  } catch {
-    // Never delete or replace malformed data automatically.
-    return fallback(
-      "ข้อมูลที่บันทึกใน Local Storage ไม่ถูกต้องหรือไม่ตรงกับต้นฉบับ ระบบแสดงข้อมูลต้นฉบับและระงับการบันทึกเพื่อรักษาข้อมูลเดิม",
+    response = await fetch(url, {
+      ...init,
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new CustomerMaterialsApiError(
+      writing ? UNCERTAIN_SAVE : LOAD_FAILED,
+      writing,
     );
   }
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isRecord(payload) || payload.ok !== true) {
+    const reloadRequired = writing && (
+      response.ok || response.status >= 500 ||
+      response.status === 409 || response.status === 404 ||
+      response.status === 401 || response.status === 403 ||
+      !isRecord(payload) || payload.ok !== false
+    );
+    const message = response.status === 401 || response.status === 403
+      ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน stock_customer_materials"
+      : isRecord(payload) && typeof payload.message === "string" && payload.message
+        ? payload.message
+        : writing ? UNCERTAIN_SAVE : LOAD_FAILED;
+    throw new CustomerMaterialsApiError(message, reloadRequired);
+  }
+  return payload;
+}
+
+async function loadSnapshot(
+  name: CustomerMaterialsSheetName,
+  signal: AbortSignal,
+): Promise<CustomerMaterialsSnapshot> {
+  const params = new URLSearchParams({ sheet_name: name });
+  const payload = await requestJson(`${STOCK_API}?${params}`, { signal });
+  return readCustomerMaterialsSnapshot(payload, name);
+}
+
+async function saveSnapshot(
+  baseline: CustomerMaterialsSnapshot,
+  draft: CustomerMaterialsSheet,
+) {
+  const request = buildCustomerMaterialsSaveRequest(baseline, draft);
+  if (request.changes.length + request.deleted_refs.length > MAX_CHANGED_ROWS) {
+    throw new CustomerMaterialsApiError("รายการเปลี่ยนแปลงเกิน 2,000 รายการต่อการบันทึก");
+  }
+  const body = JSON.stringify(request);
+  if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
+    throw new CustomerMaterialsApiError("ข้อมูลที่บันทึกมีขนาดเกิน 4 MB");
+  }
+  const payload = await requestJson(STOCK_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-csrf-token": getCsrfToken(),
+    },
+    body,
+  }, true);
+  try {
+    return readCustomerMaterialsSaveResponse(payload, baseline.sheet.name);
+  } catch {
+    // A successful HTTP status alone cannot confirm the write result.
+    throw new CustomerMaterialsApiError(UNCERTAIN_SAVE, true);
+  }
+}
+
+interface LoadRequest {
+  name: CustomerMaterialsSheetName;
+}
+
+interface LoadedSheet {
+  request: LoadRequest;
+  baseline: CustomerMaterialsSnapshot;
+  draft: CustomerMaterialsSheet;
+}
+
+interface LoadFailure {
+  request: LoadRequest;
+  message: string;
 }
 
 /* ---------------- dialog state ---------------- */
 
 interface EditorBase {
   row: CustomerMaterialsRow;
-  snapshot: StorageSnapshot;
+  snapshot: CustomerMaterialsSheet;
   returnToDetail: boolean;
 }
 
@@ -187,7 +237,7 @@ type EditorState = EditorBase &
 type DialogState =
   | EditorState
   | { kind: "DETAIL"; key: string }
-  | { kind: "DELETE"; row: CustomerMaterialsRow; snapshot: StorageSnapshot }
+  | { kind: "DELETE"; row: CustomerMaterialsRow; snapshot: CustomerMaterialsSheet }
   | null;
 
 function displayValue(value: string | null | undefined): string {
@@ -198,8 +248,10 @@ function displayValue(value: string | null | undefined): string {
 
 export function StockCustomerMaterialsWorkspace() {
   const searchId = useId();
-  const [selectedSheet, setSelectedSheet] =
-    useState<CustomerMaterialsSheetName>(CUSTOMER_MATERIALS_DEFAULT_SHEET);
+  const [loadRequest, setLoadRequest] = useState<LoadRequest>(() => ({
+    name: CUSTOMER_MATERIALS_DEFAULT_SHEET,
+  }));
+  const selectedSheet = loadRequest.name;
   const [selectedSo, setSelectedSo] =
     useState<CustomerMaterialsSoFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -208,20 +260,56 @@ export function StockCustomerMaterialsWorkspace() {
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const snapshot = useSyncExternalStore(
-    subscribeStorage,
-    getStorageSnapshot,
-    getServerSnapshot,
+  const [loaded, setLoaded] = useState<LoadedSheet | null>(null);
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [reloadRequired, setReloadRequired] = useState(false);
+  const [pendingLoad, setPendingLoad] = useState<LoadRequest | null>(null);
+  const savingRef = useRef(false);
+
+  // Object identity distinguishes repeated loads of the same sheet.
+  const active = loaded?.request === loadRequest ? loaded : null;
+  const displayed = loaded?.request.name === selectedSheet ? loaded : null;
+  const sheet = displayed?.draft;
+  const loadError = loadFailure?.request === loadRequest ? loadFailure.message : "";
+  const isLoading = active === null && loadError === "";
+  const readOnly = active === null || isSaving || reloadRequired;
+  const hasUnsavedChanges = useMemo(
+    () => displayed !== null &&
+      displayed.draft !== displayed.baseline.sheet &&
+      JSON.stringify(displayed.draft.rows) !== JSON.stringify(displayed.baseline.sheet.rows),
+    [displayed],
   );
-  const {
-    workbook,
-    stored,
-    error: storageError,
-  } = useMemo(() => decodeStorage(snapshot), [snapshot]);
-  const readOnly = storageError !== "";
-  const sheet = workbook.sheets.find(
-    (current) => current.name === selectedSheet,
-  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadSnapshot(loadRequest.name, controller.signal)
+      .then((baseline) => {
+        if (controller.signal.aborted) return;
+        setLoaded({ request: loadRequest, baseline, draft: baseline.sheet });
+        setLoadFailure(null);
+        setReloadRequired(false);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setLoadFailure({
+          request: loadRequest,
+          message: error instanceof Error ? error.message : LOAD_FAILED,
+        });
+      });
+    return () => controller.abort();
+  }, [loadRequest]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges && !isSaving) return;
+    function beforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [hasUnsavedChanges, isSaving]);
+
   const rows = useMemo(
     () =>
       sheet ? filterCustomerMaterialsRows(sheet.rows, search, selectedSo) : [],
@@ -248,16 +336,74 @@ export function StockCustomerMaterialsWorkspace() {
     setNotice("");
   }
 
+  function beginLoad(request: LoadRequest) {
+    if (savingRef.current || dialog !== null) return;
+    clearFeedback();
+    setPendingLoad(null);
+    if (request.name !== selectedSheet) {
+      // An accepted period switch discards only the previous local draft.
+      setLoaded(null);
+      setReloadRequired(false);
+      setSearch("");
+      setPage(1);
+    }
+    setLoadRequest(request);
+  }
+
+  function requestLoad(name: CustomerMaterialsSheetName) {
+    if (savingRef.current || dialog !== null || pendingLoad !== null) return;
+    const request = { name };
+    if (hasUnsavedChanges) {
+      setPendingLoad(request);
+      return;
+    }
+    beginLoad(request);
+  }
+
   function chooseSheet(value: string) {
     const name = CUSTOMER_MATERIALS_SHEET_NAMES.find(
       (candidate) => candidate === value,
     );
-    if (name === undefined) return;
+    if (name === undefined || name === selectedSheet) return;
+    requestLoad(name);
+  }
+
+  function handleReload() {
+    if (isLoading) return;
+    requestLoad(selectedSheet);
+  }
+
+  function handleDiscard() {
+    if (!active || savingRef.current || dialog !== null || pendingLoad !== null || !hasUnsavedChanges) return;
+    setLoaded({ ...active, draft: active.baseline.sheet });
+    setSaveError("");
+    setNotice("ยกเลิกการแก้ไขแล้ว คืนค่าจากข้อมูลที่โหลดหรือบันทึกสำเร็จล่าสุด");
+  }
+
+  async function handleSave() {
+    if (!active || readOnly || savingRef.current || dialog !== null || pendingLoad !== null || !hasUnsavedChanges) return;
     clearFeedback();
-    setSelectedSheet(name);
-    setSearch("");
-    setPage(1);
-    setDialog(null);
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      const saved = await saveSnapshot(active.baseline, active.draft);
+      const baseline: CustomerMaterialsSnapshot = {
+        sheet: saved.sheet,
+        revision: saved.revision,
+      };
+      setLoaded({ request: active.request, baseline, draft: baseline.sheet });
+      setNotice(
+        `บันทึกลงฐานข้อมูลสำเร็จ · เพิ่ม ${saved.inserted} · แก้ไข ${saved.updated} · ลบ ${saved.deleted} รายการ`,
+      );
+    } catch (error) {
+      if (error instanceof CustomerMaterialsApiError && error.reloadRequired) {
+        setReloadRequired(true);
+      }
+      setSaveError(error instanceof Error ? error.message : UNCERTAIN_SAVE);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   }
 
   function chooseSo(value: string) {
@@ -274,7 +420,7 @@ export function StockCustomerMaterialsWorkspace() {
   }
 
   function openCreate() {
-    if (readOnly || !sheet) return;
+    if (readOnly || !sheet || savingRef.current) return;
     clearFeedback();
     try {
       const row = blankCustomerMaterialsRow(crypto.randomUUID(), sheet.name);
@@ -282,7 +428,7 @@ export function StockCustomerMaterialsWorkspace() {
         kind: "MATERIAL",
         mode: "CREATE",
         row,
-        snapshot,
+        snapshot: sheet,
         returnToDetail: false,
       });
     } catch (error) {
@@ -298,37 +444,37 @@ export function StockCustomerMaterialsWorkspace() {
     row: CustomerMaterialsRow,
     returnToDetail = false,
   ) {
-    if (readOnly) return;
+    if (readOnly || !sheet || savingRef.current) return;
     clearFeedback();
     setDialog({
       kind: "MATERIAL",
       mode: "EDIT",
       row,
-      snapshot,
+      snapshot: sheet,
       returnToDetail,
     });
   }
 
   function openDailyEditor(row: CustomerMaterialsRow, day: number) {
     if (
-      readOnly ||
+      readOnly || !sheet || savingRef.current ||
       !customerMaterialsDaysInPeriod(row.sheet_name).includes(day)
     )
       return;
     clearFeedback();
-    setDialog({ kind: "DAILY", row, day, snapshot, returnToDetail: true });
+    setDialog({ kind: "DAILY", row, day, snapshot: sheet, returnToDetail: true });
   }
 
   function openCountEditor(row: CustomerMaterialsRow, returnToDetail = false) {
-    if (readOnly) return;
+    if (readOnly || !sheet || savingRef.current) return;
     clearFeedback();
-    setDialog({ kind: "COUNT", row, snapshot, returnToDetail });
+    setDialog({ kind: "COUNT", row, snapshot: sheet, returnToDetail });
   }
 
   function openDelete(row: CustomerMaterialsRow) {
-    if (readOnly) return;
+    if (readOnly || !sheet || savingRef.current) return;
     clearFeedback();
-    setDialog({ kind: "DELETE", row, snapshot });
+    setDialog({ kind: "DELETE", row, snapshot: sheet });
   }
 
   function closeEditor() {
@@ -346,44 +492,18 @@ export function StockCustomerMaterialsWorkspace() {
     }
   }
 
-  /** Save only the changed rows/deletions for the selected sheet. */
-  function commitSheet(
+  /** Stage changes only. The main Save button is the sole write entry point. */
+  function stageSheet(
     nextSheet: CustomerMaterialsSheet,
-    expectedSnapshot: StorageSnapshot,
+    expectedSnapshot: CustomerMaterialsSheet,
   ) {
-    if (storageError) throw new Error(storageError);
-    if (
-      nextSheet.name !== selectedSheet ||
-      expectedSnapshot !== snapshot ||
-      getStorageSnapshot() !== expectedSnapshot
-    ) {
-      throw new Error(
-        "ข้อมูลมีการเปลี่ยนแปลง กรุณาปิดฟอร์มและเปิดใหม่ก่อนบันทึก",
-      );
+    if (readOnly || !active || savingRef.current) {
+      throw new Error("ระบบยังไม่พร้อมแก้ไขข้อมูล กรุณาโหลดข้อมูลใหม่");
     }
-    const source = stockCustomerMaterialsMockWorkbook.sheets.find(
-      (current) => current.name === nextSheet.name,
-    );
-    if (!source) throw new Error("ไม่พบชีตข้อมูลต้นฉบับ");
-
-    const sheetChanges = buildCustomerMaterialsSheetChanges(source, nextSheet);
-    const changes = { ...stored.changes };
-    if (
-      sheetChanges.upserts.length === 0 &&
-      sheetChanges.deleted_keys.length === 0
-    ) {
-      delete changes[nextSheet.name];
-    } else {
-      changes[nextSheet.name] = sheetChanges;
+    if (nextSheet.name !== selectedSheet || active.draft !== expectedSnapshot) {
+      throw new Error("ข้อมูลมีการเปลี่ยนแปลง กรุณาปิดฟอร์มและเปิดใหม่ก่อนบันทึก");
     }
-    const nextStored: CustomerMaterialsStoredData = { ...stored, changes };
-    const serialized = JSON.stringify(nextStored);
-    if (!isCustomerMaterialsStoredData(nextStored)) {
-      throw new Error("โครงสร้างข้อมูลไม่ถูกต้อง ไม่สามารถบันทึกได้");
-    }
-    // A failed setItem does not close the form or discard the previous data.
-    window.localStorage.setItem(CUSTOMER_MATERIALS_STORAGE_KEY, serialized);
-    window.dispatchEvent(new Event(STORAGE_EVENT));
+    setLoaded({ ...active, draft: nextSheet });
   }
 
   function saveEditor(row: CustomerMaterialsRow) {
@@ -414,8 +534,8 @@ export function StockCustomerMaterialsWorkspace() {
         nextSheet = upsertCustomerMaterialsRow(sheet, row, dialog.mode);
         message =
           dialog.mode === "CREATE"
-            ? "เพิ่มวัสดุเรียบร้อยแล้ว"
-            : "แก้ไขวัสดุเรียบร้อยแล้ว";
+            ? "เพิ่มวัสดุลงฉบับร่างแล้ว"
+            : "แก้ไขวัสดุในฉบับร่างแล้ว";
       } else {
         if (!current) throw new Error("ไม่พบรายการวัสดุที่ต้องการบันทึก");
         // Dedicated editors may only modify their own group of fields.
@@ -424,7 +544,7 @@ export function StockCustomerMaterialsWorkspace() {
             ...current,
             daily: row.daily,
           });
-          message = "บันทึกรับ-จ่ายวัสดุเรียบร้อยแล้ว";
+          message = "บันทึกรับ-จ่ายวัสดุลงฉบับร่างแล้ว";
         } else {
           const counted = updateCustomerMaterialsCount(current, {
             physical_count: row.summary.physical_count,
@@ -432,12 +552,12 @@ export function StockCustomerMaterialsWorkspace() {
             remark: row.remark,
           });
           nextSheet = replaceCustomerMaterialsRow(sheet, counted);
-          message = "บันทึกตรวจนับวัสดุเรียบร้อยแล้ว";
+          message = "บันทึกตรวจนับวัสดุลงฉบับร่างแล้ว";
         }
       }
 
-      commitSheet(nextSheet, dialog.snapshot);
-      setNotice(message);
+      stageSheet(nextSheet, dialog.snapshot);
+      setNotice(`${message} กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล`);
       if (dialog.kind === "MATERIAL") {
         setSearch("");
         // Locate the saved row within the filtered table, not the full sheet.
@@ -476,10 +596,10 @@ export function StockCustomerMaterialsWorkspace() {
       if (!sheet.rows.some((row) => customerMaterialsRowKey(row) === key)) {
         throw new Error("ไม่พบรายการวัสดุที่ต้องการลบ");
       }
-      commitSheet(removeCustomerMaterialsRow(sheet, key), dialog.snapshot);
+      stageSheet(removeCustomerMaterialsRow(sheet, key), dialog.snapshot);
       setDialog(null);
       setPage(currentPage);
-      setNotice("ลบรายการวัสดุจากงวดที่เลือกเรียบร้อยแล้ว");
+      setNotice("นำรายการวัสดุออกจากฉบับร่างแล้ว ฐานข้อมูลจะเปลี่ยนเมื่อกดบันทึกข้อมูลจากหน้าหลัก");
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : "ไม่สามารถลบข้อมูลได้",
@@ -492,15 +612,21 @@ export function StockCustomerMaterialsWorkspace() {
       <PageHeader
         title="วัสดุคงเหลือลูกค้า"
         description="จัดการวัสดุของลูกค้า ยอดสรุป รับ-จ่ายรายวัน และตรวจนับ แยกตามงวดข้อมูล"
-        actions={<Badge variant="outline">UI MOCK · Local Storage</Badge>}
+        actions={<Badge variant="outline">ฐานข้อมูล</Badge>}
       />
 
-      {storageError && (
+      {loadError && (
         <p
           role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
         >
-          {storageError}
+          {loadError}
+        </p>
+      )}
+      {reloadRequired && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          ระบบยังไม่ยืนยันสถานะการบันทึกหรือข้อมูลมีการเปลี่ยนแปลง
+          ฉบับร่างยังอยู่ กรุณาตรวจสอบข้อมูลและโหลดข้อมูลใหม่ก่อนบันทึกอีกครั้ง
         </p>
       )}
       {notice && (
@@ -528,7 +654,7 @@ export function StockCustomerMaterialsWorkspace() {
               {period.label} ({selectedSheet})
             </p>
             <p className="text-xs text-muted-foreground">
-              {sheet?.report_caption || "ไม่พบข้อมูลชีต"}
+              {sheet?.report_caption || (isLoading ? "กำลังโหลดข้อมูล..." : "ยังไม่ได้โหลดข้อมูล")}
             </p>
             {sheet?.period_caption && (
               <p className="text-xs text-muted-foreground">
@@ -538,10 +664,43 @@ export function StockCustomerMaterialsWorkspace() {
           </div>
         </div>
         <Badge variant="secondary">
-          {!storageError && stored.changes[selectedSheet]
-            ? "ข้อมูลที่แก้ไขในเบราว์เซอร์"
-            : "ข้อมูลต้นฉบับ"}
+          {isSaving ? "กำลังบันทึก" : isLoading ? "กำลังโหลด" :
+            loadError || reloadRequired ? "ต้องโหลดข้อมูลใหม่" :
+              hasUnsavedChanges ? "มีการแก้ไขที่ยังไม่ได้บันทึก" : "ข้อมูลที่บันทึกแล้ว"}
         </Badge>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          เพิ่ม แก้ไข รับ-จ่าย ตรวจนับ และลบในฉบับร่างก่อน
+          แล้วกดบันทึกข้อมูลเพื่อจัดเก็บลงฐานข้อมูลพร้อมกัน
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isLoading || isSaving || dialog !== null || pendingLoad !== null}
+            onClick={handleReload}
+          >
+            <RefreshCw className="size-4" aria-hidden="true" /> โหลดข้อมูลใหม่
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!active || !hasUnsavedChanges || isSaving || dialog !== null || pendingLoad !== null}
+            onClick={handleDiscard}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" /> ยกเลิกการแก้ไข
+          </Button>
+          <Button
+            type="button"
+            disabled={readOnly || !hasUnsavedChanges || dialog !== null || pendingLoad !== null}
+            onClick={handleSave}
+          >
+            <Save className="size-4" aria-hidden="true" />
+            {isSaving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -558,7 +717,7 @@ export function StockCustomerMaterialsWorkspace() {
           },
           {
             label: "งวดข้อมูลทั้งหมด",
-            value: workbook.sheets.length,
+            value: CUSTOMER_MATERIALS_SHEET_NAMES.length,
             Icon: ClipboardCheck,
           },
         ].map(({ label, value, Icon }) => (
@@ -587,6 +746,7 @@ export function StockCustomerMaterialsWorkspace() {
             value={selectedSheet}
             onChange={chooseSheet}
             options={SHEET_OPTIONS}
+            disabled={isSaving || dialog !== null || pendingLoad !== null}
           />
           <SelectField
             label="เลือกกลุ่ม SO"
@@ -671,9 +831,11 @@ export function StockCustomerMaterialsWorkspace() {
                       }
                       className="py-10 text-center text-sm text-muted-foreground"
                     >
-                      {search.trim() || selectedSo !== "ALL"
-                        ? "ไม่พบวัสดุที่ตรงกับตัวกรอง"
-                        : "ยังไม่มีรายการวัสดุในงวดนี้"}
+                      {!sheet
+                        ? isLoading ? "กำลังโหลดข้อมูลจากฐานข้อมูล..." : "ยังไม่สามารถแสดงข้อมูลได้ กรุณาโหลดข้อมูลใหม่"
+                        : search.trim() || selectedSo !== "ALL"
+                          ? "ไม่พบวัสดุที่ตรงกับตัวกรอง"
+                          : "ยังไม่มีรายการวัสดุในงวดนี้"}
                     </TableCell>
                   </TableRow>
                 )}
@@ -801,10 +963,41 @@ export function StockCustomerMaterialsWorkspace() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          UI Mock: บันทึกเฉพาะข้อมูลที่เปลี่ยนในเบราว์เซอร์นี้ ไม่แก้ไข Excel
-          ต้นฉบับ ไม่เชื่อมต่อ API หรือฐานข้อมูล และไม่คำนวณยอดข้ามเดือน
+          ข้อมูลจะถูกจัดเก็บลงฐานข้อมูลเมื่อกดบันทึกจากหน้าหลักเท่านั้น
+          ไม่แก้ไข Excel ต้นฉบับ และไม่คำนวณยอดข้ามเดือนอัตโนมัติ
         </p>
       </section>
+
+      {pendingLoad && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPendingLoad(null);
+          }}
+        >
+          <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
+            <DialogTitle>มีข้อมูลที่ยังไม่ได้บันทึก</DialogTitle>
+            <DialogDescription>
+              {pendingLoad.name === selectedSheet
+                ? "การโหลดข้อมูลใหม่สำเร็จจะแทนที่ฉบับร่างปัจจุบัน หากต้องการเก็บฉบับร่าง กรุณากลับไปตรวจสอบก่อน"
+                : "การเปลี่ยนงวดจะทิ้งฉบับร่างของงวดปัจจุบันโดยไม่บันทึกลงฐานข้อมูล"}
+            </DialogDescription>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingLoad(null)}>
+                กลับไปตรวจสอบ
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isSaving}
+                onClick={() => beginLoad(pendingLoad)}
+              >
+                {pendingLoad.name === selectedSheet ? "โหลดข้อมูลใหม่" : "ทิ้งฉบับร่างและเปลี่ยนงวด"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {detailRow && (
         <CustomerMaterialsDetail
@@ -849,8 +1042,9 @@ export function StockCustomerMaterialsWorkspace() {
           <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
             <DialogTitle>ยืนยันการลบวัสดุ</DialogTitle>
             <DialogDescription>
-              ลบเฉพาะรายการวัสดุและข้อมูลรับ-จ่ายของงวดที่เลือก
-              โดยไม่ลบข้อมูลในงวดอื่นหรือแก้ไข Excel ต้นฉบับ
+              นำรายการวัสดุและข้อมูลรับ-จ่ายของงวดที่เลือกออกจากฉบับร่าง
+              เมื่อกดบันทึกจากหน้าหลัก ระบบจะยกเลิกเอกสารแบบ Soft Delete
+              โดยไม่กระทบงวดอื่นหรือ Excel ต้นฉบับ
             </DialogDescription>
             <div className="space-y-1 rounded-lg border border-border bg-muted/25 p-4">
               <p className="wrap-break-word font-semibold">

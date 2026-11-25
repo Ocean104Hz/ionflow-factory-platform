@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Trash2 } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -21,7 +21,7 @@ import {
 } from "./stock_wip_ff_domain";
 
 /**
- * Stock WIP FF: UI MOCK ONLY.
+ * Stock WIP FF: controlled snapshot table.
  * This is a controlled table. The Workspace owns drafts and decides when to save.
  * Neither this component nor its inputs recalculate stock balances.
  */
@@ -134,6 +134,8 @@ export interface StockWipTableProps {
   ) => void;
   /** Optional detail action, intended for monthly worksheets only. */
   onViewDaily?: (row: StockWipRow) => void;
+  /** Request removal from the draft; only the Workspace saves to the database. */
+  onDelete?: (row: StockWipRow) => void;
   disabled?: boolean;
 }
 
@@ -142,6 +144,7 @@ export function StockWipTable({
   supportsBioTransfer,
   onChange,
   onViewDaily,
+  onDelete,
   disabled = false,
 }: StockWipTableProps) {
   const transferColumns: readonly QuantityColumn[] = supportsBioTransfer
@@ -156,7 +159,14 @@ export function StockWipTable({
     CLOSING_COLUMN,
   ];
 
-  const totalColumns = 4 + quantityColumns.length + (onViewDaily ? 1 : 0);
+  const totalColumns =
+    4 + quantityColumns.length + (onViewDaily ? 1 : 0) + (onDelete ? 1 : 0);
+  const widthClass = supportsBioTransfer
+    ? "min-w-[1700px]"
+    : "min-w-[1580px]";
+  const deleteWidthClass = supportsBioTransfer
+    ? "min-w-[1820px]"
+    : "min-w-[1700px]";
 
   return (
     <section aria-label="ตาราง Stock WIP" className="min-w-0 space-y-3">
@@ -177,7 +187,7 @@ export function StockWipTable({
 
       <div className="min-w-0 rounded-lg border bg-card">
         <Table
-          className={supportsBioTransfer ? "min-w-[1700px]" : "min-w-[1580px]"}
+          className={onDelete ? deleteWidthClass : widthClass}
         >
           <TableHeader className="bg-muted/60">
             <TableRow className="hover:bg-transparent">
@@ -230,6 +240,11 @@ export function StockWipTable({
                   รายวัน
                 </TableHead>
               )}
+              {onDelete && (
+                <TableHead rowSpan={2} scope="col" className="w-24 text-center">
+                  จัดการ
+                </TableHead>
+              )}
             </TableRow>
             <TableRow className="hover:bg-transparent">
               <TableHead scope="col" className="min-w-32 text-center">
@@ -270,7 +285,7 @@ export function StockWipTable({
                     ไม่พบรายการสินค้า
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    ลองเปลี่ยนหมวดสินค้าหรือคำค้นหาในตัวกรอง
+                    ลองเปลี่ยนช่วงเวลาหรือคำค้นหาในตัวกรอง
                   </p>
                 </TableCell>
               </TableRow>
@@ -322,13 +337,29 @@ export function StockWipTable({
                       </Button>
                     </TableCell>
                   )}
+                  {onDelete && (
+                    <TableCell className="text-center">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={disabled}
+                        onClick={() => onDelete(row)}
+                        aria-label={`ลบรายการ ${row.item.code_new} ${row.item.name}`}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        ลบ
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
           </TableBody>
 
           <TableCaption className="px-3 pb-3 text-left text-xs leading-relaxed">
-            ค่าที่แสดงมาจาก Mock Data ตาม Excel · ไม่คำนวณยอดคงเหลืออัตโนมัติ ·
+            ข้อมูลตามงวดที่เลือก · ไม่คำนวณยอดคงเหลืออัตโนมัติ ·
             ช่องว่างไม่เท่ากับ 0 · ช่อง BIO จะแสดงเฉพาะชีตที่มีคอลัมน์นี้
           </TableCaption>
         </Table>

@@ -1,5 +1,5 @@
 /**
- * Customer materials: UI MOCK domain.
+ * Customer materials: shared UI and persistence domain.
  * Source: วัสดุคงเหลือลูกค้า-2569.1 FF.xlsx
  *
  * - Summary, daily movements and physical counts are independent inputs.
@@ -428,8 +428,7 @@ export function isValidCustomerMaterialsAddedDate(value: string): boolean {
 
   const date = new Date(`${value}T00:00:00Z`);
   return (
-    !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === value
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
   );
 }
 
@@ -474,7 +473,8 @@ export function validateCustomerMaterialsRow(
       continue;
     }
     if (!isQuantityInput(row.summary[field])) {
-      errors[field] = `กรุณาระบุ${CUSTOMER_MATERIALS_SUMMARY_LABELS[field]}เป็นตัวเลข`;
+      errors[field] =
+        `กรุณาระบุ${CUSTOMER_MATERIALS_SUMMARY_LABELS[field]}เป็นตัวเลข`;
     }
   }
 
@@ -493,7 +493,8 @@ export function validateCustomerMaterialsDailyEntry(
 
   for (const field of CUSTOMER_MATERIALS_DAILY_FIELDS) {
     if (!isQuantityInput(entry.values[field])) {
-      errors[field] = `กรุณาระบุ${CUSTOMER_MATERIALS_DAILY_LABELS[field]}เป็นตัวเลข`;
+      errors[field] =
+        `กรุณาระบุ${CUSTOMER_MATERIALS_DAILY_LABELS[field]}เป็นตัวเลข`;
     }
   }
 
@@ -528,7 +529,9 @@ export function upsertCustomerMaterialsRow(
   mode: CustomerMaterialsFormMode,
 ): CustomerMaterialsSheet {
   if (!isCustomerMaterialsRow(row) || row.sheet_name !== sheet.name) {
-    throw new Error("รายการวัสดุไม่ตรงกับงวดข้อมูลที่เลือกหรือโครงสร้างไม่ถูกต้อง");
+    throw new Error(
+      "รายการวัสดุไม่ตรงกับงวดข้อมูลที่เลือกหรือโครงสร้างไม่ถูกต้อง",
+    );
   }
 
   const key = customerMaterialsRowKey(row);
@@ -651,7 +654,10 @@ export function replaceCustomerMaterialsRow(
   };
 }
 
-/* ---------------- Local Storage contracts ---------------- */
+/* ---------------- Legacy Local Storage contracts ---------------- */
+
+// Retained for compatibility until the workspace switches to the API.
+// These helpers do not read, upload or migrate browser data.
 
 export const CUSTOMER_MATERIALS_STORAGE_KEY = "ionflow:customer-materials:v1";
 export const CUSTOMER_MATERIALS_STORAGE_VERSION = 1;
@@ -688,7 +694,9 @@ function hasStringFields(value: unknown, fields: readonly string[]): boolean {
 }
 
 /** Structural check only: never coerce original source quantities or notes. */
-export function isCustomerMaterialsRow(value: unknown): value is CustomerMaterialsRow {
+export function isCustomerMaterialsRow(
+  value: unknown,
+): value is CustomerMaterialsRow {
   if (!isRecord(value) || !isRecord(value.item)) {
     return false;
   }
@@ -705,14 +713,18 @@ export function isCustomerMaterialsRow(value: unknown): value is CustomerMateria
   if (
     !CUSTOMER_MATERIALS_SHEET_NAMES.some((name) => name === sheetName) ||
     !validIdentity ||
-    !(item.added_date === undefined ||
+    !(
+      item.added_date === undefined ||
       item.added_date === null ||
       item.added_date === "" ||
       (typeof item.added_date === "string" &&
-        isValidCustomerMaterialsAddedDate(item.added_date))) ||
-    !(item.so_sheet === undefined ||
+        isValidCustomerMaterialsAddedDate(item.added_date))
+    ) ||
+    !(
+      item.so_sheet === undefined ||
       item.so_sheet === null ||
-      isCustomerMaterialsSoSheetName(item.so_sheet)) ||
+      isCustomerMaterialsSoSheetName(item.so_sheet)
+    ) ||
     typeof item.description !== "string" ||
     ![
       item.sales_customer,
@@ -765,7 +777,7 @@ function indexCustomerMaterialsRows(
   return indexed;
 }
 
-/** Build a small per-sheet overlay against the immutable Excel snapshot. */
+/** Build a small per-sheet diff against the complete baseline snapshot. */
 export function buildCustomerMaterialsSheetChanges(
   source: CustomerMaterialsSheet,
   current: CustomerMaterialsSheet,
@@ -860,7 +872,8 @@ export function isCustomerMaterialsStoredData(
       !Array.isArray(changes.deleted_keys) ||
       !changes.deleted_keys.every((key: unknown) => typeof key === "string") ||
       !changes.upserts.every(
-        (row: unknown) => isCustomerMaterialsRow(row) && row.sheet_name === name,
+        (row: unknown) =>
+          isCustomerMaterialsRow(row) && row.sheet_name === name,
       )
     ) {
       return false;
@@ -868,4 +881,138 @@ export function isCustomerMaterialsStoredData(
   }
 
   return true;
+}
+
+/* ---------------- Database API contracts ---------------- */
+
+/** A successfully loaded or saved sheet and its server-issued revision. */
+export interface CustomerMaterialsSnapshot {
+  sheet: CustomerMaterialsSheet;
+  revision: string;
+}
+
+/** GET /api/stock/customer-materials?sheet_name=... */
+export interface CustomerMaterialsGetResponse extends CustomerMaterialsSnapshot {
+  ok: true;
+}
+
+/** POST /api/stock/customer-materials */
+export interface CustomerMaterialsSaveRequest {
+  action: "save_sheet";
+  sheet_name: CustomerMaterialsSheetName;
+  expected_revision: string;
+  changes: CustomerMaterialsRow[];
+  deleted_refs: string[];
+}
+
+export interface CustomerMaterialsSaveResponse extends CustomerMaterialsGetResponse {
+  inserted: number;
+  updated: number;
+  deleted: number;
+}
+
+function isCustomerMaterialsRevision(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function isChangeCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+/**
+ * Decode a successful GET or POST response without changing literal cells.
+ * Do not treat an invalid response as an empty sheet or fall back to mock data.
+ * Historical source slots outside the calendar month are structurally valid;
+ * the existing editing rules continue to prevent changes to those slots.
+ */
+export function readCustomerMaterialsSnapshot(
+  value: unknown,
+  expectedSheetName: CustomerMaterialsSheetName,
+): CustomerMaterialsSnapshot {
+  if (
+    !isRecord(value) ||
+    value.ok !== true ||
+    !isCustomerMaterialsRevision(value.revision) ||
+    !isRecord(value.sheet)
+  ) {
+    throw new Error("รูปแบบข้อมูลจาก API ไม่ถูกต้อง");
+  }
+
+  const { sheet, revision } = value;
+  if (
+    sheet.name !== expectedSheetName ||
+    typeof sheet.report_caption !== "string" ||
+    typeof sheet.period_caption !== "string" ||
+    !Array.isArray(sheet.rows) ||
+    !sheet.rows.every(isCustomerMaterialsRow)
+  ) {
+    throw new Error(
+      "ข้อมูลจาก API ไม่ตรงกับงวดที่เลือกหรือมีโครงสร้างไม่ถูกต้อง",
+    );
+  }
+
+  // Reject duplicate identities and rows belonging to a different sheet.
+  indexCustomerMaterialsRows(expectedSheetName, sheet.rows);
+
+  return {
+    revision,
+    sheet: {
+      name: expectedSheetName,
+      report_caption: sheet.report_caption,
+      period_caption: sheet.period_caption,
+      rows: sheet.rows,
+    },
+  };
+}
+
+/** Decode the saved snapshot and the server's actual operation counts. */
+export function readCustomerMaterialsSaveResponse(
+  value: unknown,
+  expectedSheetName: CustomerMaterialsSheetName,
+): CustomerMaterialsSaveResponse {
+  const snapshot = readCustomerMaterialsSnapshot(value, expectedSheetName);
+  if (
+    !isRecord(value) ||
+    !isChangeCount(value.inserted) ||
+    !isChangeCount(value.updated) ||
+    !isChangeCount(value.deleted)
+  ) {
+    throw new Error("ไม่สามารถยืนยันผลการบันทึกจาก API ได้");
+  }
+
+  return {
+    ok: true,
+    ...snapshot,
+    inserted: value.inserted,
+    updated: value.updated,
+    deleted: value.deleted,
+  };
+}
+
+/**
+ * Compare the complete saved sheet with the complete draft, never the filtered
+ * or paginated rows. Omitted baseline rows become explicit deletion refs;
+ * the API performs Soft Delete only after a successful transaction.
+ * The revision is received from the server, not generated by the client.
+ */
+export function buildCustomerMaterialsSaveRequest(
+  baseline: CustomerMaterialsSnapshot,
+  draft: CustomerMaterialsSheet,
+): CustomerMaterialsSaveRequest {
+  if (!isCustomerMaterialsRevision(baseline.revision)) {
+    throw new Error(
+      "ไม่พบ Revision ที่ถูกต้อง กรุณาโหลดข้อมูลล่าสุดก่อนบันทึก",
+    );
+  }
+
+  const { upserts, deleted_keys: deletedRefs } =
+    buildCustomerMaterialsSheetChanges(baseline.sheet, draft);
+
+  return {
+    action: "save_sheet",
+    sheet_name: baseline.sheet.name,
+    expected_revision: baseline.revision,
+    changes: upserts,
+    deleted_refs: deletedRefs,
+  };
 }

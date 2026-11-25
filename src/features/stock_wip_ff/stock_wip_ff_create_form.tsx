@@ -27,11 +27,12 @@ import {
   type StockWipPeriod,
 } from "./stock_wip_ff_domain";
 
-/** UI mock: monthly draft only. Workspace owns Save and Discard. */
+/** Monthly draft only. Workspace owns database Save and Discard. */
 export interface StockWipFfCreateFormProps {
   open: boolean;
   period: StockWipPeriod;
   onOpenChange: (open: boolean) => void;
+  /** Return false to keep the form open when the Workspace cannot accept edits. */
   onCreate: (input: StockWipCreateInput) => void | boolean;
   disabled?: boolean;
 }
@@ -181,6 +182,9 @@ function StockWipMonthlyCreateForm({
   }
 
   function updateField(field: "code_new" | "code_old" | "name", value: string) {
+    if (disabled) {
+      return;
+    }
     setValues((current) => ({ ...current, [field]: value }));
     if (field === "code_new") {
       setCodeError("");
@@ -192,6 +196,9 @@ function StockWipMonthlyCreateForm({
   }
 
   function updateDailyDate(rowId: number, date: string) {
+    if (disabled) {
+      return;
+    }
     setDailyRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, date } : row)),
     );
@@ -302,7 +309,7 @@ function StockWipMonthlyCreateForm({
       });
       if (accepted === false) {
         setSubmitError(
-          "ไม่สามารถเพิ่มรายการ WIP ได้ กรุณาตรวจสอบข้อมูลอีกครั้ง",
+          "ยังไม่สามารถเพิ่มลงฉบับร่างได้ กรุณาตรวจสอบสถานะการโหลดข้อมูลหรือการบันทึกจากหน้าหลัก",
         );
         return;
       }
@@ -311,12 +318,12 @@ function StockWipMonthlyCreateForm({
         error instanceof Error &&
         error.message ===
           "The WIP item code already exists in the selected month."
-          ? "รหัสใหม่นี้มีอยู่แล้วในเดือนที่เลือก"
+          ? "รหัสใหม่นี้มีอยู่แล้วหรืออยู่ระหว่างรอลบในเดือนที่เลือก กรุณาตรวจสอบรายการในหน้าหลัก"
           : "ไม่สามารถเพิ่มรายการ WIP ได้ กรุณาตรวจสอบข้อมูลอีกครั้ง";
       setSubmitError(message);
       return;
     }
-    // The new row is now in the monthly draft, not permanently saved.
+    // The Workspace accepted the row into its draft. No API write has occurred.
     closeForm();
   }
 
@@ -344,7 +351,7 @@ function StockWipMonthlyCreateForm({
           </div>
           <DialogDescription className="text-sm leading-relaxed">
             เพิ่มรายการ WIP ใหม่เฉพาะเดือน {periodLabel}{" "}
-            โดยไม่กระทบข้อมูลเดือนอื่น
+            ลงฉบับร่างโดยไม่กระทบข้อมูลเดือนอื่น
           </DialogDescription>
         </div>
 
@@ -673,7 +680,8 @@ function StockWipMonthlyCreateForm({
             )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                บันทึกลงฉบับร่างก่อน ต้องกดบันทึกจากหน้าหลักอีกครั้ง
+                เพิ่มลงฉบับร่างก่อน ต้องกดบันทึกข้อมูลจากหน้าหลักอีกครั้ง
+                จึงจะจัดเก็บลงฐานข้อมูล
               </p>
               <div className="flex shrink-0 justify-end gap-2">
                 <Button type="button" variant="outline" onClick={closeForm}>
@@ -681,7 +689,7 @@ function StockWipMonthlyCreateForm({
                 </Button>
                 <Button type="submit" disabled={disabled}>
                   <PackagePlus className="size-4" aria-hidden="true" />
-                  เพิ่มรายการ WIP
+                  เพิ่มลงฉบับร่าง
                 </Button>
               </div>
             </div>

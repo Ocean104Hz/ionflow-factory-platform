@@ -30,9 +30,9 @@ import {
 } from "./stock_wip_ff_domain";
 
 /**
- * Stock WIP FF: UI MOCK ONLY.
+ * Stock WIP FF: daily snapshot detail.
  * All dates are rendered from the selected month, including empty dates.
- * Edits are sent to the Workspace draft and never saved here.
+ * Edits update the Workspace draft; only the Workspace saves to the database.
  * Daily movements do not recalculate monthly or annual summaries.
  */
 
@@ -202,7 +202,9 @@ export function StockWipDailyDetail({
                 className="size-4 text-primary"
                 aria-hidden="true"
               />
-              <Badge variant="outline">UI MOCK</Badge>
+              <Badge variant="outline">
+                {disabled ? "ดูข้อมูลเท่านั้น" : "ข้อมูลรายวัน"}
+              </Badge>
             </div>
             <CardTitle className="text-lg leading-relaxed">
               ข้อมูลรายวันของ {row.item.name}
@@ -239,7 +241,12 @@ export function StockWipDailyDetail({
         {isMonthly ? (
           <>
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-              การแก้ไขในตารางยังไม่ถือเป็นการบันทึกจนกว่าจะกดบันทึกใน Workspace
+              {disabled
+                ? "ขณะนี้ไม่สามารถแก้ไขข้อมูลรายวันได้ กรุณาตรวจสอบสถานะจากหน้าหลัก"
+                : "การแก้ไขจะอยู่ในฉบับร่าง กรุณากดบันทึกข้อมูลจากหน้า Stock WIP FF หลักเพื่อจัดเก็บลงฐานข้อมูล"}
+              <p className="mt-1">
+                การแก้ไขยอดรายวันไม่คำนวณยอดสรุปรายเดือนหรือรายปีอัตโนมัติ
+              </p>
             </div>
 
             <Table
