@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { FactoryAuthError, createCsrfToken } from "@/src/server/auth/auth-service.ts";
+import { FactoryAuthBoundaryError } from "@/src/server/auth/auth-boundary.ts";
 import {
   CSRF_COOKIE,
   SESSION_COOKIE,
@@ -52,6 +53,11 @@ export async function POST(request: NextRequest) {
     });
     return response;
   } catch (error) {
+    if (error instanceof FactoryAuthBoundaryError) {
+      const trace = request.headers.get("x-cloud-trace-context") ?? "";
+      const traceId = /^([a-f0-9]{32})(?:\/[0-9]{1,20})?(?:;o=[01])?$/.exec(trace)?.[1];
+      console.warn(JSON.stringify({ reason: error.reason, traceId }));
+    }
     return authErrorResponse(error);
   }
 }
