@@ -198,6 +198,7 @@
   content: "";
 }
 .factory-column-resize:hover::after,
+.factory-column-resize[data-resizing="true"]::after,
 .factory-column-resize:focus-visible::after {
   opacity: 1;
 }

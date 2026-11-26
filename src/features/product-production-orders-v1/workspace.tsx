@@ -548,6 +548,7 @@ export function ProductProductionOrdersV1Workspace() {
               columns={historyColumns.map((label, index) => ({
                 key: label,
                 label,
+                textOverflow: "wrap",
                 numeric: index >= 5 && index <= 7,
                 header: index === 0 ? (
                   <span className="flex items-center gap-3">

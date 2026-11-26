@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { clampColumnWidth, fillColumnWidths } from "./history-table-widths";
 import {
   ArrowLeft,
   Inbox,
@@ -341,16 +342,10 @@ export interface Column<T> {
   header?: ReactNode;
   render: (row: T, index: number) => ReactNode;
   numeric?: boolean;
-}
-
-function tableHeaderWidths(handle: HTMLButtonElement) {
-  const headers = handle.closest("tr")?.querySelectorAll<HTMLTableCellElement>("[data-column-key]");
-  return Object.fromEntries(
-    Array.from(headers ?? [], (header) => [
-      header.dataset.columnKey!,
-      Math.round(header.getBoundingClientRect().width),
-    ]),
-  );
+  width?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  textOverflow?: "ellipsis" | "wrap";
 }
 
 export function FactoryDataTable<T>({
@@ -375,22 +370,73 @@ export function FactoryDataTable<T>({
   emptyMessage?: string;
 }) {
   const [hidden, setHidden] = useState<string[]>([]);
-  const [widths, setWidths] = useState<Record<string, number> | null>(null);
-  const drag = useRef<{ start: number; widths: Record<string, number> } | null>(null);
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [resizing, setResizing] = useState<string | null>(null);
+  const drag = useRef<{ key: string; pointerId: number; startX: number; startWidth: number } | null>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const table = useRef<HTMLTableElement>(null);
   const isHistory = variant === "history";
+  useEffect(() => {
+    const element = viewport.current;
+    if (!isHistory || !element) return;
+    const measure = () => setViewportWidth(element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isHistory]);
+
   const visible = isHistory ? columns.filter(({ key }) => !hidden.includes(key)) : columns;
   const visibleColumns = visible.length ? visible : columns;
-  const fitWidth = Math.ceil(minWidth / Math.max(1, columns.length));
-  const customWidth = widths
-    ? visibleColumns.reduce((total, column) => total + (widths[column.key] ?? fitWidth), 0)
-    : undefined;
-  const resize = (original: Record<string, number>, key: string, delta: number) => {
-    const width = original[key] ?? fitWidth;
-    setWidths((previous) => ({
-      ...previous,
-      ...original,
-      [key]: Math.max(56, Math.min(Math.max(650, width), width + delta)),
-    }));
+  const defaultWidth = Math.ceil(minWidth / Math.max(1, columns.length));
+  const fittedWidths = isHistory
+    ? fillColumnWidths(visibleColumns.map((column) => ({
+      ...column,
+      width: column.width ?? defaultWidth,
+    })), widths, viewportWidth)
+    : {};
+  const tableWidth = visibleColumns.reduce((total, column) => total + (fittedWidths[column.key] ?? 0), 0);
+  const resize = (column: Column<T>, requested: number) => {
+    setWidths({ ...widths, ...fittedWidths, [column.key]: clampColumnWidth(column, requested) });
+  };
+  const stopResize = (event: PointerEvent<HTMLElement>) => {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    drag.current = null;
+    setResizing(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+  const autoFit = (column: Column<T>) => {
+    if (!table.current) return;
+    const probe = document.createElement("div");
+    Object.assign(probe.style, {
+      position: "fixed", left: "-100000px", top: "0", visibility: "hidden", width: "max-content",
+    });
+    probe.setAttribute("aria-hidden", "true");
+    document.body.append(probe);
+    let width = 0;
+    try {
+      for (const cell of table.current.querySelectorAll<HTMLElement>("[data-column-key]")) {
+        if (cell.dataset.columnKey !== column.key) continue;
+        const content = cell.querySelector<HTMLElement>("[data-history-content]");
+        if (!content) continue;
+        const clone = content.cloneNode(true) as HTMLElement;
+        const computed = window.getComputedStyle(content);
+        Object.assign(clone.style, {
+          width: "max-content", maxWidth: "none", whiteSpace: "nowrap",
+          overflow: "visible", font: computed.font, letterSpacing: computed.letterSpacing,
+        });
+        probe.replaceChildren(clone);
+        const cellStyle = window.getComputedStyle(cell);
+        const padding = parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight);
+        width = Math.max(width, clone.getBoundingClientRect().width + padding);
+      }
+    } finally {
+      probe.remove();
+    }
+    resize(column, Math.ceil(width + 16));
   };
 
   return (
@@ -422,25 +468,27 @@ export function FactoryDataTable<T>({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" disabled={!widths} onClick={() => setWidths(null)}>
+          <Button variant="outline" size="sm" disabled={!Object.keys(widths).length} onClick={() => setWidths({})}>
             <RotateCcw aria-hidden="true" />รีเซ็ตความกว้าง
           </Button>
         </div>
       )}
       <Table
+        ref={isHistory ? table : undefined}
         containerProps={{
+          ref: isHistory ? viewport : undefined,
           tabIndex: 0,
           role: "region",
           "aria-label": "ตารางข้อมูล เลื่อนแนวนอนเพื่อดูทุกคอลัมน์",
           className: "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
         }}
-        style={customWidth === undefined
-          ? { minWidth: isHistory ? Math.min(minWidth, fitWidth * visibleColumns.length) : minWidth }
-          : { width: customWidth, minWidth: customWidth, tableLayout: "fixed" }}
+        style={isHistory
+          ? { width: tableWidth, minWidth: "100%", tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 0 }
+          : { minWidth }}
       >
-        {widths && (
+        {isHistory && (
           <colgroup>
-            {visibleColumns.map((column) => <col key={column.key} style={{ width: widths[column.key] ?? fitWidth }} />)}
+            {visibleColumns.map((column) => <col key={column.key} style={{ width: fittedWidths[column.key] }} />)}
           </colgroup>
         )}
         <TableHeader className="bg-surface-muted">
@@ -456,30 +504,47 @@ export function FactoryDataTable<T>({
                   c.numeric && "text-right",
                 )}
               >
-                {isHistory && !c.header
-                  ? <span className="block truncate" title={c.label}>{c.label}</span>
+                {isHistory
+                  ? <span data-history-content className="block truncate" title={c.header ? undefined : c.label}>{c.header ?? c.label}</span>
                   : c.header ?? c.label}
                 {isHistory && (
-                  <button
-                    type="button"
+                  <span
+                    role="separator"
+                    tabIndex={state === "loading" ? -1 : 0}
+                    aria-orientation="vertical"
+                    aria-valuemin={clampColumnWidth(c, 0)}
+                    aria-valuemax={clampColumnWidth(c, Infinity)}
+                    aria-valuenow={fittedWidths[c.key]}
+                    aria-disabled={state === "loading"}
                     aria-label={`ปรับความกว้างคอลัมน์ ${c.label}`}
-                    title="ลากหรือใช้ปุ่มลูกศรซ้ายและขวาเพื่อปรับความกว้าง"
+                    title="ลากหรือใช้ลูกศรซ้าย/ขวา · ดับเบิลคลิกหรือ Enter เพื่อปรับพอดี · Home เพื่อคืนค่า"
                     className="factory-column-resize"
+                    data-resizing={resizing === c.key}
+                    onDoubleClick={() => { if (state !== "loading") autoFit(c); }}
                     onPointerDown={(event) => {
-                      if (event.button !== 0) return;
-                      drag.current = { start: event.clientX, widths: tableHeaderWidths(event.currentTarget) };
+                      if (state === "loading" || event.button !== 0) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      drag.current = {
+                        key: c.key, pointerId: event.pointerId, startX: event.clientX, startWidth: fittedWidths[c.key],
+                      };
                       event.currentTarget.setPointerCapture(event.pointerId);
+                      setResizing(c.key);
                     }}
                     onPointerMove={(event) => {
-                      if (drag.current && event.currentTarget.hasPointerCapture(event.pointerId)) {
-                        resize(drag.current.widths, c.key, event.clientX - drag.current.start);
-                      }
+                      const current = drag.current;
+                      if (state === "loading" || current?.key !== c.key || current.pointerId !== event.pointerId) return;
+                      resize(c, current.startWidth + event.clientX - current.startX);
                     }}
-                    onLostPointerCapture={() => { drag.current = null; }}
+                    onPointerUp={stopResize}
+                    onPointerCancel={stopResize}
+                    onLostPointerCapture={stopResize}
                     onKeyDown={(event) => {
-                      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                      if (state === "loading" || !["ArrowLeft", "ArrowRight", "Home", "Enter"].includes(event.key)) return;
                       event.preventDefault();
-                      resize(tableHeaderWidths(event.currentTarget), c.key, event.key === "ArrowLeft" ? -16 : 16);
+                      event.stopPropagation();
+                      if (event.key === "Enter") autoFit(c);
+                      else resize(c, event.key === "Home" ? c.width ?? defaultWidth : fittedWidths[c.key] + (event.key === "ArrowLeft" ? -16 : 16));
                     }}
                   />
                 )}
@@ -494,13 +559,22 @@ export function FactoryDataTable<T>({
                 {visibleColumns.map((c) => (
                   <TableCell
                     key={c.key}
+                    data-column-key={isHistory ? c.key : undefined}
                     className={cn(
                       "px-4 py-2.5 align-middle",
-                      isHistory && "whitespace-normal [overflow-wrap:anywhere]",
                       c.numeric && "text-right tabular-nums",
                     )}
                   >
-                    {c.render(row, index)}
+                    {isHistory ? (
+                      <div
+                        data-history-content
+                        className={c.textOverflow === "wrap"
+                          ? "overflow-hidden whitespace-normal [overflow-wrap:anywhere]"
+                          : "truncate"}
+                      >
+                        {c.render(row, index)}
+                      </div>
+                    ) : c.render(row, index)}
                   </TableCell>
                 ))}
               </TableRow>

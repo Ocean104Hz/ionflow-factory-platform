@@ -76,8 +76,9 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
     {
       key: "time",
       label: "วันและเวลา",
+      width: 140,
       render: (entry) => (
-        <time className="whitespace-nowrap text-xs" dateTime={entry.occurredAt}>
+        <time className="block truncate text-xs" title={formatTime(entry.occurredAt)} dateTime={entry.occurredAt}>
           {formatTime(entry.occurredAt)}
         </time>
       ),
@@ -85,16 +86,18 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
     {
       key: "user",
       label: "ผู้ทำรายการ",
+      width: 280,
       render: (entry) => (
         <div>
-          <p className="font-medium">{entry.user}</p>
-          <p className="text-xs text-muted-foreground">{entry.email}</p>
+          <p className="truncate font-medium" title={entry.user}>{entry.user}</p>
+          <p className="truncate text-xs text-muted-foreground" title={entry.email}>{entry.email}</p>
         </div>
       ),
     },
     {
       key: "action",
       label: "การกระทำ",
+      width: 150,
       render: (entry) => (
         <StatusBadge tone={actionTones[entry.action]}>
           {auditActions[entry.action]}
@@ -104,6 +107,8 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
     {
       key: "module",
       label: "หมวด / เอกสารอ้างอิง",
+      width: 200,
+      textOverflow: "wrap",
       render: (entry) => (
         <div>
           <p>{entry.module}</p>
@@ -114,13 +119,15 @@ export function AuditLog({ entries, loadError }: { entries: AuditEntry[]; loadEr
     {
       key: "summary",
       label: "รายละเอียด",
+      width: 420,
       render: (entry) => (
-        <p className="max-w-72 leading-relaxed">{entry.summary}</p>
+        <p className="truncate leading-relaxed" title={entry.summary}>{entry.summary}</p>
       ),
     },
     {
       key: "view",
       label: "ดูรายละเอียด",
+      width: 150,
       render: (entry) => (
         <RowActionMenu readOnly><RowActionItem aria-label={`ดูรายละเอียด ${entry.id}`} onClick={() => setSelected(entry)}>
           <Eye aria-hidden="true" />
