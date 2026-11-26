@@ -49,6 +49,14 @@ export function RowActionMenu({
         ref={menu}
         align="end"
         forceMount={keepMounted ? true : undefined}
+        onInteractOutside={(event) => {
+          // The mounted layer also sees the toggle click as an outside interaction.
+          // Let the trigger handle it once, including when reopening the hidden menu.
+          const target = event.target;
+          if (target instanceof Node && trigger.current?.contains(target)) {
+            event.preventDefault();
+          }
+        }}
         className="min-w-40 data-[state=closed]:hidden"
       >
         {children}

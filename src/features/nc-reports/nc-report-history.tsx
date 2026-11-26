@@ -8,7 +8,6 @@ import {
   SelectField,
   SectionCard,
   StatusBadge,
-  EmptyState,
 } from "@/src/components/factory/patterns";
 import { ConfirmDialog } from "@/src/components/factory/confirm-dialog";
 import { Button } from "@/src/components/ui/button";
@@ -25,12 +24,14 @@ import {
 
 export function NCReportHistory({
   records,
+  readOnly = false,
   onView,
   onEdit,
   onPrint,
   onDelete,
 }: {
   records: NCReport[];
+  readOnly?: boolean;
   onView: (r: NCReport) => void;
   onEdit: (r: NCReport) => void;
   onPrint: (r: NCReport) => void;
@@ -49,7 +50,7 @@ export function NCReportHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติใบ NC"
-        subtitle={`พบ ${rows.length} จาก ${records.length} รายการตัวอย่าง`}
+        subtitle={readOnly ? "ข้อมูลทดสอบบนเครื่อง · ดูและพิมพ์ตัวอย่างได้" : `พบ ${rows.length} จาก ${records.length} รายการตัวอย่าง`}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-2">
@@ -135,110 +136,110 @@ export function NCReportHistory({
           </div>
         </div>
       </SectionCard>
-      {records.length === 0 ? (
-        <EmptyState
-          title="ยังไม่มีใบ NC ตัวอย่าง"
-          description="กลับไปที่สร้างใบ NC เพื่อบันทึกเอกสาร"
-        />
-      ) : (
-        <FactoryDataTable variant="history"
-          rows={paged.rows}
-          rowKey={(r) => r.id}
-          minWidth={1050}
-          columns={[
-            {
-              key: "number",
-              label: "เลขที่เอกสาร",
-              render: (r) => (
-                <Button
-                  variant="link"
-                  className="h-auto max-w-48 whitespace-normal break-all p-0 text-left"
-                  onClick={() => onView(r)}
-                >
-                  {r.doc_no}
-                </Button>
-              ),
-            },
-            { key: "date", label: "วันที่", render: (r) => ncDate(r.doc_date) },
-            {
-              key: "discoverer",
-              label: "ผู้พบ",
-              render: (r) => (
-                <span className="block max-w-40 whitespace-normal break-words">
-                  {r.discoverer}
-                </span>
-              ),
-            },
-            {
-              key: "department",
-              label: "แผนก",
-              render: (r) => (
-                <span className="block max-w-32 whitespace-normal break-words">
-                  {r.department}
-                </span>
-              ),
-            },
-            {
-              key: "product",
-              label: "สินค้า",
-              render: (r) => (
-                <span className="block max-w-52 whitespace-normal break-words">
-                  {r.product_name}
-                </span>
-              ),
-            },
-            {
-              key: "quantity",
-              label: "ปริมาณ",
-              render: (r) => `${r.quantity} ${r.unit}`,
-            },
-            {
-              key: "decisions",
-              label: "แนวทางจัดการ (ตัวอย่าง)",
-              render: (r) => (
-                <div className="flex max-w-60 flex-wrap gap-1">
-                  {ncDecisions
-                    .filter(([k]) => r.decisions[k])
-                    .map(([k, l]) => (
-                      <StatusBadge key={k}>{l}</StatusBadge>
-                    ))}
-                </div>
-              ),
-            },
-            {
-              key: "actions",
-              label: "จัดการ",
-              render: (r) => (
-                <RowActionMenu containsDialog>
-                  {action(`ดูรายละเอียด ${r.doc_no}`, <Eye />, () => onView(r))}
-                  {action(`แก้ไข ${r.doc_no}`, <Pencil />, () => onEdit(r))}
-                  {action(`พรีวิวพิมพ์ ${r.doc_no}`, <Printer />, () =>
-                    onPrint(r),
-                  )}
-                  <ConfirmDialog
-                    title={`ลบ ${r.doc_no}?`}
-                    description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
-                    trigger={
-                      <RowActionItem aria-label={`ลบ ${r.doc_no}`} title={`ลบ ${r.doc_no}`} className="w-full justify-start text-destructive">
-                        <Trash2 />
-                       ลบ</RowActionItem>
-                    }
-                    onConfirm={() => onDelete(r)}
-                  />
-                </RowActionMenu>
-              ),
-            },
-          ]}
-          pagination={
-            <Pagination
-              page={paged.page}
-              pageSize={size}
-              total={rows.length}
-              onChange={setPage}
-            />
-          }
-        />
-      )}
+      <FactoryDataTable
+        variant="history"
+        emptyMessage={records.length ? "ไม่พบรายการที่ตรงกับตัวกรอง" : "ยังไม่มีใบ NC"}
+        rows={paged.rows}
+        rowKey={(r) => r.id}
+        minWidth={1050}
+        columns={[
+          {
+            key: "number",
+            label: "เลขที่เอกสาร",
+            render: (r) => (
+              <Button
+                variant="link"
+                className="h-auto max-w-48 whitespace-normal break-all p-0 text-left"
+                onClick={() => onView(r)}
+              >
+                {r.doc_no}
+              </Button>
+            ),
+          },
+          { key: "date", label: "วันที่", render: (r) => ncDate(r.doc_date) },
+          {
+            key: "discoverer",
+            textOverflow: "wrap",
+            label: "ผู้พบ",
+            render: (r) => (
+              <span className="block max-w-40 whitespace-normal break-words">
+                {r.discoverer}
+              </span>
+            ),
+          },
+          {
+            key: "department",
+            textOverflow: "wrap",
+            label: "แผนก",
+            render: (r) => (
+              <span className="block max-w-32 whitespace-normal break-words">
+                {r.department}
+              </span>
+            ),
+          },
+          {
+            key: "product",
+            textOverflow: "wrap",
+            label: "สินค้า",
+            render: (r) => (
+              <span className="block max-w-52 whitespace-normal break-words">
+                {r.product_name}
+              </span>
+            ),
+          },
+          {
+            key: "quantity",
+            label: "ปริมาณ",
+            render: (r) => `${r.quantity} ${r.unit}`,
+          },
+          {
+            key: "decisions",
+            textOverflow: "wrap",
+            label: "แนวทางจัดการ (ตัวอย่าง)",
+            render: (r) => (
+              <div className="flex max-w-60 flex-wrap gap-1">
+                {ncDecisions
+                  .filter(([k]) => r.decisions[k])
+                  .map(([k, l]) => (
+                    <StatusBadge key={k}>{l}</StatusBadge>
+                  ))}
+              </div>
+            ),
+          },
+          {
+            key: "actions",
+            label: "จัดการ",
+            render: (r) => (
+              <RowActionMenu readOnly={readOnly} containsDialog>
+                {action(`ดูรายละเอียด ${r.doc_no}`, <Eye />, () => onView(r))}
+                {!readOnly && action(`แก้ไข ${r.doc_no}`, <Pencil />, () => onEdit(r))}
+                {action(`พรีวิวพิมพ์ ${r.doc_no}`, <Printer />, () =>
+                  onPrint(r),
+                )}
+                {!readOnly && <ConfirmDialog
+                  title={`ลบ ${r.doc_no}?`}
+                  description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
+                  trigger={
+                    <RowActionItem aria-label={`ลบ ${r.doc_no}`} title={`ลบ ${r.doc_no}`} className="w-full justify-start text-destructive">
+                      <Trash2 />
+                      ลบ
+                    </RowActionItem>
+                  }
+                  onConfirm={() => onDelete(r)}
+                />}
+              </RowActionMenu>
+            ),
+          },
+        ]}
+        pagination={
+          <Pagination
+            page={paged.page}
+            pageSize={size}
+            total={rows.length}
+            onChange={setPage}
+          />
+        }
+      />
     </div>
   );
 }

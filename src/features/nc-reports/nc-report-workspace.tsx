@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { useLocalTablePreview } from "@/src/components/factory/use-local-table-preview";
+import { localNCExamples } from "@/src/features/qc-documents/local-history-examples";
 import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 import {
   AlertDialog,
@@ -24,6 +26,8 @@ import { NCReportPrintPreview } from "./nc-report-print-preview";
 
 export function NCReportWorkspace() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<NCReport>("nc_reports");
+  const localPreview = useLocalTablePreview() && !loading && !loadError && records.length === 0;
+  const historyRecords = localPreview ? localNCExamples : records;
   const [report, setReport] = useState(blankNC),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankNC()));
   const [tab, setTab] = useState("history"),
@@ -92,7 +96,8 @@ export function NCReportWorkspace() {
         </div>)}
         {tab === "history" && (<div className="mt-3 min-w-0">
           <NCReportHistory
-            records={records}
+            records={historyRecords}
+            readOnly={localPreview}
             onEdit={request}
             onView={(r) => setViewId(r.id)}
             onPrint={(r) => setPrintId(r.id)}
@@ -139,11 +144,11 @@ export function NCReportWorkspace() {
         </AlertDialogContent>
       </AlertDialog>
       <NCReportDetail
-        report={records.find((r) => r.id === viewId) ?? null}
+        report={historyRecords.find((r) => r.id === viewId) ?? null}
         onClose={() => setViewId(null)}
       />
       <NCReportPrintPreview
-        report={records.find((r) => r.id === printId) ?? null}
+        report={historyRecords.find((r) => r.id === printId) ?? null}
         onClose={() => setPrintId(null)}
       />
     </div>
