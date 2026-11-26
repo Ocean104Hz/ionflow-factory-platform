@@ -165,8 +165,11 @@ function FactoryShell({
       <SidebarInset className="min-w-0 bg-background">
         <SiteHeader
           currentUser={currentUser}
+          standaloneTitle={pathname === "/qc_raw_material"}
           title={
-            pathname.startsWith("/settings")
+            pathname === "/qc_raw_material"
+              ? "ใบตรวจสอบคุณภาพวัตถุดิบ"
+              : pathname.startsWith("/settings")
               ? "ตั้งค่า"
               : (current?.title ?? branding.factoryName)
           }
@@ -396,9 +399,11 @@ function AppSidebar({
 function SiteHeader({
   title,
   currentUser,
+  standaloneTitle = false,
 }: {
   title: string;
   currentUser: CurrentUser;
+  standaloneTitle?: boolean;
 }) {
   const { branding } = useBranding();
   const router = useRouter();
@@ -414,19 +419,23 @@ function SiteHeader({
           aria-controls="factory-sidebar"
         />
         <Separator orientation="vertical" className="mx-1 h-4 md:hidden" />
-        <Breadcrumb>
-          <BreadcrumbList className="flex-nowrap text-sm">
-            <BreadcrumbItem className="hidden sm:block">
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Factory</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden sm:block" />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{title}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        {standaloneTitle ? (
+          <h1 className="min-w-0 truncate text-base font-bold text-[#173b63] sm:text-xl" title={title}>{title}</h1>
+        ) : (
+          <Breadcrumb>
+            <BreadcrumbList className="flex-nowrap text-sm">
+              <BreadcrumbItem className="hidden sm:block">
+                <BreadcrumbLink asChild>
+                  <Link href="/dashboard">Factory</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden sm:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{title}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <Tooltip>

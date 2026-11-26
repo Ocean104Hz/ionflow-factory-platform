@@ -1,0 +1,12 @@
+import { paperChecks, paperResults, type PaperRecord } from "./paper-domain";
+import { formatThaiDate } from "@/src/lib/date/thai-date";
+const entities: Record<string,string> = {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};
+const escape = (value:string) => value.replace(/[&<>"']/g,ch=>entities[ch]??ch);
+export function buildPaperPrintHtml(record: PaperRecord, factoryName: string): string {
+  const rows=Array.from({length:10},(_,i)=>{
+    const r=record.lines.find(l=>l.lineNo===i+1);
+    const fields=r?[r.materialCode,r.supplierCode,r.quantity,r.unit,...paperChecks.map(c=>paperResults.find(x=>x.value===r[c.key])?.symbol??""),r.note]:Array<string>(9).fill("");
+    return `<tr><td>${i+1}</td>${fields.map(value=>`<td>${escape(value)}</td>`).join("")}</tr>`;
+  }).join("");
+  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบตรวจสอบคุณภาพวัตถุดิบ</title><style>@page{size:A5 landscape;margin:7mm}*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;color:#111;margin:0;font-size:10px}h1,h2{text-align:center;margin:4px 0;font-size:12px}header{display:flex;justify-content:space-between;margin:8px 0}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #777;padding:3px;text-align:center;overflow-wrap:anywhere}td{height:20px}th{background:#eee}tr{break-inside:avoid}footer{display:flex;justify-content:space-between;margin-top:14px}.legend{margin:8px 0;text-align:center}</style></head><body><h1>${escape(factoryName)}</h1><h2>ใบตรวจสอบคุณภาพวัตถุดิบ</h2><header><span>วันที่ ${escape(formatThaiDate(record.date))}</span><span>เอกสารเลขที่ ${escape(record.number)}</span></header><table><colgroup><col style="width:5%"><col style="width:13%"><col style="width:13%"><col style="width:8%"><col style="width:7%"><col span="4" style="width:8%"><col style="width:22%"></colgroup><thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">รหัสวัตถุดิบ</th><th rowspan="2">รหัส Supplier</th><th rowspan="2">จำนวน</th><th rowspan="2">หน่วย</th><th colspan="4">การตรวจสอบคุณภาพ</th><th rowspan="2">หมายเหตุ</th></tr><tr>${paperChecks.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table><div class="legend">/ = ผ่าน &nbsp;&nbsp; O = ยอมรับได้ &nbsp;&nbsp; X = ไม่ผ่าน</div><footer><span>ผู้ตรวจสอบคุณภาพ ................................</span><span>รับทราบโดย ................................</span></footer><p>ยังไม่เปิดใช้งานระบบลงนามอิเล็กทรอนิกส์</p></body></html>`;
+}
