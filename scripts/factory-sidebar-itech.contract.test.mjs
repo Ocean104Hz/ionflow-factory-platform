@@ -62,3 +62,17 @@ test("v2 uses i-Tech typography and category rhythm only inside the main sidebar
 test("v2 section icons follow i-Tech while retaining Factory group titles and route filtering", () => {
   for (const token of ["PURCHASING: ShoppingCart", "QC: FlaskConical", "WAREHOUSE: Package", "PRODUCTION: Factory", "PACKING: Archive", "LOGISTICS: Receipt", "ITECH_SECTION_ICONS[group.key] ?? navigation.find", "{group.title}", "currentUser.modules.includes(navigationModuleKey(item.href))"]) assert.ok(shell.includes(token), token);
 });
+
+test("v3 overview links are direct and retain permission filtering without a collapsible header", () => {
+  const visibility = shell.indexOf("if (!visible) return null;");
+  const direct = shell.indexOf('if (group.key === "OVERVIEW")');
+  const rest = shell.indexOf("const GroupIcon = ITECH_SECTION_ICONS[group.key]", direct);
+  assert.ok(visibility >= 0 && visibility < direct && direct < rest);
+  const block = shell.slice(direct, rest);
+  assert.ok(block.includes("{menu(group.key)}"));
+  assert.ok(block.includes('className="factory-itech-overview-links"'));
+  assert.ok(block.includes('!compact && <div aria-hidden="true" className="factory-itech-overview-divider"'));
+  assert.doesNotMatch(block, /SidebarGroupLabel|toggleGroup|collapsedGroups|aria-expanded|inert=/);
+  assert.ok(shell.includes("currentUser.modules.includes(navigationModuleKey(item.href))"));
+  assert.ok(css.includes(".factory-sidebar-itech .factory-itech-overview-divider"));
+});

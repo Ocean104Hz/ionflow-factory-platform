@@ -324,6 +324,14 @@ function AppSidebar({
                 currentUser.modules.includes(navigationModuleKey(item.href)),
             );
             if (!visible) return null;
+            if (group.key === "OVERVIEW") {
+              return (
+                <div key={group.key} className="factory-itech-overview-links">
+                  {menu(group.key)}
+                  {!compact && <div aria-hidden="true" className="factory-itech-overview-divider" />}
+                </div>
+              );
+            }
             const GroupIcon = ITECH_SECTION_ICONS[group.key] ?? navigation.find((item) => item.group === group.key)?.icon;
             const isCollapsed = collapsedGroups[group.key] ?? false;
             const contentId = `factory-sidebar-group-${group.key.toLowerCase().replaceAll(" ", "-")}`;

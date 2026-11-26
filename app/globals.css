@@ -633,3 +633,13 @@
   .factory-sidebar-itech,
   .factory-itech-tooltip { display: none !important; }
 }
+
+/* Nan Factory sidebar v3: direct overview links, no category heading. */
+.factory-sidebar-itech .factory-itech-overview-links {
+  min-width: 0;
+  width: 100%;
+}
+.factory-sidebar-itech .factory-itech-overview-divider {
+  margin-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
