@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
   AlertDialog,
@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import {
-  blankLog,
+  newLogDraft,
   validateLog,
   type SubmissionLog,
   type LogErrors,
@@ -23,11 +23,21 @@ import { SubmissionLogSections } from "./submission_log_form";
 import { SubmissionLogHistory } from "./submission_log_history";
 import { SubmissionLogDetail } from "./submission_log_detail";
 
+// NAN_SAMPLE_LOG_DEFAULT_DATES_V6
+// Initialize the current Bangkok day only after hydration, not during cached SSR.
+const subscribeToHydration = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 export function SubmissionLogWorkspace() {
+  const hydrated = useSyncExternalStore(subscribeToHydration, getClientSnapshot, getServerSnapshot);
+  return hydrated ? <SubmissionLogWorkspaceContent /> : <p role="status">กำลังโหลดเอกสาร…</p>;
+}
+
+function SubmissionLogWorkspaceContent() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<SubmissionLog>("sample_submission_log");
   const
-    [row, setRow] = useState(blankLog),
-    [baseline, setBaseline] = useState(() => JSON.stringify(blankLog()));
+    [row, setRow] = useState(newLogDraft),
+    [baseline, setBaseline] = useState(() => JSON.stringify(row));
   const [tab, setTab] = useState("form"),
     [errors, setErrors] = useState<LogErrors>({}),
     [message, setMessage] = useState("");
@@ -45,6 +55,17 @@ export function SubmissionLogWorkspace() {
     if (JSON.stringify(row) !== baseline) setPending(r);
     else open(r);
   }
+  function changeTab(value: string) {
+    if (busy || loading || loadError) return;
+    // Refresh only an untouched NEW draft when re-entering the form.
+    // Existing or user-edited drafts must never be reset automatically.
+    if (value === "form" && tab !== "form" && !row.id && JSON.stringify(row) === baseline) {
+      const next = newLogDraft();
+      setRow(next);
+      setBaseline(JSON.stringify(next));
+    }
+    setTab(value);
+  }
   async function save() {
     const issues = validateLog(row, records);
     setErrors(issues);
@@ -55,7 +76,7 @@ export function SubmissionLogWorkspace() {
     }
     try {
       await persist(row);
-      const next = blankLog();
+      const next = newLogDraft();
       setRow(next);
       setBaseline(JSON.stringify(next));
       setErrors({});
@@ -70,7 +91,7 @@ export function SubmissionLogWorkspace() {
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <Tabs value={tab} onValueChange={setTab} activationMode="manual" className="min-w-0 gap-3">
+      <Tabs value={tab} onValueChange={changeTab} activationMode="manual" className="min-w-0 gap-3">
         {/* NAN_SUBMISSION_LOG_ICON_FORM_V1 */}
         <TabsList aria-label="แบบบันทึกการนำส่งตัวอย่างวิเคราะห์" className="mx-auto w-full max-w-xl rounded-full border bg-card p-1 shadow-sm group-data-[orientation=horizontal]/tabs:h-11">
           <TabsTrigger value="form" disabled={busy || loading || !!loadError} className="rounded-full px-4" style={tab === "form" ? { backgroundColor: "#173b63", color: "#ffffff" } : undefined}>กรอกข้อมูล</TabsTrigger>
@@ -89,7 +110,7 @@ export function SubmissionLogWorkspace() {
             {row.id && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm">
                 <p className="break-all">กำลังแก้ไขเอกสาร: <span className="font-semibold">{row.doc_no}</span></p>
-                <Button type="button" variant="ghost" size="sm" onClick={() => request(blankLog())}>ยกเลิกการแก้ไข</Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => request(newLogDraft())}>ยกเลิกการแก้ไข</Button>
               </div>
             )}
             <div
@@ -120,6 +141,7 @@ export function SubmissionLogWorkspace() {
             <SubmissionLogSections
               row={row}
               errors={errors}
+              disabled={busy}
               onChange={(r) => {
                 setRow(r);
                 setMessage("");
@@ -142,7 +164,7 @@ export function SubmissionLogWorkspace() {
                 setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
                 return;
               }
-              if (row.id === r.id) open(blankLog());
+              if (row.id === r.id) open(newLogDraft());
               if (view?.id === r.id) setView(null);
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}

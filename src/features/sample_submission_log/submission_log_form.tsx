@@ -1,5 +1,6 @@
 "use client";
 import { Input } from "@/src/components/ui/input";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
 import { cn } from "@/src/lib/utils";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Label } from "@/src/components/ui/label";
@@ -28,14 +29,17 @@ import {
 // NAN_SAMPLE_LOG_CHECKBOX_V4
 const squareChoiceClass = "relative rounded-none border-input data-[state=checked]:border-[#173b63] data-[state=checked]:bg-[#173b63] [&_svg]:hidden after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-2.5 after:w-1.5 after:-translate-x-1/2 after:-translate-y-[60%] after:rotate-45 after:border-r-2 after:border-b-2 after:border-white after:content-[''] data-[state=checked]:after:block";
 
+// NAN_SAMPLE_LOG_THAI_DATE_V5
 export function SubmissionLogSections({
   row,
   onChange,
   errors = {},
+  disabled = false,
 }: {
   row: SubmissionLog;
   onChange?: (row: SubmissionLog) => void;
   errors?: LogErrors;
+  disabled?: boolean;
 }) {
   const readOnly = !onChange,
     prefix = readOnly ? "read-log" : "log",
@@ -66,16 +70,18 @@ export function SubmissionLogSections({
       <div
         className={cn(
           "grid min-w-0 content-start gap-2",
+          !readOnly && type === "date" && "[&>div>label]:leading-none",
           !readOnly && key === "sample_characteristics" && "sm:col-span-2",
           !readOnly && (key === "received_by" || key === "received_date") && "order-2",
           !readOnly && (key === "accepted_by" || key === "accepted_date") && "order-4",
         )}
         key={key}
         data-log-field={key}
+        id={!readOnly && type === "date" ? id : undefined}
       >
         {readOnly ? (
           <p className="text-xs text-muted-foreground">{label}</p>
-        ) : (
+        ) : type === "date" ? null : (
           <Label htmlFor={id}>
             {label}
             {required && <span className="text-danger"> *</span>}
@@ -85,6 +91,14 @@ export function SubmissionLogSections({
           <p className="whitespace-pre-wrap wrap-break-word text-sm">
             {type === "date" ? logDate(value) : value || "—"}
           </p>
+        ) : type === "date" ? (
+          <ThaiBuddhistDatePicker
+            label={required ? `${label} *` : label}
+            value={value}
+            onChange={(nextValue) => { if (!disabled) set(nextValue); }}
+            error={issue}
+            disabled={disabled}
+          />
         ) : multiline ? (
           <Textarea
             id={id}
@@ -109,7 +123,7 @@ export function SubmissionLogSections({
             onChange={(e) => set(e.target.value)}
           />
         )}
-        {fieldError(key)}
+        {(readOnly || type !== "date") && fieldError(key)}
       </div>
     );
   }
@@ -254,7 +268,7 @@ export function SubmissionLogSections({
     <div className={cn("min-w-0 space-y-4 wrap-anywhere", !readOnly && "[&_[data-slot=card]]:gap-0 [&_[data-slot=card]]:rounded-xl [&_[data-slot=card]]:bg-white [&_[data-slot=card]]:py-0 [&_[data-slot=card]]:shadow-sm [&_[data-slot=card-header]]:border-b [&_[data-slot=card-header]]:px-4 [&_[data-slot=card-header]]:py-3 [&_[data-slot=card-content]]:p-4")}>
       {/* NAN_SUBMISSION_LOG_ICON_FORM_V1 */}
       <SectionCard title={readOnly ? "ข้อมูลเอกสาร" : "แบบบันทึกการนำส่งตัวอย่างวิเคราะห์"} subtitle={readOnly ? undefined : "กรอกข้อมูลให้ครบตามแบบฟอร์ม"}>
-        <div className={readOnly ? "grid gap-4 sm:grid-cols-2" : "grid gap-4 md:grid-cols-[2fr_1fr]"}>
+        <div className={readOnly ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]"}>
           {field(
             "doc_no",
             "เลขที่คำขอ",
@@ -268,6 +282,15 @@ export function SubmissionLogSections({
             row.sample_code,
             (sample_code) => patch({ sample_code }),
             true,
+          )}
+          {/* NAN_SAMPLE_LOG_DEFAULT_DATES_V6 */}
+          {field(
+            "doc_date",
+            "วันที่เอกสาร",
+            row.doc_date ?? "",
+            (doc_date) => patch({ doc_date }),
+            false,
+            "date",
           )}
         </div>
       </SectionCard>

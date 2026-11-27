@@ -56,10 +56,10 @@ export function SubmissionLogHistory({ records, onEdit, onView, onPrint, onDelet
             <Label htmlFor="log-search">ค้นหา</Label>
             <Input ref={searchRef} id="log-search" className="h-9 rounded-lg" placeholder="ค้นหา (เลขที่เอกสาร/ชื่อ/รหัสตัวอย่าง)" value={filters.search} onChange={event => updateFilter("search", event.target.value)} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 [&>div>label]:leading-none">
             <ThaiBuddhistDatePicker label="จากวันที่" value={filters.from} onChange={value => updateFilter("from", value)} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 [&>div>label]:leading-none">
             <ThaiBuddhistDatePicker label="ถึงวันที่" value={filters.to} onChange={value => updateFilter("to", value)} error={error || undefined} />
           </div>
           <div className="min-w-0 space-y-2">

@@ -6,7 +6,7 @@ import type { AuditEntry } from "../lib/mock-data/audit-log.ts";
 import { blankReport, saveReport, timeSlots, validateReport } from "../features/qc-organic-fertilizer/qc-organic-domain.ts";
 import { blankNC, saveNC, validateNC, withNCSignerFields } from "../features/nc-reports/nc-report-mock-helpers.ts";
 import { newSubmission, saveSubmission, validateSubmission } from "../features/sample-submissions/sample-submission-domain.ts";
-import { blankLog, saveLog, validateLog } from "../features/sample_submission_log/submission_log_domain.ts";
+import { blankLog, saveLog, validateLog, withLogDocumentDate } from "../features/sample_submission_log/submission_log_domain.ts";
 import { blankLabSheet, saveLabSheet, validateLabSheet } from "../features/lab_sample_receiving/lab_sample_receiving_domain.ts";
 import { blankQcWeightDocument, saveQcWeightDocument, validateQcWeightDocument } from "../features/qc_product_weight_check/qc_product_weight_check_domain.tsx";
 import { getFactoryDatabasePool } from "./auth/access-repository.ts";
@@ -61,6 +61,8 @@ const organicTemplate = blankReport();
 organicTemplate.fertilizer[0].extra_times = [timeSlots[0]];
 organicTemplate.stop_start = [{ id: "", machine_stop_time: "", machine_run_time: "", machine_stop_reason: "" }];
 const ncDefinition = define("ใบ NC", blankNC(), validateNC, saveNC);
+// NAN_SAMPLE_LOG_DEFAULT_DATES_V6
+const sampleLogDefinition = define("แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์", blankLog(), validateLog, saveLog);
 export const qcKinds = {
   qc_organic_fertilizer: define("ตรวจคุณภาพปุ๋ยอินทรีย์เคมี", organicTemplate, (draft, records) => {
     if (draft.profile !== "itech" && draft.profile !== "ifoam") return { profile: "โรงงานไม่ถูกต้อง" };
@@ -77,7 +79,14 @@ export const qcKinds = {
     },
   },
   sample_submissions: define("ใบส่งตัวอย่าง", newSubmission(), validateSubmission, saveSubmission),
-  sample_submission_log: define("แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์", blankLog(), validateLog, saveLog),
+  sample_submission_log: {
+    ...sampleLogDefinition,
+    save(input: unknown, records: Document[], at: string): Document {
+      const raw = object(input);
+      const previous = records.find(row => row.id === raw.id);
+      return sampleLogDefinition.save(withLogDocumentDate(raw, previous ? object(previous) : undefined), records, at);
+    },
+  },
   lab_sample_receiving: define("i-Lab แบบบันทึกรับตัวอย่าง", blankLabSheet("template"), validateLabSheet, saveLabSheet),
   qc_product_weight_check: define("QC ตรวจเช็คน้ำหนักผลิตภัณฑ์", blankQcWeightDocument("template"), validateQcWeightDocument, saveQcWeightDocument),
 };
