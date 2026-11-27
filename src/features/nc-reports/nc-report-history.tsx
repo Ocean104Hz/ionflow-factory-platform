@@ -1,13 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
-import { ChevronDown, Eye, Pencil, Printer, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ChevronDown, FileText, Pencil, Printer, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/src/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/src/components/ui/alert-dialog";
 import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
@@ -147,15 +147,14 @@ export function NCReportHistory({
                   <TableCell className={`${cellClass} text-center`}>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
-                        <Button ref={(node) => { if (node) manageTriggers.current.set(r.id, node); else manageTriggers.current.delete(r.id); }} type="button" variant="outline" size="sm" className="rounded-lg font-semibold text-[#173b63] dark:text-foreground" aria-label={`จัดการ ${r.doc_no}`}>
+                        <Button ref={(node) => { if (node) manageTriggers.current.set(r.id, node); else manageTriggers.current.delete(r.id); }} type="button" variant="outline" size="sm" className="h-10 gap-2 rounded-xl border-[#a6bf49] bg-muted/40 px-3 font-medium text-[#173b63] shadow-none hover:bg-muted data-[state=open]:border-[#a6bf49] data-[state=open]:bg-muted dark:text-foreground" aria-label={`จัดการ ${r.doc_no}`}>
                           จัดการ <ChevronDown aria-hidden="true" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-44" onCloseAutoFocus={(event) => { if (deleteTarget) event.preventDefault(); }}>
-                        <DropdownMenuItem onSelect={() => onView(r)}><Eye aria-hidden="true" />ดูรายละเอียด</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => onPrint(r)}><Printer aria-hidden="true" />พรีวิวพิมพ์</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => onEdit(r)}><Pencil aria-hidden="true" />แก้ไข</DropdownMenuItem>
-                        <DropdownMenuSeparator />
+                      <DropdownMenuContent align="end" sideOffset={8} className="w-56 max-w-[calc(100vw-24px)] rounded-xl p-2 shadow-lg [&_[data-slot=dropdown-menu-item]]:min-h-10 [&_[data-slot=dropdown-menu-item]]:cursor-pointer [&_[data-slot=dropdown-menu-item]]:gap-3 [&_[data-slot=dropdown-menu-item]]:rounded-lg [&_[data-slot=dropdown-menu-item]]:px-3 [&_[data-slot=dropdown-menu-item]]:py-2" onCloseAutoFocus={(event) => { if (deleteTarget) event.preventDefault(); }}>
+                        <DropdownMenuItem onSelect={() => onView(r)}><FileText aria-hidden="true" className="text-current" />ดูรายละเอียด</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onPrint(r)}><Printer aria-hidden="true" className="text-current" />พิมพ์เอกสาร</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onEdit(r)}><Pencil aria-hidden="true" className="text-current" />แก้ไข</DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onSelect={() => {
                           deleteTrigger.current = manageTriggers.current.get(r.id) ?? null;
                           setDeleteTarget(r);

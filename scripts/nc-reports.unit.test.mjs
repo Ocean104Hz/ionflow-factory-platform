@@ -347,7 +347,11 @@ test("reference NC layout preserves date values, text entry, decision labels and
   assert.doesNotMatch(workspace, /<PageHeader/);
   assert.match(workspace, /<NCReportForm[\s\S]*?disabled=\{busy \|\| loading \|\| !!loadError\}/);
   const shell = read("src/components/factory/app-shell.tsx");
-  assert.match(shell, /standaloneTitle=\{pathname === "\/qc_raw_material" \|\| pathname === "\/nc-reports"\}/);
+  assert.doesNotMatch(shell, /standaloneTitle/);
+  assert.match(shell, /<h1 className="[^"\n]*text-xl[^"\n]*font-bold[^"\n]*sm:text-2xl[^"\n]*" title=\{title\}>\s*\{title\}/);
+  assert.match(shell, /<p className="[^"\n]*text-xs[^"\n]*"[^>]*>\{dateLabel\}<\/p>/);
+  assert.match(shell, /timeZone: "Asia\/Bangkok"/);
+  assert.match(shell, /th-TH-u-ca-buddhist-nu-latn/);
   assert.match(shell, /pathname === "\/nc-reports"\s*\? "รายงานข้อบกพร่อง"/);
 });
 

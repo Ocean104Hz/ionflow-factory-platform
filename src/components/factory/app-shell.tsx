@@ -7,14 +7,6 @@ import {
   type CSSProperties,
   useState,
 } from "react";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "../ui/breadcrumb";
 import { Archive, Bell, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Factory, FlaskConical, Package, Receipt, ShoppingCart, X, type LucideIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -165,15 +157,14 @@ function FactoryShell({
       <SidebarInset className="min-w-0 bg-background">
         <SiteHeader
           currentUser={currentUser}
-          standaloneTitle={pathname === "/qc_raw_material" || pathname === "/nc-reports"}
           title={
             pathname === "/qc_raw_material"
               ? "ใบตรวจสอบคุณภาพวัตถุดิบ"
               : pathname === "/nc-reports"
-              ? "รายงานข้อบกพร่อง"
-              : pathname.startsWith("/settings")
-              ? "ตั้งค่า"
-              : (current?.title ?? branding.factoryName)
+                ? "รายงานข้อบกพร่อง"
+                : pathname.startsWith("/settings")
+                  ? "ตั้งค่า"
+                  : (current?.title ?? branding.factoryName)
           }
         />
         <div
@@ -398,19 +389,39 @@ function AppSidebar({
     </Sidebar>
   );
 }
+const headerDateFormatter = new Intl.DateTimeFormat("th-TH-u-ca-buddhist-nu-latn", {
+  timeZone: "Asia/Bangkok",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+function getHeaderDate(): string {
+  return headerDateFormatter.format(new Date());
+}
+
+function getServerHeaderDate(): string {
+  return "";
+}
+
+function subscribeHeaderDate(onChange: () => void): () => void {
+  const timer = window.setInterval(onChange, 60_000);
+  return () => window.clearInterval(timer);
+}
+
 function SiteHeader({
   title,
   currentUser,
-  standaloneTitle = false,
 }: {
   title: string;
   currentUser: CurrentUser;
-  standaloneTitle?: boolean;
 }) {
   const { branding } = useBranding();
   const router = useRouter();
   const [logoutPending, setLogoutPending] = useState(false);
   const { isMobile, openMobile } = useSidebar();
+  const dateLabel = useSyncExternalStore(subscribeHeaderDate, getHeaderDate, getServerHeaderDate);
   return (
     <header className="no-print sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card/95 px-4 backdrop-blur lg:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -421,23 +432,10 @@ function SiteHeader({
           aria-controls="factory-sidebar"
         />
         <Separator orientation="vertical" className="mx-1 h-4 md:hidden" />
-        {standaloneTitle ? (
-          <h1 className="min-w-0 truncate text-base font-bold text-[#173b63] sm:text-xl" title={title}>{title}</h1>
-        ) : (
-          <Breadcrumb>
-            <BreadcrumbList className="flex-nowrap text-sm">
-              <BreadcrumbItem className="hidden sm:block">
-                <BreadcrumbLink asChild>
-                  <Link href="/dashboard">Factory</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden sm:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{title}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        )}
+        <h1 className="min-w-0 truncate text-xl font-bold leading-tight tracking-tight text-[#173b63] sm:text-2xl dark:text-foreground" title={title}>
+          {title}
+        </h1>
+        <p className="hidden shrink-0 text-xs font-medium text-slate-400 sm:block dark:text-muted-foreground">{dateLabel}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <Tooltip>
