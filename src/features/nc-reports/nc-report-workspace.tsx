@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,7 +26,7 @@ export function NCReportWorkspace() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<NCReport>("nc_reports");
   const [report, setReport] = useState(blankNC),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankNC()));
-  const [tab, setTab] = useState("history"),
+  const [tab, setTab] = useState("form"),
     [errors, setErrors] = useState<NCErrors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<NCReport | null>(null),
@@ -44,6 +44,11 @@ export function NCReportWorkspace() {
     if (dirty) setPending(r);
     else open(r);
   }
+  function changeTab(value: string) {
+    if (busy || loading || loadError) return;
+    if (value === "form" && tab !== "form") request(blankNC());
+    else if (value === "history") setTab("history");
+  }
   async function save() {
     const nextErrors = validateNC(report, records);
     setErrors(nextErrors);
@@ -52,64 +57,65 @@ export function NCReportWorkspace() {
       return;
     }
     try {
-      const saved = await persist(report);
-      setReport(saved);
-      setBaseline(JSON.stringify(saved));
-      setMessage(
-        "บันทึกเอกสารแล้ว",
-      );
+      await persist(report);
+      const next = blankNC();
+      setReport(next);
+      setBaseline(JSON.stringify(next));
+      setErrors({});
+      setTab("history");
+      setMessage("บันทึกเอกสารแล้ว");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "บันทึกเอกสารไม่ได้");
     }
   }
   return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="ใบ NC"
-        description="บันทึกและติดตามรายงานข้อบกพร่องของสินค้าและกระบวนการผลิต"
-        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบ NC" disabled={busy || loading || !!loadError} onCreate={() => request(blankNC())} onHistory={() => setTab("history")} />}
-      />
+    <div className="min-w-0 space-y-3 pt-3">
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <div className="min-w-0">
-
-        <p role="status" className="text-sm text-primary">
-          {message}
-        </p>
-        {tab === "form" && (<div className="mt-3 min-w-0">
-          <NCReportForm
-            report={report}
-            errors={errors}
-            onChange={(r) => {
-              setReport(r);
-              setMessage("");
-            }}
-            onSave={save}
-            onReset={() => request(blankNC())}
-            onCancel={() => request(blankNC())}
-          />
-        </div>)}
-        {tab === "history" && (<div className="mt-3 min-w-0">
-          <NCReportHistory
-            records={records}
-            onEdit={request}
-            onView={(r) => setViewId(r.id)}
-            onPrint={(r) => setPrintId(r.id)}
-            onDelete={async (r) => {
-              try { await remove(r.id); }
-              catch (error) {
-                setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
-                return;
-              }
-              if (report.id === r.id) open(blankNC());
-              if (viewId === r.id) setViewId(null);
-              if (printId === r.id) setPrintId(null);
-              setMessage("ลบเอกสารจากรายการแล้ว");
-            }}
-          />
-        </div>)}
-      </div>
+        <Tabs value={tab} onValueChange={changeTab} activationMode="manual" className="min-w-0 gap-3">
+          <TabsList aria-label="ใบ NC" className="mx-auto w-full max-w-xl rounded-full border bg-card p-1 shadow-sm group-data-[orientation=horizontal]/tabs:h-11">
+            <TabsTrigger value="form" disabled={busy || loading || !!loadError} className="rounded-full px-4" style={tab === "form" ? { backgroundColor: "#173b63", color: "#ffffff" } : undefined}>
+              สร้างเอกสาร
+            </TabsTrigger>
+            <TabsTrigger value="history" disabled={busy || loading || !!loadError} className="rounded-full px-4" style={tab === "history" ? { backgroundColor: "#173b63", color: "#ffffff" } : undefined}>
+              ประวัติ
+            </TabsTrigger>
+          </TabsList>
+          <p role="status" className="text-sm text-primary empty:hidden">{message}</p>
+          <TabsContent value="form" className="min-w-0">
+            <NCReportForm
+              report={report}
+              errors={errors}
+              disabled={busy || loading || !!loadError}
+              onChange={(r) => {
+                setReport(r);
+                setMessage("");
+              }}
+              onSave={save}
+              onCancel={() => request(blankNC())}
+            />
+          </TabsContent>
+          <TabsContent value="history" className="min-w-0">
+            <NCReportHistory
+              records={records}
+              onEdit={request}
+              onView={(r) => setViewId(r.id)}
+              onPrint={(r) => setPrintId(r.id)}
+              onDelete={async (r) => {
+                try { await remove(r.id); }
+                catch (error) {
+                  setMessage(error instanceof Error ? error.message : "ลบเอกสารไม่สำเร็จ");
+                  return;
+                }
+                if (report.id === r.id) open(blankNC());
+                if (viewId === r.id) setViewId(null);
+                if (printId === r.id) setPrintId(null);
+                setMessage("ลบเอกสารจากรายการแล้ว");
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </fieldset>
       <AlertDialog
         open={!!pending}

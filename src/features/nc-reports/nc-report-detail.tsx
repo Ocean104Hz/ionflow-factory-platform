@@ -16,6 +16,7 @@ import {
   productFields,
   descriptionFields,
   reviewerFields,
+  legacyReviewerFields,
   ncFieldValue,
 } from "./nc-report-mock-helpers";
 import { ncDecisions, type NCReport } from "./nc-report-types";
@@ -69,16 +70,26 @@ export function NCReportContent({ report }: { report: NCReport }) {
         </div>
       </section>
       <section>
-        <h3 className="mb-3 text-base font-semibold">ผู้ทบทวนและผู้อนุมัติ</h3>
-        <InfoGrid>
+        <h3 className="mb-3 text-base font-semibold">ลงชื่อ</h3>
+        <dl className="grid gap-4 md:grid-cols-3">
           {reviewerFields.map(([k, l]) => (
             <InfoRow key={k} label={l}>
               {ncFieldValue(report, k)}
             </InfoRow>
           ))}
-        </InfoGrid>
+        </dl>
+        {legacyReviewerFields.some(([k]) => Boolean(report[k])) && (
+          <div className="mt-4 border-t pt-3">
+            <p className="mb-2 text-xs font-medium">รายชื่อผู้ทบทวนจากเอกสารรูปแบบเดิม (เก็บไว้เพื่ออ้างอิง)</p>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              {legacyReviewerFields.map(([k, l]) => (
+                <InfoRow key={k} label={l}>{ncFieldValue(report, k)}</InfoRow>
+              ))}
+            </dl>
+          </div>
+        )}
         <p className="mt-3 text-xs">
-          ชื่อเป็นข้อความตัวอย่าง ไม่ใช่ลายมือชื่อหรือผลอนุมัติ QA
+          ชื่อเป็นข้อมูลประกอบเอกสาร ไม่ใช่ลายมือชื่อหรือผลอนุมัติ QA
         </p>
       </section>
     </div>

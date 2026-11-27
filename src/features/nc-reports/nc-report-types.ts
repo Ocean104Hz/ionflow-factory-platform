@@ -20,6 +20,8 @@ export interface NCReport {
   problem_defect: string;
   countermeasure: string;
   decisions: Record<NCDecision, boolean>;
+  discoverer_signer_name: string;
+  responsible_reviewer_name: string;
   reviewer_name_1: string;
   reviewer_name_2: string;
   approver_name: string;

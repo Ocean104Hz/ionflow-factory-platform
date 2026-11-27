@@ -165,10 +165,12 @@ function FactoryShell({
       <SidebarInset className="min-w-0 bg-background">
         <SiteHeader
           currentUser={currentUser}
-          standaloneTitle={pathname === "/qc_raw_material"}
+          standaloneTitle={pathname === "/qc_raw_material" || pathname === "/nc-reports"}
           title={
             pathname === "/qc_raw_material"
               ? "ใบตรวจสอบคุณภาพวัตถุดิบ"
+              : pathname === "/nc-reports"
+              ? "รายงานข้อบกพร่อง"
               : pathname.startsWith("/settings")
               ? "ตั้งค่า"
               : (current?.title ?? branding.factoryName)
@@ -176,7 +178,7 @@ function FactoryShell({
         />
         <div
           id="main-content"
-          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""}`}
+          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""} ${pathname === "/nc-reports" ? "bg-[#f7f8fa] dark:bg-background" : ""}`}
         >
           {previewMenu && (
             <Alert role="status">

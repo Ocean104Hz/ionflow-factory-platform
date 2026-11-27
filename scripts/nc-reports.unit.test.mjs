@@ -250,6 +250,7 @@ test("detail and A4 preview share every original field and all selected/unselect
     ...d.productFields,
     ...d.descriptionFields,
     ...d.reviewerFields,
+    ...d.legacyReviewerFields,
   ].map(([k]) => k);
   assert.deepEqual(
     new Set(fields),
@@ -264,6 +265,7 @@ test("detail and A4 preview share every original field and all selected/unselect
     "productFields",
     "descriptionFields",
     "reviewerFields",
+    "legacyReviewerFields",
     "ncDecisions",
   ])
     assert.ok(content.includes(`${name}.map`), name);
@@ -282,12 +284,14 @@ test("detail and A4 preview share every original field and all selected/unselect
     r.problem_defect,
   );
 });
-test("workspace opens history first, enters the editor from the header and confirms reset", () => {
+test("workspace opens form first, switches via capsule tabs and confirms reset", () => {
   const workspace = read(root + "nc-report-workspace.tsx");
-  assert.match(workspace, /useState\("history"\)/);
-  assert.match(workspace, /<DocumentViewActions/);
-  assert.match(workspace, /onCreate=\{\(\) => request\(blankNC\(\)\)\}/);
-  assert.match(workspace, /onHistory=\{\(\) => setTab\("history"\)\}/);
+  assert.match(workspace, /\[tab, setTab\] = useState\("form"\)/);
+  assert.match(workspace, /<Tabs value=\{tab\} onValueChange=\{changeTab\} activationMode="manual"/);
+  assert.match(workspace, /<TabsTrigger value="form" disabled=\{busy \|\| loading \|\| !!loadError\}/);
+  assert.match(workspace, /<TabsTrigger value="history" disabled=\{busy \|\| loading \|\| !!loadError\}/);
+  assert.match(workspace, /if \(value === "form" && tab !== "form"\) request\(blankNC\(\)\)/);
+  assert.match(workspace, /else if \(value === "history"\) setTab\("history"\)/);
   assert.match(workspace, /if \(dirty\) setPending/);
   assert.match(workspace, /useQcDocuments<NCReport>\("nc_reports"\)/);
   assert.match(workspace, /await persist\(report\)/);
@@ -303,4 +307,175 @@ test("workspace opens history first, enters the editor from the header and confi
     nav,
     /group: "QC", title: "ใบ NC", href: "\/nc-reports", icon: ClipboardList/,
   );
+});
+
+test("iCon-style NC form retains controlled fields and decisions, without a reset button", () => {
+  const form = read(root + "nc-report-form.tsx");
+  for (const group of ["headerFields", "productFields", "descriptionFields", "reviewerFields", "ncDecisions"])
+    assert.ok(form.includes(`${group}.map`), group);
+  assert.equal((form.match(/<NCFormCard\b/g) || []).length, 3);
+  assert.match(form, /value: report\[key\]/);
+  assert.match(form, /onChange\(\{ \.\.\.report, \[key\]: e\.target\.value \}\)/);
+  assert.match(form, /if \(key === "doc_date" \|\| key === "production_date"\)/);
+  assert.match(form, /<ThaiBuddhistDatePicker[\s\S]*?value=\{report\[key\]\}[\s\S]*?onChange=\{\(value\) => onChange\(\{ \.\.\.report, \[key\]: value \}\)\}[\s\S]*?error=\{error\}[\s\S]*?disabled=\{disabled\}/);
+  assert.match(form, /inputMode=\{key === "quantity" \? "decimal" : undefined\}/);
+  assert.match(form, /field\(k, l, false, true\)/);
+  assert.match(form, /checked=\{report\.decisions\[key\]\}/);
+  assert.match(form, /decisions: \{ \.\.\.report\.decisions, \[key\]: v === true \}/);
+  assert.match(form, /onSave\(\)/);
+  assert.doesNotMatch(form, /\bonReset\b/);
+  assert.match(form, /onClick=\{onCancel\}/);
+  assert.match(form, /aria-describedby=\{errors.decisions/);
+  const workspace = read(root + "nc-report-workspace.tsx");
+  assert.match(workspace, /if \(busy \|\| loading \|\| loadError\) return;/);
+  assert.match(workspace, /const nextErrors = validateNC\(report, records\)/);
+  assert.match(workspace, /onSave=\{save\}/);
+  assert.doesNotMatch(workspace, /\bonReset\b/);
+  assert.match(workspace, /onCancel=\{\(\) => request\(blankNC\(\)\)\}/);
+  assert.match(workspace, /if \(pending\) open\(pending\)/);
+});
+
+test("reference NC layout preserves date values, text entry, decision labels and scoped header", () => {
+  const form = read(root + "nc-report-form.tsx");
+  for (const title of ["ส่วนหัวเอกสาร", "รายละเอียดข้อบกพร่อง", "รายชื่อผู้ลงนาม"])
+    assert.ok(form.includes(`<NCFormCard title="${title}">`), title);
+  assert.match(form, /placeholder: placeholders\[key\]/);
+  assert.match(form, /onSelect=\{\(\) => onChange\(\{ \.\.\.report, \[key\]: value \}\)\}/);
+  assert.match(form, /<Button type="submit"[\s\S]*?>\s*บันทึก\s*<\/Button>/);
+  assert.match(form, /ไม่ใช่การลงนามหรือผลอนุมัติ QA/);
+  const workspace = read(root + "nc-report-workspace.tsx");
+  assert.doesNotMatch(workspace, /<PageHeader/);
+  assert.match(workspace, /<NCReportForm[\s\S]*?disabled=\{busy \|\| loading \|\| !!loadError\}/);
+  const shell = read("src/components/factory/app-shell.tsx");
+  assert.match(shell, /standaloneTitle=\{pathname === "\/qc_raw_material" \|\| pathname === "\/nc-reports"\}/);
+  assert.match(shell, /pathname === "\/nc-reports"\s*\? "รายงานข้อบกพร่อง"/);
+});
+
+test("iCon-style history keeps NC filters, all decisions, paging and confirmed actions", () => {
+  const history = read(root + "nc-report-history.tsx");
+  assert.match(history, /useState\(10\)/);
+  assert.match(history, /filterNC\(records, filters\)/);
+  assert.match(history, /paginateNC\(rows, page, size\)/);
+  assert.match(history, /ncFilterError\(filters\)/);
+  for (const key of ["search", "department", "from", "to"])
+    assert.ok(history.includes(`updateFilter("${key}",`), key);
+  assert.match(history, /setFilters\(\{ \.\.\.emptyNCFilters \}\)/);
+  assert.equal((history.match(/<TableHead className=/g) || []).length, 6);
+  assert.match(history, /ncDecisions\.filter\(\(\[k\]\) => r\.decisions\[k\]\)/);
+  assert.match(history, /selected\.map\(\(\[k, label\]\)/);
+  assert.match(history, /formatThaiDate\(r\.doc_date\)/);
+  assert.match(history, /\[r\.product_name, r\.problem_defect\]/);
+  assert.match(history, /\[r\.quantity, r\.unit\]/);
+  for (const action of ["onView", "onPrint", "onEdit"])
+    assert.ok(history.includes(`onSelect={() => ${action}(r)}`), action);
+  assert.match(history, /setDeleteTarget\(r\)/);
+  assert.match(history, /<AlertDialogAction onClick=\{\(\) => \{ if \(deleteTarget\) onDelete\(deleteTarget\)/);
+  assert.equal((history.match(/onDelete\(deleteTarget\)/g) || []).length, 1);
+  assert.match(history, /disabled=\{paged\.page <= 1\}/);
+  assert.match(history, /disabled=\{paged\.page >= pages\}/);
+  assert.match(history, /!paged\.rows\.length/);
+});
+
+
+test("NC signer order, payload compatibility and legacy preservation", () => {
+  assert.deepEqual(d.reviewerFields, [
+    ["discoverer_signer_name", "ผู้พบข้อบกพร่อง"],
+    ["responsible_reviewer_name", "ผู้รับผิดชอบ/ผู้ทบทวน"],
+    ["approver_name", "ผู้อนุมัติ"],
+  ]);
+  const { discoverer_signer_name, responsible_reviewer_name, ...legacy } = valid();
+  assert.equal(discoverer_signer_name, "");
+  assert.equal(responsible_reviewer_name, "");
+  const before = JSON.stringify(legacy);
+  const migrated = d.withNCSignerFields(legacy);
+  assert.equal(migrated.discoverer_signer_name, "");
+  assert.equal(migrated.responsible_reviewer_name, "");
+  assert.equal(migrated.reviewer_name_1, legacy.reviewer_name_1);
+  assert.equal(migrated.reviewer_name_2, legacy.reviewer_name_2);
+  assert.equal(JSON.stringify(legacy), before);
+  const names = { discoverer_signer_name: "ผู้พบ", responsible_reviewer_name: "ผู้รับผิดชอบ", approver_name: "ผู้อนุมัติ" };
+  const created = d.saveNC([], { ...migrated, ...names }, "new").saved;
+  const { discoverer_signer_name: a, responsible_reviewer_name: b, ...oldClient } = created;
+  assert.equal(a, names.discoverer_signer_name);
+  assert.equal(b, names.responsible_reviewer_name);
+  const compatible = d.withNCSignerFields(oldClient, created);
+  const edited = d.saveNC([created], compatible, "unused").saved;
+  for (const [key, value] of Object.entries(names)) assert.equal(edited[key], value);
+  assert.equal(edited.reviewer_name_2, legacy.reviewer_name_2);
+  assert.equal(d.withNCSignerFields({ ...oldClient, responsible_reviewer_name: "" }, created).responsible_reviewer_name, "");
+  assert.equal(d.withNCSignerFields({ ...oldClient, discoverer_signer_name: 123 }, created).discoverer_signer_name, 123);
+  const server = read("src/server/qc-documents.ts");
+  assert.match(server, /ncDefinition = define\("ใบ NC", blankNC\(\), validateNC, saveNC\)/);
+  assert.match(server, /ncDefinition\.save\(withNCSignerFields\(raw, previous\), records, at\)/);
+  assert.match(server, /kind === "nc_reports" \? withNCSignerFields\(row\.payload\) : row\.payload/);
+  for (const path of ["nc-report-form.tsx", "nc-report-detail.tsx"]) {
+    const content = read(root + path);
+    assert.match(content, /reviewerFields\.map/);
+    assert.match(content, /legacyReviewerFields\.some/);
+    assert.match(content, /legacyReviewerFields\.map/);
+  }
+});
+
+test("NC successful create and edit reset editor and switch to history; failed saves retain draft", async () => {
+  // Exercise the actual save handler with deterministic persistence at its boundary.
+  const workspace = read(root + "nc-report-workspace.tsx");
+  const parsed = ts.createSourceFile("workspace.tsx", workspace, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const component = parsed.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === "NCReportWorkspace");
+  const handler = component?.body?.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === "save");
+  assert.ok(handler);
+  const js = compile(handler.getText(parsed));
+  async function run(draft, failure) {
+    const state = { report: draft, baseline: JSON.stringify(draft), tab: "form", errors: {}, message: "", calls: 0 };
+    const execute = new Function("report", "records", "validateNC", "blankNC", "persist", "setReport", "setBaseline", "setErrors", "setTab", "setMessage", `${js}\nreturn save();`);
+    await execute(draft, [], () => ({}), d.blankNC, async () => {
+      state.calls++;
+      if (failure) throw new Error("DB unavailable");
+      return { ...draft, id: draft.id || "saved" };
+    }, v => { state.report = v; }, v => { state.baseline = v; }, v => { state.errors = v; }, v => { state.tab = v; }, v => { state.message = v; });
+    return state;
+  }
+  for (const id of ["", "existing"]) {
+    const draft = { ...valid(), id };
+    const saved = await run(draft, false);
+    assert.equal(saved.calls, 1);
+    assert.deepEqual(saved.report, d.blankNC());
+    assert.equal(saved.baseline, JSON.stringify(saved.report));
+    assert.equal(saved.tab, "history");
+    assert.equal(saved.message, "บันทึกเอกสารแล้ว");
+    const failed = await run(draft, true);
+    assert.equal(failed.calls, 1);
+    assert.deepEqual(failed.report, draft);
+    assert.equal(failed.baseline, JSON.stringify(draft));
+    assert.equal(failed.tab, "form");
+    assert.equal(failed.message, "DB unavailable");
+  }
+});
+
+test("NC server parser persists new role keys and rejects invalid signer values", () => {
+  const source = read("src/server/qc-documents.ts");
+  const parsed = ts.createSourceFile("server.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const declaration = (name) => {
+    const node = parsed.statements.find(n =>
+      ((ts.isFunctionDeclaration(n) || ts.isClassDeclaration(n)) && n.name?.text === name) ||
+      (ts.isVariableStatement(n) && n.declarationList.declarations.some(v => v.name.getText(parsed) === name)));
+    assert.ok(node, name);
+    return node;
+  };
+  const kinds = declaration("qcKinds").declarationList.declarations[0].initializer;
+  const nc = kinds.properties.find(p => p.name?.getText(parsed) === "nc_reports");
+  assert.ok(nc);
+  const isolated = ["QcError", "object", "parseFields", "define", "ncDefinition"]
+    .map(name => declaration(name).getText(parsed).replace(/^export /, "")).join("\n") + `\nconst ncKind = { ${nc.getText(parsed)} }.nc_reports;`;
+  const instantiate = new Function("blankNC", "validateNC", "saveNC", "withNCSignerFields", "randomUUID", `${compile(isolated)}\nreturn ncKind;`);
+  const kind = instantiate(d.blankNC, d.validateNC, d.saveNC, d.withNCSignerFields, () => "new-uuid");
+  const names = { discoverer_signer_name: "A", responsible_reviewer_name: "B", approver_name: "C" };
+  const created = kind.save({ ...valid(), ...names }, [], "at");
+  for (const [field, value] of Object.entries(names)) assert.equal(created[field], value);
+  const { discoverer_signer_name, responsible_reviewer_name, ...oldClient } = created;
+  const edited = kind.save(oldClient, [created], "at");
+  assert.equal(edited.discoverer_signer_name, discoverer_signer_name);
+  assert.equal(edited.responsible_reviewer_name, responsible_reviewer_name);
+  assert.equal(edited.reviewer_name_1, created.reviewer_name_1);
+  assert.throws(() => kind.save({ ...created, discoverer_signer_name: 123 }, [created], "at"), { status: 400 });
+  assert.throws(() => kind.save({ ...created, responsible_reviewer_name: "x".repeat(10001) }, [created], "at"), { status: 400 });
 });
