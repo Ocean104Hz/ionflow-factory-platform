@@ -11,7 +11,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
-import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import {
   blankLog,
@@ -28,7 +28,7 @@ export function SubmissionLogWorkspace() {
   const
     [row, setRow] = useState(blankLog),
     [baseline, setBaseline] = useState(() => JSON.stringify(blankLog()));
-  const [tab, setTab] = useState("history"),
+  const [tab, setTab] = useState("form"),
     [errors, setErrors] = useState<LogErrors>({}),
     [message, setMessage] = useState("");
   const [pending, setPending] = useState<SubmissionLog | null>(null),
@@ -54,32 +54,30 @@ export function SubmissionLogWorkspace() {
       return;
     }
     try {
-      const saved = await persist(row);
-      setRow(saved);
-      setBaseline(JSON.stringify(saved));
-      setMessage(
-        "บันทึกเอกสารแล้ว",
-      );
+      await persist(row);
+      const next = blankLog();
+      setRow(next);
+      setBaseline(JSON.stringify(next));
+      setErrors({});
+      setTab("history");
+      setMessage("บันทึกเอกสารแล้ว");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "บันทึกเอกสารไม่ได้");
     }
   }
   return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="แบบบันทึกการนำส่งตัวอย่างวิเคราะห์ (สำหรับลูกค้า)"
-        description="บันทึกข้อมูลการนำส่งตัวอย่างเพื่อตรวจวิเคราะห์"
-        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างแบบบันทึก" disabled={busy || loading || !!loadError} onCreate={() => request(blankLog())} onHistory={() => setTab("history")} />}
-      />
+    <div className="min-w-0 space-y-3 pt-3">
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <div className="min-w-0">
-
-        <p role="status" className="text-sm text-primary">
-          {message}
-        </p>
-        {tab === "form" && (<div className="mt-3 min-w-0">
+      <Tabs value={tab} onValueChange={setTab} activationMode="manual" className="min-w-0 gap-3">
+        {/* NAN_SUBMISSION_LOG_ICON_FORM_V1 */}
+        <TabsList aria-label="แบบบันทึกการนำส่งตัวอย่างวิเคราะห์" className="mx-auto w-full max-w-xl rounded-full border bg-card p-1 shadow-sm group-data-[orientation=horizontal]/tabs:h-11">
+          <TabsTrigger value="form" disabled={busy || loading || !!loadError} className="rounded-full px-4" style={tab === "form" ? { backgroundColor: "#173b63", color: "#ffffff" } : undefined}>กรอกข้อมูล</TabsTrigger>
+          <TabsTrigger value="history" disabled={busy || loading || !!loadError} className="rounded-full px-4" style={tab === "history" ? { backgroundColor: "#173b63", color: "#ffffff" } : undefined}>ดูประวัติ</TabsTrigger>
+        </TabsList>
+        <p role="status" className="text-sm text-primary empty:hidden">{message}</p>
+        <TabsContent value="form" className="min-w-0">
           <form
             noValidate
             className="space-y-4"
@@ -89,9 +87,10 @@ export function SubmissionLogWorkspace() {
             }}
           >
             {row.id && (
-              <p className="break-all text-sm text-primary">
-                กำลังแก้ไขเอกสาร: {row.doc_no}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm">
+                <p className="break-all">กำลังแก้ไขเอกสาร: <span className="font-semibold">{row.doc_no}</span></p>
+                <Button type="button" variant="ghost" size="sm" onClick={() => request(blankLog())}>ยกเลิกการแก้ไข</Button>
+              </div>
             )}
             <div
               ref={summary}
@@ -127,18 +126,11 @@ export function SubmissionLogWorkspace() {
               }}
             />
             <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => request(blankLog())}
-              >
-                {row.id ? "ยกเลิกการแก้ไข / เริ่มใหม่" : "ล้างข้อมูล"}
-              </Button>
-              <Button type="submit">บันทึกเอกสาร</Button>
+              <Button type="submit" disabled={busy || loading || !!loadError} className="bg-[#173b63] text-white hover:bg-[#173b63]/90">บันทึก</Button>
             </div>
           </form>
-        </div>)}
-        {tab === "history" && (<div className="mt-3 min-w-0">
+        </TabsContent>
+        <TabsContent value="history" className="min-w-0">
           <SubmissionLogHistory
             records={records}
             onEdit={request}
@@ -155,8 +147,8 @@ export function SubmissionLogWorkspace() {
               setMessage("ลบเอกสารจากรายการแล้ว");
             }}
           />
-        </div>)}
-      </div>
+        </TabsContent>
+      </Tabs>
       </fieldset>
       <AlertDialog
         open={!!pending}
