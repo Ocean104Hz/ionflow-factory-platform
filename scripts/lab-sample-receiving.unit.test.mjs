@@ -1,3 +1,4 @@
+// NAN_LAB_ITECH_THEME_V1
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -7,7 +8,7 @@ import ts from "typescript";
 // โหลดไฟล์ Domain จริงมาใช้ทดสอบ
 const source = readFileSync(
   new URL(
-    "../src/features/lab-sample-receiving/lab-sample-receiving-domain.ts",
+    "../src/features/lab_sample_receiving/lab_sample_receiving_domain.ts",
     import.meta.url,
   ),
   "utf8",

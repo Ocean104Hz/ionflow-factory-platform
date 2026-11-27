@@ -1,3 +1,4 @@
+// NAN_LAB_ITECH_THEME_V1
 
 "use client";
 
@@ -16,9 +17,7 @@ import {
   AlertDialogCancel,
 } from "@/src/components/ui/alert-dialog";
 
-import { DocumentViewActions,
-  PageHeader,
-} from "@/src/components/factory/patterns";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 
@@ -64,7 +63,7 @@ export function LabSampleReceivingWorkspace() {
 
   /* ---------------- UI state ---------------- */
 
-  const [tab, setTab] = useState<TabKey>("history");
+  const [tab, setTab] = useState<TabKey>("form");
 
   const [errors, setErrors] =
     useState<LabSampleErrors>({});
@@ -231,20 +230,19 @@ export function LabSampleReceivingWorkspace() {
   /* ---------------- render ---------------- */
 
   return (
-    <div className="min-w-0 space-y-5">
-      {/* Page Header */}
-
-      <PageHeader
-        title="i-Lab แบบบันทึกรับตัวอย่าง"
-        description="จัดการข้อมูลการรับตัวอย่างเพื่อตรวจวิเคราะห์"
-        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างแบบบันทึกรับตัวอย่าง" disabled={busy || loading || !!loadError} onCreate={handleNew} onHistory={() => setTab("history")} />}
-      />
-
+    <div className="factory-itech-theme min-w-0 space-y-3 pt-3">
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <div className="min-w-0">
-
+      <Tabs value={tab} activationMode="manual" className="min-w-0 gap-3" onValueChange={(value) => {
+        if (busy || loading || loadError) return;
+        if (value === "form") handleNew();
+        else if (value === "history") setTab("history");
+      }}>
+        <TabsList aria-label="i-Lab แบบบันทึกรับตัวอย่าง" className="factory-itech-tabs">
+          <TabsTrigger value="form" disabled={busy || loading || !!loadError}>กรอกข้อมูล</TabsTrigger>
+          <TabsTrigger value="history" disabled={busy || loading || !!loadError}>ดูประวัติ</TabsTrigger>
+        </TabsList>
 
         {/* Message */}
 
@@ -259,7 +257,7 @@ export function LabSampleReceivingWorkspace() {
 
         {/* Form Tab */}
 
-        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
+        <TabsContent value="form" className="min-w-0 space-y-4">
           {isEditing && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
               <div className="text-sm text-foreground">
@@ -314,13 +312,13 @@ export function LabSampleReceivingWorkspace() {
               setMessage("");
             }}
             onSave={handleSave}
-            onReset={handleNew}
+            // onReset={handleNew}
           />
-        </div>)}
+        </TabsContent>
 
         {/* History Tab */}
 
-        {tab === "history" && (<div className="mt-3 min-w-0">
+        <TabsContent value="history" className="min-w-0">
           <LabSampleReceivingHistory
             records={records}
             onEdit={handleEdit}
@@ -330,8 +328,8 @@ export function LabSampleReceivingWorkspace() {
               setDeleteSheet(sheet)
             }
           />
-        </div>)}
-      </div>
+        </TabsContent>
+      </Tabs>
       </fieldset>
 
       {/* Confirm Unsaved Changes */}

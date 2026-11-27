@@ -1,3 +1,4 @@
+// NAN_LAB_ITECH_THEME_V1
 
 "use client";
 
@@ -5,7 +6,8 @@ import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-actio
 import { useState } from "react";
 
 import {
-  Eye,
+  Download,
+  FileText,
   Pencil,
   Printer,
   Search,
@@ -15,6 +17,7 @@ import {
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
 
 import {
   SectionCard,
@@ -154,6 +157,7 @@ export function LabSampleReceivingHistory({
       {/* Search and Filters */}
 
       <SectionCard
+        contentClassName="space-y-4"
         title="ประวัติแบบบันทึกรับตัวอย่าง"
         subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
@@ -186,60 +190,36 @@ export function LabSampleReceivingHistory({
             </div>
 
             {/* From Date */}
-
-            <div className="grid min-w-0 content-start gap-2">
-              <Label htmlFor="lab-history-from">
-                จากวันที่บันทึก
-              </Label>
-
-              <Input
-                id="lab-history-from"
-                type="date"
-                value={draftFilters.from}
-                aria-invalid={Boolean(filterError)}
-                aria-describedby={
-                  filterError
-                    ? "lab-history-filter-error"
-                    : undefined
-                }
-                onChange={(event) =>
-                  setDraftFilters((current) => ({
-                    ...current,
-                    from: event.currentTarget.value,
-                  }))
-                }
-              />
+            <div className="factory-itech-date-filter min-w-0">
+              <ThaiBuddhistDatePicker label="จากวันที่บันทึก" value={draftFilters.from} onChange={(value) => setDraftFilters((current) => ({ ...current, from: value }))} />
             </div>
 
             {/* To Date */}
+            <div className="factory-itech-date-filter min-w-0">
+              <ThaiBuddhistDatePicker label="ถึงวันที่บันทึก" value={draftFilters.to} onChange={(value) => setDraftFilters((current) => ({ ...current, to: value }))} error={filterError || undefined} />
+            </div>
 
-            <div className="grid min-w-0 content-start gap-2">
-              <Label htmlFor="lab-history-to">
-                ถึงวันที่บันทึก
-              </Label>
-
-              <Input
-                id="lab-history-to"
-                type="date"
-                value={draftFilters.to}
-                aria-invalid={Boolean(filterError)}
-                aria-describedby={
-                  filterError
-                    ? "lab-history-filter-error"
-                    : undefined
-                }
-                onChange={(event) =>
-                  setDraftFilters((current) => ({
-                    ...current,
-                    to: event.currentTarget.value,
-                  }))
-                }
+            <div className="min-w-0">
+              <SelectField
+                label="แสดงต่อหน้า"
+                value={String(pageSize)}
+                onChange={(value) => {
+                  setPageSize(Number(value));
+                  setPage(1);
+                }}
+                options={[5, 10, 20, 50, 100].map(
+                  (number) => ({
+                    value: String(number),
+                    label: `${number} รายการ`,
+                  }),
+                )}
               />
             </div>
+          </div>
 
             {/* Actions */}
 
-            <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Button type="submit">
                 <Search
                   className="size-4"
@@ -256,7 +236,6 @@ export function LabSampleReceivingHistory({
                 ล้างตัวกรอง
               </Button>
             </div>
-          </div>
 
           {/* Filter Error */}
 
@@ -264,46 +243,18 @@ export function LabSampleReceivingHistory({
             <p
               id="lab-history-filter-error"
               role="alert"
-              className="text-sm text-danger"
+              className="sr-only"
             >
               {filterError}
             </p>
           )}
         </form>
-      </SectionCard>
 
-      {/* Page Size */}
-
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="text-sm text-muted-foreground">
-          ทั้งหมด{" "}
-          <span className="font-semibold text-foreground">
-            {filteredRecords.length}
-          </span>{" "}
-          เอกสาร
-        </div>
-
-        <div className="w-40">
-          <SelectField
-            label="แสดงต่อหน้า"
-            value={String(pageSize)}
-            onChange={(value) => {
-              setPageSize(Number(value));
-              setPage(1);
-            }}
-            options={[5, 10, 20, 50, 100].map(
-              (number) => ({
-                value: String(number),
-                label: `${number} รายการ`,
-              }),
-            )}
-          />
-        </div>
-      </div>
+        <p className="text-sm text-muted-foreground">ทั้งหมด <span className="font-semibold text-foreground">{filteredRecords.length}</span> เอกสาร</p>
 
       {/* History Table */}
 
-      <FactoryDataTable variant="history"
+        <FactoryDataTable variant="history"
         rows={paginated.items}
         rowKey={(sheet) => sheet.id}
         minWidth={1200}
@@ -410,15 +361,15 @@ export function LabSampleReceivingHistory({
             key: "actions",
             label: "จัดการ",
             render: (sheet) => (
-              <RowActionMenu>
+              <RowActionMenu appearance="itech">
                 {/* View */}
 
                 <RowActionItem type="button" onClick={() => onView(sheet)}>
-                  <Eye
+                  <FileText
                     className="size-4"
                     aria-hidden="true"
                   />
-                  ดู
+                  ดูรายงาน
                 </RowActionItem>
 
                 {/* Print */}
@@ -428,7 +379,7 @@ export function LabSampleReceivingHistory({
                     className="size-4"
                     aria-hidden="true"
                   />
-                  พิมพ์
+                  พิมพ์เอกสาร
                 </RowActionItem>
 
                 {/* Edit */}
@@ -441,6 +392,11 @@ export function LabSampleReceivingHistory({
                   แก้ไข
                 </RowActionItem>
 
+                <RowActionItem disabled title="ยังไม่เปิดใช้งานการนำออก Excel">
+                  <Download className="size-4" aria-hidden="true" />
+                  นำออก Excel
+                </RowActionItem>
+
                 {/* Delete */}
 
                 <RowActionItem type="button" onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
@@ -448,7 +404,7 @@ export function LabSampleReceivingHistory({
                     className="size-4"
                     aria-hidden="true"
                   />
-                  ลบ
+                  ลบเอกสาร
                 </RowActionItem>
               </RowActionMenu>
             ),
@@ -462,7 +418,8 @@ export function LabSampleReceivingHistory({
             onChange={setPage}
           />
         }
-      />
+        />
+      </SectionCard>
     </div>
   );
 }

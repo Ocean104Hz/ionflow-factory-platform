@@ -1,19 +1,20 @@
+// NAN_LAB_ITECH_THEME_V1
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import ts from "typescript";
 
-const feature = "src/features/lab-sample-receiving/";
+const feature = "src/features/lab_sample_receiving/";
 
 const paths = {
-  page: "app/(factory)/lab-sample-receiving/page.tsx",
-  domain: `${feature}lab-sample-receiving-domain.ts`,
-  workspace: `${feature}lab-sample-receiving-workspace.tsx`,
-  form: `${feature}lab-sample-receiving-form.tsx`,
-  history: `${feature}lab-sample-receiving-history.tsx`,
-  detail: `${feature}lab-sample-receiving-detail.tsx`,
-  paper: `${feature}lab-sample-receiving-paper.tsx`,
+  page: "app/(factory)/lab_sample_receiving/page.tsx",
+  domain: `${feature}lab_sample_receiving_domain.ts`,
+  workspace: `${feature}lab_sample_receiving_workspace.tsx`,
+  form: `${feature}lab_sample_receiving_form.tsx`,
+  history: `${feature}lab_sample_receiving_history.tsx`,
+  detail: `${feature}lab_sample_receiving_detail.tsx`,
+  paper: `${feature}lab_sample_receiving_paper.tsx`,
   mock: "src/lib/mock-data/lab-sample-receiving.ts",
 };
 
@@ -304,7 +305,7 @@ test(
 /* ---------------- Test 5 ---------------- */
 
 test(
-  "form provides add, remove, reset and submit actions",
+  "form provides add, remove and submit actions",
   () => {
     assert.match(
       source.form,
@@ -321,7 +322,11 @@ test(
       /blankLabSampleRow\(crypto\.randomUUID\(\)\)/,
     );
 
-    assert.match(source.form, /onReset/);
+    assert.doesNotMatch(source.form, /onReset/);
+    assert.equal(
+      (source.form.match(/onClick=\{addRow\}/g) ?? []).length,
+      1,
+    );
     assert.match(source.form, /onSave\(\)/);
 
     assert.match(
@@ -489,15 +494,15 @@ test(
 /* ---------------- Test 8 ---------------- */
 
 test(
-  "workspace connects mock data, validation, form, history and detail",
+  "workspace connects live QC data, validation, form, history and detail",
   () => {
     const workspace = source.workspace;
 
     for (const token of [
-      "structuredClone(demoLabSampleReceivingSheets)",
+      'useQcDocuments<LabSampleReceivingSheet>("lab_sample_receiving")',
       "validateLabSheet",
-      "saveLabSheet",
-      "deleteLabSheet",
+      "persist(draft)",
+      "remove(deletedId)",
       "LabSampleReceivingForm",
       "LabSampleReceivingHistory",
       "LabSampleReceivingDetail",
@@ -517,7 +522,7 @@ test(
 
     assert.doesNotMatch(
       workspace,
-      /\bfetch\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/,
+      /\bfetch\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|demoLabSampleReceivingSheets/,
     );
 
     assert.match(
@@ -531,3 +536,37 @@ test(
     );
   },
 );
+
+
+// NAN_LAB_ITECH_THEME_V1: regression for opt-in theme and unchanged field/filter wiring.
+test("i-Lab reuses opt-in iTech theme, shared dates and existing actions", () => {
+  const theme = read("app/globals.css");
+  const menu = read("src/components/factory/row-action-menu.tsx");
+  assert.match(theme, /\.factory-itech-theme,\s*\.factory-itech-action-menu\s*\{/);
+  assert.match(theme, /--factory-itech-navy: #173b63/);
+  assert.match(theme, /--factory-itech-lime: #9ec23a/);
+  assert.match(theme, /\.factory-itech-theme \.factory-section/);
+  assert.match(source.workspace, /className="factory-itech-theme /);
+  assert.match(source.workspace, /<Tabs value=\{tab\}/);
+  assert.match(source.workspace, /<TabsTrigger value="form"/);
+  assert.match(source.workspace, /<TabsTrigger value="history"/);
+  assert.match(source.workspace, /if \(value === "form"\) handleNew\(\)/);
+  assert.match(source.workspace, /if \(hasUnsavedChanges\)/);
+  assert.match(source.workspace, /await persist\(draft\)/);
+  assert.match(source.workspace, /await remove\(deletedId\)/);
+  assert.match(source.form, /factory-itech-form-table/);
+  assert.match(source.form, /<ThaiBuddhistDatePicker label=\{label\} value=\{value\} onChange=\{onChange\}/);
+  const dateFields = formCalls.filter(call => /type:\s*"date"/.test(call.getText(formTree))).map(formFieldName);
+  assert.deepEqual(dateFields, ["sent_date", "lot_date", "received_date"]);
+  assert.match(source.history, /value=\{draftFilters.from\}/);
+  assert.match(source.history, /value=\{draftFilters.to\}/);
+  assert.match(source.history, /labFilterError\(draftFilters\)/);
+  assert.match(source.history, /setFilters\(\{ \.\.\.draftFilters \}\)/);
+  assert.match(source.history, /<FactoryDataTable variant="history"/);
+  assert.match(source.history, /<RowActionMenu appearance="itech">/);
+  for (const action of ["onView", "onPrint", "onEdit", "onDelete"]) assert.ok(source.history.includes(action + "(sheet)"));
+  assert.match(source.history, /<RowActionItem disabled title=/);
+  assert.match(menu, /appearance = "default"/);
+  assert.match(menu, /isItech \? "outline" : "ghost"/);
+  assert.match(source.detail, /\(print \? "" : "factory-itech-theme "\)/);
+});

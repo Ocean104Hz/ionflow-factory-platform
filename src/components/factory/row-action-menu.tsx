@@ -1,7 +1,8 @@
+// NAN_LAB_ITECH_THEME_V1
 "use client";
 
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Eye, Pencil } from "lucide-react";
+import { ChevronDown, Eye, Pencil } from "lucide-react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -16,17 +17,20 @@ export function RowActionMenu({
   readOnly = false,
   containsDialog = false,
   triggerId,
+  appearance = "default",
 }: {
   children: ReactNode;
   label?: string;
   readOnly?: boolean;
   containsDialog?: boolean;
   triggerId?: string;
+  appearance?: "default" | "itech";
 }) {
   const [keepMounted, setKeepMounted] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const Icon = readOnly ? Eye : Pencil;
+  const isItech = appearance === "itech";
 
   return (
     <DropdownMenu modal={false} onOpenChange={(open) => {
@@ -41,15 +45,15 @@ export function RowActionMenu({
       });
     }}>
       <DropdownMenuTrigger asChild>
-        <Button ref={trigger} id={triggerId} type="button" variant="ghost" size="icon" aria-label={label}>
-          <Icon aria-hidden="true" />
+        <Button ref={trigger} id={triggerId} type="button" variant={isItech ? "outline" : "ghost"} size={isItech ? "sm" : "icon"} className={isItech ? "factory-itech-action-trigger" : undefined} aria-label={label}>
+          {isItech ? <>จัดการ <ChevronDown className="size-3.5" aria-hidden="true" /></> : <Icon aria-hidden="true" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         ref={menu}
         align="end"
         forceMount={keepMounted ? true : undefined}
-        className="min-w-40 data-[state=closed]:hidden"
+        className={isItech ? "factory-itech-action-menu data-[state=closed]:hidden" : "min-w-40 data-[state=closed]:hidden"}
       >
         {children}
       </DropdownMenuContent>

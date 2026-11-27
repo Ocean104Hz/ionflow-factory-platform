@@ -643,3 +643,123 @@
   margin-top: 12px;
   border-top: 1px solid #e2e8f0;
 }
+
+/* NAN_LAB_ITECH_THEME_V1: opt-in iTech visual system. Do not apply to :root. */
+.factory-itech-theme,
+.factory-itech-action-menu {
+  --factory-itech-navy: #173b63;
+  --factory-itech-lime: #9ec23a;
+}
+.factory-itech-theme {
+  --primary: var(--factory-itech-navy);
+  --primary-foreground: #ffffff;
+  --primary-ink: var(--factory-itech-navy);
+  --ring: var(--factory-itech-lime);
+  --accent: color-mix(in srgb, var(--factory-itech-navy) 6%, var(--surface));
+  --accent-foreground: var(--foreground);
+  --table-header: color-mix(in srgb, var(--factory-itech-navy) 7%, var(--surface));
+}
+.dark .factory-itech-theme { --primary-ink: var(--foreground); }
+.factory-itech-tabs {
+  display: flex;
+  width: 100%;
+  max-width: 36rem;
+  height: 2.75rem;
+  margin-inline: auto;
+  padding: .25rem;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--surface);
+  box-shadow: var(--panel-shadow);
+}
+.factory-itech-tabs [data-slot="tabs-trigger"] {
+  border-radius: 9999px;
+  min-width: 0;
+  color: var(--foreground);
+}
+.factory-itech-tabs [data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--factory-itech-navy);
+  color: white;
+  border-color: transparent;
+}
+.factory-itech-theme .factory-section {
+  gap: 0;
+  padding-block: 0;
+  border-radius: .75rem;
+  background: var(--surface);
+  box-shadow: var(--panel-shadow);
+}
+.factory-itech-theme .factory-section > [data-slot="card-header"] {
+  border-bottom: 1px solid var(--border);
+  padding: .75rem 1rem;
+}
+.factory-itech-theme .factory-section > [data-slot="card-content"] { padding: 1rem; }
+.factory-itech-form-table [data-slot="table-head"] {
+  background: var(--factory-itech-navy, #173b63);
+  border-color: color-mix(in srgb, white 22%, var(--factory-itech-navy, #173b63));
+  color: #ffffff;
+}
+.factory-itech-form-table [data-slot="table-head"] .text-danger { color: #fecaca; }
+.factory-itech-theme .factory-table[data-variant="history"] { box-shadow: none; }
+.factory-itech-date-filter > div > label { line-height: 1; }
+/* Keep the picker accessible in table cells without duplicating the column heading. */
+.factory-itech-date-cell > div > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.factory-itech-date-cell > div > button {
+  margin-top: 0;
+  height: 2.25rem;
+  background: var(--surface);
+  box-shadow: none;
+}
+.factory-itech-action-trigger[data-slot="button"][data-variant="outline"] {
+  height: 2.25rem;
+  gap: .25rem;
+  padding-inline: .625rem;
+  border-color: var(--factory-itech-lime, #9ec23a);
+  border-radius: .625rem;
+  color: var(--factory-itech-navy, #173b63);
+  background: var(--surface);
+  box-shadow: none;
+  font-size: .75rem;
+  font-weight: 600;
+}
+.dark .factory-itech-action-trigger[data-slot="button"][data-variant="outline"] { color: var(--foreground); }
+.factory-itech-action-trigger[data-slot="button"][data-variant="outline"]:hover:not(:disabled),
+.factory-itech-action-trigger[data-slot="button"][data-state="open"] {
+  border-color: var(--factory-itech-lime, #9ec23a);
+  background: color-mix(in srgb, var(--factory-itech-navy, #173b63) 6%, var(--surface));
+}
+.factory-itech-action-menu {
+  width: 13rem;
+  max-width: calc(100vw - 1rem);
+  padding: .375rem;
+  border-radius: .75rem;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 12px 30px rgb(23 32 51 / 14%);
+}
+.factory-itech-action-menu [role="menuitem"] {
+  min-height: 2.5rem;
+  gap: .625rem;
+  padding: .625rem .75rem;
+  border-radius: .5rem;
+  justify-content: flex-start;
+  font-size: .875rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.factory-itech-action-menu [role="menuitem"] svg { color: currentColor; }
+.factory-itech-action-menu [role="menuitem"]:not(.text-destructive):not([data-disabled]) { color: var(--foreground); }
+.factory-itech-action-menu [role="menuitem"][data-highlighted] { background: color-mix(in srgb, var(--factory-itech-navy) 6%, var(--surface)); }
+.factory-itech-action-menu [role="menuitem"].text-destructive { color: var(--destructive); }
+.factory-itech-action-menu [role="menuitem"].text-destructive[data-highlighted] { background: color-mix(in srgb, var(--destructive) 10%, var(--surface)); }
+.factory-itech-action-menu [role="menuitem"][data-disabled] { opacity: .4; cursor: not-allowed; }

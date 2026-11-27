@@ -1,3 +1,4 @@
+// NAN_LAB_ITECH_THEME_V1
 
 "use client";
 
@@ -110,6 +111,7 @@ export function LabSampleReceivingDetail({
       <DialogContent
         variant={print ? "preview" : "default"}
         className={
+          (print ? "" : "factory-itech-theme ") +
           "flex max-h-[94dvh] w-[96vw] max-w-none " +
           "flex-col gap-4 overflow-hidden p-4 " +
           "sm:max-w-350 sm:p-6"
