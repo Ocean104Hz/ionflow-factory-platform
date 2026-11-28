@@ -33,16 +33,16 @@ export function createCsrfToken(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-export function csrfTokensMatch(cookieToken: string, headerToken: string): boolean {
+export function csrfTokenFailure(cookieToken: string, headerToken: string) {
+  if (!cookieToken || !headerToken) return "csrf_missing";
   if (
+    cookieToken.length !== 43 || headerToken.length !== 43 ||
     !/^[A-Za-z0-9_-]{43}$/.test(cookieToken) ||
     !/^[A-Za-z0-9_-]{43}$/.test(headerToken)
   )
-    return false;
-  return crypto.timingSafeEqual(
-    Buffer.from(cookieToken),
-    Buffer.from(headerToken),
-  );
+    return "csrf_invalid";
+  if (!crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken)))
+    return "csrf_mismatch";
 }
 
 export function requireFactoryModule(
