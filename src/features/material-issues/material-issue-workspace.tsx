@@ -3,13 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Save } from "lucide-react";
 
-import { DocumentViewActions,
-    PageHeader,
-    StatusBadge,
-} from "@/src/components/factory/patterns";
-
 import { Button } from "@/src/components/ui/button";
-
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
+import { DocumentEditBanner } from "@/src/components/factory/document-edit-banner";
 
 import {
     AlertDialog,
@@ -94,7 +90,7 @@ async function fetchRecord(id: string): Promise<MaterialIssueRecord> {
 }
 
 export function MaterialIssueWorkspace() {
-    const [tab, setTab] = useState("history");
+    const [tab, setTab] = useState("form");
 
     const [records, setRecords] = useState<
         MaterialIssueRecord[]
@@ -596,16 +592,16 @@ export function MaterialIssueWorkspace() {
     }
 
     return (
-        <div className="min-w-0 space-y-5">
+        <div className="factory-itech-theme min-w-0 space-y-5">
 
-            {/* Page Header */}
-            <PageHeader
-                title="ใบเบิกจ่ายวัสดุ"
-                actions={<><StatusBadge tone="info">{connected ? "เชื่อมต่อฐานข้อมูลแล้ว" : "ยังไม่เชื่อมต่อฐานข้อมูล"}</StatusBadge><DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบเบิกจ่ายวัสดุ" disabled={saving} onCreate={requestNewDocument} onHistory={() => setTab("history")} /></>}
-            />
-
-            <div className="min-w-0">
-
+            <Tabs value={tab} activationMode="manual" className="min-w-0 gap-3" onValueChange={(value) => {
+                if (savingRef.current || saving) return;
+                if (value === "form" || value === "history") setTab(value);
+            }}>
+                <TabsList aria-label="ใบเบิกจ่ายวัสดุ" className="factory-itech-tabs">
+                    <TabsTrigger value="form" disabled={saving}>กรอกข้อมูล</TabsTrigger>
+                    <TabsTrigger value="history" disabled={saving}>ดูประวัติ</TabsTrigger>
+                </TabsList>
 
                 {/* Messages */}
                 {message && (
@@ -630,32 +626,16 @@ export function MaterialIssueWorkspace() {
             Tab: Form
         ========================== */}
 
-                {tab === "form" && (<div className="mt-3 min-w-0">
+                <TabsContent value="form" className="mt-3 min-w-0">
                     <div className="space-y-5">
 
                         {editingRecord && (
-                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
-                                <p className="text-sm text-primary">
-                                    กำลังแก้ไขใบเบิกจ่ายวัสดุ:
-                                    {" "}
-                                    <span className="font-medium">
-                                        {
-                                            editingRecord.documentNo
-                                        }
-                                    </span>
-                                </p>
-
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={
-                                        requestNewDocument
-                                    }
-                                >
-                                    สร้างเอกสารใหม่
-                                </Button>
-                            </div>
+                            <DocumentEditBanner
+                                label="กำลังแก้ไขใบเบิกจ่ายวัสดุ:"
+                                documentNo={editingRecord.documentNo}
+                                disabled={saving}
+                                onCancel={requestNewDocument}
+                            />
                         )}
 
                         {/* ฟอร์มเดิม */}
@@ -698,21 +678,21 @@ export function MaterialIssueWorkspace() {
                             </Button>
                         </div>
                     </div>
-                </div>)}
+                </TabsContent>
 
                 {/* ==========================
             Tab: History
         ========================== */}
 
-                {tab === "history" && (<div className="mt-3 min-w-0">
+                <TabsContent value="history" className="mt-3 min-w-0">
                     <MaterialIssueHistory
                         records={records}
                         onView={handleViewRecord}
                         onEdit={handleEditRecord}
                         onDelete={handleDeleteRecord}
                     />
-                </div>)}
-            </div>
+                </TabsContent>
+            </Tabs>
 
             {/* Confirm Unsaved Changes */}
             <AlertDialog

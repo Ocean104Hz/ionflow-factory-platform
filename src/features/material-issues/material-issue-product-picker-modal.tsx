@@ -91,7 +91,7 @@ export function MaterialIssueProductPickerModal({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-4xl overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-black/40"
+      className="factory-itech-theme fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-4xl overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-black/40"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -160,7 +160,7 @@ export function MaterialIssueProductPickerModal({
         {/* Product Table */}
         <div className="min-h-0 flex-1 overflow-auto p-5">
           <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-162.5">
+            <Table className="factory-itech-form-table min-w-162.5">
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-16 text-center">

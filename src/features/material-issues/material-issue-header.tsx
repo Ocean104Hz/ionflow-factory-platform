@@ -71,7 +71,7 @@ export function MaterialIssueHeader({
         >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
                 {/* วันที่ */}
-                <div className="[&_label]:leading-none">
+                <div className="factory-itech-date-filter min-w-0">
                     <ThaiBuddhistDatePicker
                         label="วันที่"
                         value={values.issueDate}

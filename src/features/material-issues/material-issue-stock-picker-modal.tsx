@@ -106,7 +106,7 @@ export function MaterialIssueStockPickerModal({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-4xl overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-black/40"
+      className="factory-itech-theme fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-4xl overflow-hidden rounded-xl border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-black/40"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -176,7 +176,7 @@ export function MaterialIssueStockPickerModal({
         <div className="min-h-0 min-w-0 flex-1 overflow-auto p-5">
           <div className="w-full min-w-0 overflow-x-auto rounded-md border">
 
-            <Table className="w-full min-w-150 table-fixed">
+            <Table className="factory-itech-form-table w-full min-w-150 table-fixed">
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-12 text-center">
