@@ -51,7 +51,7 @@ function createNewDocument(
 
   return {
     ...blankQcWeightEntryDocument(rowId),
-    doc_no: `QC-W-${rowId}`,
+    doc_no: "",
     doc_date: today,
     prepared_date: today,
     checked_date: today,

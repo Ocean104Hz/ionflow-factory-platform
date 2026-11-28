@@ -472,7 +472,7 @@ export function validateQcWeightDocument(
 
   if (!document.doc_no.trim()) {
     errors.doc_no =
-      "ไม่พบเลขที่เอกสารภายใน";
+      "กรุณากรอกเลขที่เอกสาร";
   }
 
   /* Product */

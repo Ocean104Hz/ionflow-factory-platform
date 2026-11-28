@@ -88,9 +88,6 @@ export function QcProductWeightCheckForm({
   ) {
     onChange({
       ...document,
-      doc_no:
-        document.doc_no.trim() ||
-        `QC-W-${crypto.randomUUID()}`,
       [field]: value,
     });
   }
@@ -312,9 +309,18 @@ export function QcProductWeightCheckForm({
             <Input
               id="qc-weight-doc-no"
               value={document.doc_no}
-              placeholder="ระบบสร้างเลขที่เอกสารอัตโนมัติ"
-              readOnly
-              className={`${inputClass} bg-muted/40`}
+              placeholder="ระบุเลขที่เอกสาร"
+              aria-required
+              aria-invalid={Boolean(errors.doc_no)}
+              aria-describedby={
+                errors.doc_no
+                  ? "qc-weight-error-doc_no"
+                  : undefined
+              }
+              onChange={(event) =>
+                updateHeader("doc_no", event.currentTarget.value)
+              }
+              className={inputClass}
             />
 
             {fieldError("doc_no")}
@@ -532,166 +538,166 @@ export function QcProductWeightCheckForm({
                             </TableRow>
                           </>
                         )}
-                      <TableRow>
-                        {/* One shared time for a compatible pair; legacy distinct times stay separate. */}
-                        {timeSpan !== 0 && (
-                          <TableCell rowSpan={timeSpan} className="border border-border p-2 align-middle whitespace-normal">
-                            <ThaiTime15Picker
-                              label={timeSpan === 2 ? `เวลารอบตรวจที่ ${rowIndex + 1}–${rowIndex + 2}` : `เวลารอบตรวจที่ ${rowIndex + 1}`}
-                              value={row.time}
-                              onChange={(value) => onChange(updateQcWeightRoundTime(document, rowIndex, value))}
-                              error={timeError}
-                              allowEmpty
-                            />
-                          </TableCell>
-                        )}
-
-                        {/* Measurement Groups */}
-
-                        {QC_WEIGHT_GROUP_KEYS.flatMap(
-                          (group, groupIndex) =>
-                            QC_WEIGHT_READING_INDEXES.map(
-                              (index) => {
-                                const key = `rows.${rowIndex}.${group}.${index}`;
-
-                                return (
-                                  <TableCell
-                                    key={`${row.id}-${group}-${index}`}
-                                    className={
-                                      cellClass
-                                    }
-                                  >
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      value={
-                                        row
-                                          .measurements[
-                                        group
-                                        ][index]
-                                      }
-                                      placeholder="0.005"
-                                      aria-label={`รอบที่ ${rowIndex + 1} กลุ่มที่ ${groupIndex + 1} ค่า ${index + 1}`}
-                                      aria-invalid={Boolean(
-                                        errors[key],
-                                      )}
-                                      onChange={(
-                                        event,
-                                      ) =>
-                                        updateReading(
-                                          row.id,
-                                          group,
-                                          index,
-                                          event
-                                            .currentTarget
-                                            .value,
-                                        )
-                                      }
-                                      className={`${inputClass} text-center tabular-nums`}
-                                    />
-
-                                    {fieldError(key)}
-                                  </TableCell>
-                                );
-                              },
-                            ),
-                        )}
-
-                        {/* Average */}
-
-                        <TableCell className={cellClass}>
-                          <Input
-                            type="text"
-                            value={row.average}
-                            placeholder="คำนวณอัตโนมัติ"
-                            aria-label={`ค่าเฉลี่ยรอบที่ ${rowIndex + 1}`}
-                            aria-invalid={Boolean(averageError)}
-                            readOnly
-                            className={`${inputClass} bg-muted/40 text-center tabular-nums`}
-                          />
-
-                          {fieldError(`rows.${rowIndex}.average`)}
-                        </TableCell>
-
-                        {/* Result */}
-
-                        <TableCell
-                          className={cellClass}
-                        >
-                          <Select
-                            value={
-                              row.result || "UNSET"
-                            }
-                            onValueChange={(value) => {
-                              const result: QcWeightResult =
-                                value === "PASS" ||
-                                  value === "FAIL"
-                                  ? value
-                                  : "";
-
-                              updateRow(row.id, {
-                                result,
-                              });
-                            }}
-                          >
-                            <SelectTrigger
-                              aria-label={`ผลตรวจรอบที่ ${rowIndex + 1}`}
-                              aria-invalid={Boolean(
-                                resultError,
-                              )}
-                              className="w-full min-w-0 bg-surface"
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-
-                            <SelectContent>
-                              <SelectItem value="UNSET">
-                                ยังไม่ระบุ
-                              </SelectItem>
-
-                              {QC_WEIGHT_RESULT_OPTIONS.map(
-                                (option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={
-                                      option.value
-                                    }
-                                  >
-                                    {option.label}
-                                  </SelectItem>
-                                ),
-                              )}
-                            </SelectContent>
-                          </Select>
-
-                          {fieldError(
-                            `rows.${rowIndex}.result`,
+                        <TableRow>
+                          {/* One shared time for a compatible pair; legacy distinct times stay separate. */}
+                          {timeSpan !== 0 && (
+                            <TableCell rowSpan={timeSpan} className="border border-border p-2 align-middle whitespace-normal">
+                              <ThaiTime15Picker
+                                label={timeSpan === 2 ? `เวลารอบตรวจที่ ${rowIndex + 1}–${rowIndex + 2}` : `เวลารอบตรวจที่ ${rowIndex + 1}`}
+                                value={row.time}
+                                onChange={(value) => onChange(updateQcWeightRoundTime(document, rowIndex, value))}
+                                error={timeError}
+                                allowEmpty
+                              />
+                            </TableCell>
                           )}
-                        </TableCell>
 
-                        {/* Delete Row */}
+                          {/* Measurement Groups */}
 
-                        <TableCell
-                          className={`${cellClass} text-center`}
-                        >
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() =>
-                              removeRow(row.id)
-                            }
-                            aria-label={`ลบรอบตรวจที่ ${rowIndex + 1}`}
-                            title="ลบรอบตรวจ"
-                            className="text-danger hover:text-danger"
-                          >
-                            <Trash2
-                              className="size-4"
-                              aria-hidden="true"
+                          {QC_WEIGHT_GROUP_KEYS.flatMap(
+                            (group, groupIndex) =>
+                              QC_WEIGHT_READING_INDEXES.map(
+                                (index) => {
+                                  const key = `rows.${rowIndex}.${group}.${index}`;
+
+                                  return (
+                                    <TableCell
+                                      key={`${row.id}-${group}-${index}`}
+                                      className={
+                                        cellClass
+                                      }
+                                    >
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={
+                                          row
+                                            .measurements[
+                                          group
+                                          ][index]
+                                        }
+                                        placeholder="0.005"
+                                        aria-label={`รอบที่ ${rowIndex + 1} กลุ่มที่ ${groupIndex + 1} ค่า ${index + 1}`}
+                                        aria-invalid={Boolean(
+                                          errors[key],
+                                        )}
+                                        onChange={(
+                                          event,
+                                        ) =>
+                                          updateReading(
+                                            row.id,
+                                            group,
+                                            index,
+                                            event
+                                              .currentTarget
+                                              .value,
+                                          )
+                                        }
+                                        className={`${inputClass} text-center tabular-nums`}
+                                      />
+
+                                      {fieldError(key)}
+                                    </TableCell>
+                                  );
+                                },
+                              ),
+                          )}
+
+                          {/* Average */}
+
+                          <TableCell className={cellClass}>
+                            <Input
+                              type="text"
+                              value={row.average}
+                              placeholder="คำนวณอัตโนมัติ"
+                              aria-label={`ค่าเฉลี่ยรอบที่ ${rowIndex + 1}`}
+                              aria-invalid={Boolean(averageError)}
+                              readOnly
+                              className={`${inputClass} bg-muted/40 text-center tabular-nums`}
                             />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+
+                            {fieldError(`rows.${rowIndex}.average`)}
+                          </TableCell>
+
+                          {/* Result */}
+
+                          <TableCell
+                            className={cellClass}
+                          >
+                            <Select
+                              value={
+                                row.result || "UNSET"
+                              }
+                              onValueChange={(value) => {
+                                const result: QcWeightResult =
+                                  value === "PASS" ||
+                                    value === "FAIL"
+                                    ? value
+                                    : "";
+
+                                updateRow(row.id, {
+                                  result,
+                                });
+                              }}
+                            >
+                              <SelectTrigger
+                                aria-label={`ผลตรวจรอบที่ ${rowIndex + 1}`}
+                                aria-invalid={Boolean(
+                                  resultError,
+                                )}
+                                className="w-full min-w-0 bg-surface"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+
+                              <SelectContent>
+                                <SelectItem value="UNSET">
+                                  ยังไม่ระบุ
+                                </SelectItem>
+
+                                {QC_WEIGHT_RESULT_OPTIONS.map(
+                                  (option) => (
+                                    <SelectItem
+                                      key={option.value}
+                                      value={
+                                        option.value
+                                      }
+                                    >
+                                      {option.label}
+                                    </SelectItem>
+                                  ),
+                                )}
+                              </SelectContent>
+                            </Select>
+
+                            {fieldError(
+                              `rows.${rowIndex}.result`,
+                            )}
+                          </TableCell>
+
+                          {/* Delete Row */}
+
+                          <TableCell
+                            className={`${cellClass} text-center`}
+                          >
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() =>
+                                removeRow(row.id)
+                              }
+                              aria-label={`ลบรอบตรวจที่ ${rowIndex + 1}`}
+                              title="ลบรอบตรวจ"
+                              className="text-danger hover:text-danger"
+                            >
+                              <Trash2
+                                className="size-4"
+                                aria-hidden="true"
+                              />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       </Fragment>
                     );
                   },
@@ -786,7 +792,7 @@ export function QcProductWeightCheckForm({
         <Button type="submit">
           {document.id
             ? "บันทึกการแก้ไข"
-            : "บันทึกข้อมูล"}
+            : "บันทึก"}
         </Button>
       </div>
     </form>

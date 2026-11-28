@@ -20,7 +20,17 @@ test("all existing document form fields are retained", () => {
   assert.deepEqual(actual.sort(), expected.sort());
   assert.match(source.form, /value=\{document\.remark\}/);
   assert.match(source.form, /updateHeader\(\s*"remark",\s*event\s*\.\s*currentTarget\s*\.\s*value\s*,?\s*\)/);
-  assert.match(source.form, /doc_no:\s*document\.doc_no\.trim\(\)\s*\|\|/);
+  assert.doesNotMatch(source.form, /doc_no:\s*document\.doc_no\.trim\(\)\s*\|\|/);
+
+  const docNoInput = source.form.match(
+    /<Input\s+id="qc-weight-doc-no"[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(docNoInput);
+  assert.match(docNoInput, /value=\{document\.doc_no\}/);
+  assert.match(docNoInput, /updateHeader\("doc_no", event\.currentTarget\.value\)/);
+  assert.doesNotMatch(docNoInput, /\breadOnly\b/);
+  assert.equal(domain.blankQcWeightEntryDocument("row-1").doc_no, "");
   assert.match(source.form, /\[field\]: value/);
 });
 
