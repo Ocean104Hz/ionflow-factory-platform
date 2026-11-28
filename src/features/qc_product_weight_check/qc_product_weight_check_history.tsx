@@ -1,4 +1,4 @@
-
+// NAN_QC_WEIGHT_ITECH_V1
 "use client";
 
 import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Label } from "@/src/components/ui/label";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
 
 import {
   FactoryDataTable,
@@ -90,6 +91,7 @@ function formatUpdatedAt(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Asia/Bangkok",
+    hourCycle: "h23",
   }).format(new Date(value));
 }
 
@@ -176,6 +178,7 @@ export function QcProductWeightCheckHistory({
       {/* Search And Filters */}
 
       <SectionCard
+        contentClassName="space-y-4"
         title="ประวัติการตรวจเช็ค QC น้ำหนักผลิตภัณฑ์"
         subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
       >
@@ -210,80 +213,37 @@ export function QcProductWeightCheckHistory({
             </div>
 
             {/* From Date */}
-
-            <div className="grid min-w-0 content-start gap-2">
-              <Label htmlFor="qc-weight-history-from">
-                จากวันที่เอกสาร
-              </Label>
-
-              <Input
-                id="qc-weight-history-from"
-                type="date"
-                value={draftFilters.from}
-                aria-invalid={Boolean(filterError)}
-                aria-describedby={
-                  filterError
-                    ? "qc-weight-history-filter-error"
-                    : undefined
-                }
-                onChange={(event) => {
-                  setDraftFilters((current) => ({
-                    ...current,
-                    from: event.currentTarget.value,
-                  }));
-
-                  setFilterError("");
-                }}
-              />
+            <div className="factory-itech-date-filter min-w-0">
+              <ThaiBuddhistDatePicker label="จากวันที่เอกสาร" value={draftFilters.from} onChange={(value) => {
+                setDraftFilters((current) => ({ ...current, from: value }));
+                setFilterError("");
+              }} />
             </div>
 
             {/* To Date */}
-
-            <div className="grid min-w-0 content-start gap-2">
-              <Label htmlFor="qc-weight-history-to">
-                ถึงวันที่เอกสาร
-              </Label>
-
-              <Input
-                id="qc-weight-history-to"
-                type="date"
-                value={draftFilters.to}
-                aria-invalid={Boolean(filterError)}
-                aria-describedby={
-                  filterError
-                    ? "qc-weight-history-filter-error"
-                    : undefined
-                }
-                onChange={(event) => {
-                  setDraftFilters((current) => ({
-                    ...current,
-                    to: event.currentTarget.value,
-                  }));
-
-                  setFilterError("");
-                }}
-              />
+            <div className="factory-itech-date-filter min-w-0">
+              <ThaiBuddhistDatePicker label="ถึงวันที่เอกสาร" value={draftFilters.to} onChange={(value) => {
+                setDraftFilters((current) => ({ ...current, to: value }));
+                setFilterError("");
+              }} error={filterError || undefined} />
             </div>
 
-            {/* Filter Buttons */}
-
-            <div className="flex flex-wrap items-end gap-2">
-              <Button type="submit">
-                <Search
-                  className="size-4"
-                  aria-hidden="true"
-                />
-                ค้นหา
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleResetFilters}
-              >
-                ล้างตัวกรอง
-              </Button>
+            <div className="min-w-0">
+              <SelectField label="แสดงต่อหน้า" value={String(pageSize)} onChange={(value) => {
+                setPageSize(Number(value));
+                setPage(1);
+              }} options={[5, 10, 20, 50].map((number) => ({ value: String(number), label: `${number} รายการ` }))} />
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="submit">
+              <Search className="size-4" aria-hidden="true" />
+              ค้นหา
+            </Button>
+            <Button type="button" variant="outline" onClick={handleResetFilters}>
+              ล้างตัวกรอง
+            </Button>
           </div>
 
           {/* Filter Error */}
@@ -292,42 +252,15 @@ export function QcProductWeightCheckHistory({
             <p
               id="qc-weight-history-filter-error"
               role="alert"
-              className="text-sm text-danger"
+              className="sr-only"
             >
               {filterError}
             </p>
           )}
         </form>
-      </SectionCard>
-
-      {/* Page Size */}
-
-      <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          ทั้งหมด{" "}
-          <span className="font-semibold text-foreground">
-            {filteredRecords.length}
-          </span>{" "}
-          เอกสาร
+          ทั้งหมด <span className="font-semibold text-foreground">{filteredRecords.length}</span> เอกสาร
         </p>
-
-        <div className="w-40">
-          <SelectField
-            label="แสดงต่อหน้า"
-            value={String(pageSize)}
-            onChange={(value) => {
-              setPageSize(Number(value));
-              setPage(1);
-            }}
-            options={[5, 10, 20, 50].map(
-              (number) => ({
-                value: String(number),
-                label: `${number} รายการ`,
-              }),
-            )}
-          />
-        </div>
-      </div>
 
       {/* History Table */}
 
@@ -454,7 +387,7 @@ export function QcProductWeightCheckHistory({
             key: "actions",
             label: "จัดการ",
             render: (document) => (
-              <RowActionMenu>
+              <RowActionMenu appearance="itech">
                 {/* View */}
 
                 <RowActionItem type="button" onClick={() => onView(document)}>
@@ -462,7 +395,7 @@ export function QcProductWeightCheckHistory({
                     className="size-4"
                     aria-hidden="true"
                   />
-                  ดู
+                  ดูรายงาน
                 </RowActionItem>
 
                 {/* Print Preview */}
@@ -492,7 +425,7 @@ export function QcProductWeightCheckHistory({
                     className="size-4"
                     aria-hidden="true"
                   />
-                  ลบ
+                  ลบเอกสาร
                 </RowActionItem>
               </RowActionMenu>
             ),
@@ -507,6 +440,7 @@ export function QcProductWeightCheckHistory({
           />
         }
       />
+      </SectionCard>
     </div>
   );
 }

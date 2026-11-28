@@ -33,6 +33,12 @@ export const QC_WEIGHT_RESULT_OPTIONS = [
 export type QcWeightGroupKey =
   (typeof QC_WEIGHT_GROUP_KEYS)[number];
 
+export const QC_WEIGHT_TIMED_GROUP_KEYS = ["group_2", "group_3", "group_4"] as const;
+
+export type QcWeightTimedGroupKey = (typeof QC_WEIGHT_TIMED_GROUP_KEYS)[number];
+export type QcWeightTimeRange = { start: string; end: string };
+export type QcWeightGroupTimes = Record<QcWeightTimedGroupKey, QcWeightTimeRange>;
+
 export type QcWeightReadingIndex =
   (typeof QC_WEIGHT_READING_INDEXES)[number];
 
@@ -86,6 +92,7 @@ export interface QcProductWeightCheckDocument {
   weight_spec: string;
 
   // ตารางตรวจสอบ
+  group_times: QcWeightGroupTimes;
   rows: QcProductWeightCheckRow[];
 
   // ส่วนท้ายเอกสาร
@@ -153,10 +160,10 @@ export const QC_WEIGHT_HEADER_LABELS: Record<
 
 export const emptyQcWeightFilters:
   QcWeightHistoryFilters = {
-    search: "",
-    from: "",
-    to: "",
-  };
+  search: "",
+  from: "",
+  to: "",
+};
 
 function blankReadings(): QcWeightReadings {
   return ["", "", "", ""];
@@ -179,6 +186,53 @@ export function blankQcWeightRow(
   };
 }
 
+export function blankQcWeightGroupTimes(): QcWeightGroupTimes {
+  return {
+    group_2: { start: "", end: "" },
+    group_3: { start: "", end: "" },
+    group_4: { start: "", end: "" },
+  };
+}
+
+// Older JSONB documents/clients lack the field. Only default an absent field;
+// explicitly supplied malformed values must still be rejected by the API parser.
+export function withQcWeightGroupTimes<T extends object>(
+  document: T,
+  previous?: object,
+): T & { group_times: unknown } {
+  const group_times = "group_times" in document
+    ? document.group_times
+    : previous && "group_times" in previous
+      ? previous.group_times
+      : blankQcWeightGroupTimes();
+  return { ...document, group_times };
+}
+
+export function updateQcWeightGroupTime(
+  document: QcProductWeightCheckDocument,
+  group: QcWeightTimedGroupKey,
+  part: keyof QcWeightTimeRange,
+  value: string,
+): QcProductWeightCheckDocument {
+  return {
+    ...document,
+    group_times: {
+      ...document.group_times,
+      [group]: { ...document.group_times[group], [part]: value },
+    },
+  };
+}
+
+export function formatQcWeightGroupHeading(
+  document: Pick<QcProductWeightCheckDocument, "group_times">,
+  group: QcWeightGroupKey,
+): string {
+  if (group === "group_1") return "ตั้งค่าเครื่อง";
+  const range = document.group_times?.[group];
+  if (!range?.start && !range?.end) return "-";
+  return `${range.start || "--:--"} - ${range.end || "--:--"}`;
+}
+
 export function blankQcWeightDocument(
   rowId: string,
 ): QcProductWeightCheckDocument {
@@ -194,6 +248,7 @@ export function blankQcWeightDocument(
     pack_count: "",
     weight_spec: "",
 
+    group_times: blankQcWeightGroupTimes(),
     rows: [blankQcWeightRow(rowId)],
 
     remark: "",
@@ -209,6 +264,55 @@ export function blankQcWeightDocument(
 
 /* ---------------- update readings ---------------- */
 
+export function calculateQcWeightAverage(
+  measurements: QcWeightMeasurements,
+): string {
+  const values = Object.values(measurements)
+    .flat()
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
+
+  if (
+    values.length === 0 ||
+    values.some((value) => !isValidQcWeightValue(value))
+  ) {
+    return "";
+  }
+
+  const decimals = values.map((value) => {
+    const [whole, fraction = ""] = value.split(".");
+
+    return {
+      whole: whole || "0",
+      fraction,
+    };
+  });
+
+  const scale = Math.max(
+    0,
+    ...decimals.map((item) => item.fraction.length),
+  );
+
+  const sum = decimals.reduce(
+    (total, item) =>
+      total +
+      BigInt(item.whole + item.fraction.padEnd(scale, "0")),
+    BigInt(0),
+  );
+
+  const denominator =
+    BigInt(values.length) *
+    BigInt("1" + "0".repeat(scale));
+
+  const rounded =
+    (sum * BigInt(2000) + denominator) /
+    (denominator * BigInt(2));
+
+  const digits = rounded.toString().padStart(4, "0");
+
+  return `${digits.slice(0, -3)}.${digits.slice(-3)}`;
+}
+
 export function updateQcWeightReading(
   row: QcProductWeightCheckRow,
   group: QcWeightGroupKey,
@@ -221,12 +325,15 @@ export function updateQcWeightReading(
 
   readings[index] = value;
 
+  const measurements: QcWeightMeasurements = {
+    ...row.measurements,
+    [group]: readings,
+  };
+
   return {
     ...row,
-    measurements: {
-      ...row.measurements,
-      [group]: readings,
-    },
+    measurements,
+    average: calculateQcWeightAverage(measurements),
   };
 }
 
@@ -330,7 +437,7 @@ export function validateQcWeightDocument(
     (item) =>
       item.id !== document.id &&
       item.doc_no.trim().toLowerCase() ===
-        document.doc_no.trim().toLowerCase(),
+      document.doc_no.trim().toLowerCase(),
   );
 
   if (
@@ -355,6 +462,23 @@ export function validateQcWeightDocument(
       !isValidQcWeightDate(value)
     ) {
       errors[field] = "วันที่ไม่ถูกต้อง";
+    }
+  }
+
+  /* Group time ranges (optional as a pair, 24-hour format) */
+  for (const group of QC_WEIGHT_TIMED_GROUP_KEYS) {
+    const range = document.group_times[group];
+    if (range.start && !isValidQcWeightTime(range.start)) {
+      errors[`group_times.${group}.start`] = "เวลาเริ่มต้นต้องอยู่ในรูปแบบ HH:mm";
+    }
+    if (range.end && !isValidQcWeightTime(range.end)) {
+      errors[`group_times.${group}.end`] = "เวลาสิ้นสุดต้องอยู่ในรูปแบบ HH:mm";
+    }
+    if (range.start && !range.end) {
+      errors[`group_times.${group}.end`] = "กรุณาเลือกเวลาสิ้นสุด";
+    }
+    if (!range.start && range.end) {
+      errors[`group_times.${group}.start`] = "กรุณาเลือกเวลาเริ่มต้น";
     }
   }
 
@@ -482,8 +606,8 @@ export function saveQcWeightDocument(
 } {
   const previous = draft.id
     ? existing.find(
-        (item) => item.id === draft.id,
-      )
+      (item) => item.id === draft.id,
+    )
     : undefined;
 
   if (draft.id && !previous) {
@@ -549,6 +673,11 @@ export function saveQcWeightDocument(
 
     /* Rows */
 
+    group_times: {
+      group_2: { ...draft.group_times.group_2 },
+      group_3: { ...draft.group_times.group_3 },
+      group_4: { ...draft.group_times.group_4 },
+    },
     rows: draft.rows.map(normalizeQcWeightRow),
 
     /* System */
@@ -560,8 +689,8 @@ export function saveQcWeightDocument(
 
   const records = previous
     ? existing.map((item) =>
-        item.id === draft.id ? saved : item,
-      )
+      item.id === draft.id ? saved : item,
+    )
     : [saved, ...existing];
 
   return {

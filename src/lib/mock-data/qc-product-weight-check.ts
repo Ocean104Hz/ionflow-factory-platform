@@ -1,5 +1,6 @@
 import {
   blankQcWeightRow,
+  blankQcWeightGroupTimes,
   type QcProductWeightCheckDocument,
   type QcProductWeightCheckRow,
   type QcWeightMeasurements,
@@ -142,6 +143,7 @@ function createDemoDocument(
 
     /* Weight Check Rows */
 
+    group_times: blankQcWeightGroupTimes(),
     rows: Array.from({ length: rowCount }, (_, index) =>
       createDemoRow(documentNumber, index + 1),
     ),
