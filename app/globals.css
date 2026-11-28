@@ -763,3 +763,23 @@
 .factory-itech-action-menu [role="menuitem"].text-destructive { color: var(--destructive); }
 .factory-itech-action-menu [role="menuitem"].text-destructive[data-highlighted] { background: color-mix(in srgb, var(--destructive) 10%, var(--surface)); }
 .factory-itech-action-menu [role="menuitem"][data-disabled] { opacity: .4; cursor: not-allowed; }
+/* NAN_ITECH_BUTTON_COLORS_V1: reusable opt-in button colors, including portal dialogs. */
+.factory-itech-button-primary[data-slot="button"][data-variant="default"] {
+  background-color: var(--factory-itech-navy, #173b63);
+  color: #ffffff;
+}
+.factory-itech-button-primary[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--factory-itech-navy, #173b63) 88%, black);
+  color: #ffffff;
+}
+.factory-itech-button-outline[data-slot="button"][data-variant="outline"] {
+  border-color: var(--factory-itech-lime, #9ec23a);
+  background-color: var(--surface);
+  color: var(--factory-itech-navy, #173b63);
+}
+.factory-itech-button-outline[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--factory-itech-navy, #173b63) 6%, var(--surface));
+}
+.dark .factory-itech-button-outline[data-slot="button"][data-variant="outline"] {
+  color: var(--foreground);
+}

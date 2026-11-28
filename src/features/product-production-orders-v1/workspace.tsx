@@ -1,9 +1,13 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { AlertCircle, FileSpreadsheet, Link2, LockKeyhole, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, FileSpreadsheet, FileText, Link2, LockKeyhole, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
+import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/src/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
+import { formatThaiDate } from "@/src/lib/date/thai-date";
 import { Checkbox } from "@/src/components/ui/checkbox";
 import {
   Dialog,
@@ -32,7 +36,7 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import { Textarea } from "@/src/components/ui/textarea";
-import { DocumentViewActions, PageHeader, FactoryDataTable, Pagination } from "@/src/components/factory/patterns";
+// import { PageHeader } from "@/src/components/factory/patterns";
 import { useBOM } from "../bom/bom-provider";
 import { productionRequest, useProductionV1Data } from "../production-flow/production-v1-client";
 import type { ProductionOrderV1 } from "./types";
@@ -197,7 +201,10 @@ export function ProductProductionOrdersV1Workspace() {
     (!historyFrom || order.date >= historyFrom) && (!historyTo || order.date <= historyTo) &&
     `${order.documentNumber} ${order.location} ${order.sheet.lines[0].productName}`.toLowerCase().includes(historySearch.trim().toLowerCase()),
   );
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / Number(pageSize))));
+  const historyPages = Math.max(1, Math.ceil(filtered.length / Number(pageSize)));
+  const currentPage = Math.min(page, historyPages);
+  const historyDateError = Boolean(historyFrom && historyTo && historyFrom > historyTo);
+  const activeHistoryFilter = Boolean(historySearch || historyFrom || historyTo);
 
   async function save() {
     if (saving) return;
@@ -251,21 +258,23 @@ export function ProductProductionOrdersV1Workspace() {
 
   return (
     <div className="min-w-0 pb-10 text-[#1e3868]">
-      <PageHeader title="ใบสั่งผลิตสินค้า V1" description="จัดทำและติดตามใบสั่งผลิตสินค้า" actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบสั่งผลิต" disabled={loading || saving} onCreate={() => setTab("form")} onHistory={() => setTab("history")} />} />
+      {/* <PageHeader title="ใบสั่งผลิตสินค้า" description="จัดทำและติดตามใบสั่งผลิตสินค้า" /> */}
       {notice && <p role="status" className="mb-4 text-sm">{notice}</p>}
       {saveError && <p role="alert" className="mb-4 text-sm text-danger">{saveError}</p>}
-      {error && <div className="mb-4 flex items-center gap-2"><p role="alert">{error}</p><Button onClick={refresh}>ลองใหม่</Button></div>}
-      <div className="space-y-4">
-
-
-        {tab === "form" && (<div className="space-y-4">
+      {error && <div className="mb-4 flex items-center gap-2"><p role="alert">{error}</p><Button className="factory-itech-button-primary" onClick={refresh}>ลองใหม่</Button></div>}
+      <Tabs value={tab} onValueChange={setTab} className="mt-3 min-w-0 space-y-3">
+        <TabsList aria-label="ใบสั่งผลิตสินค้า" className="factory-itech-theme factory-itech-tabs">
+          <TabsTrigger value="form" disabled={loading || saving}>กรอกข้อมูล</TabsTrigger>
+          <TabsTrigger value="history" disabled={loading || saving}>ดูประวัติ</TabsTrigger>
+        </TabsList>
+        <TabsContent value="form" className="min-w-0 space-y-4">
           <DocumentSection
             title="ใบสั่งงาน"
             subtitle="ข้อมูลหัวเอกสารและแผนการผลิต"
             action={
               <Button
                 type="button"
-                className="h-9 bg-[#84CAED] text-white hover:bg-[#90DBD8]"
+                className="h-9 factory-itech-button-primary"
                 onClick={() => setImportOpen(true)}
               >
                 <FileSpreadsheet className="size-4" aria-hidden="true" />
@@ -282,7 +291,7 @@ export function ProductProductionOrdersV1Workspace() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-[#84CAED] text-[#1e3868]"
+                    className="factory-itech-button-outline"
                     onClick={() => setDocNumberOpen(true)}
                   >
                     สร้างเลข PRD
@@ -303,7 +312,7 @@ export function ProductProductionOrdersV1Workspace() {
                     readOnly
                     placeholder="ค้นหาสูตรปุ๋ย"
                   />
-                  <Button
+                  <Button className="factory-itech-button-outline"
                     type="button"
                     variant="outline"
                     size="icon"
@@ -345,13 +354,13 @@ export function ProductProductionOrdersV1Workspace() {
                   />
                   <Button
                     type="button"
-                    className="bg-[#84CAED] text-white hover:bg-[#90DBD8]"
+                    className="factory-itech-button-primary"
                     onClick={() => setReferenceOpen(true)}
                   >
                     <Link2 className="size-4" aria-hidden="true" />
                     ผูกกับ ใบรายงานผสมปุ๋ยผง
                   </Button>
-                  <Button type="button" variant="outline" disabled={!mixingReference} onClick={() => setMixingReference("")}>ล้างเลขอ้างอิง</Button>
+                  <Button className="factory-itech-button-outline" type="button" variant="outline" disabled={!mixingReference} onClick={() => setMixingReference("")}>ล้างเลขอ้างอิง</Button>
                 </div>
               </div>
             </div>
@@ -370,7 +379,7 @@ export function ProductProductionOrdersV1Workspace() {
             subtitle="ข้อมูลจริงมาจากใบรายงานผสมปุ๋ยผงเมื่อเชื่อมระบบ"
           >
             <div className="overflow-hidden rounded-lg border border-gray-200">
-              <Table className="min-w-[1000px] border-collapse">
+              <Table className="min-w-250 border-collapse">
                 <TableHeader className="bg-gray-100 text-gray-700">
                   <TableRow className="hover:bg-gray-100">
                     <TableHead rowSpan={3} className="w-44 border-r text-center">วันที่ผลิต</TableHead>
@@ -442,7 +451,7 @@ export function ProductProductionOrdersV1Workspace() {
             </div>
             <Button
               type="button"
-              className="mt-3 bg-[#84CAED] text-white hover:bg-[#90DBD8]"
+              className="mt-3 factory-itech-button-primary"
               onClick={() => setRows((current) => [...current, newLine()])}
             >
               <Plus className="size-4" aria-hidden="true" />
@@ -483,90 +492,121 @@ export function ProductProductionOrdersV1Workspace() {
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
               ระบบออกเลข PRD เมื่อบันทึกใบสั่งผลิต
             </p>
-            <Button type="button" disabled={saving || formulasLoading || Boolean(formulasError)} onClick={() => void save()} className="h-10 px-6">
+            <Button type="button" disabled={saving || formulasLoading || Boolean(formulasError)} onClick={() => void save()} className="h-10 px-6 factory-itech-button-primary">
               {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </div>
-        </div>)}
+        </TabsContent>
 
-        {tab === "history" && (<div>
-          <DocumentSection
-            title="ข้อมูลที่บันทึก"
-            subtitle="รายการจากใบสั่งผลิต V1 ที่บันทึกแล้ว"
-          >
-            <div className="mb-4 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-12">
-              <div className="space-y-2 xl:col-span-4">
-                <Label htmlFor="history-search">ค้นหา (เอกสาร/โรงงาน/สูตรปุ๋ย)</Label>
-                <Input
-                  id="history-search"
-                  value={historySearch}
-                  onChange={(event) => setHistorySearch(event.target.value)}
-                  placeholder="พิมพ์คำค้น..."
-                />
+        <TabsContent value="history" className="min-w-0">
+          <Card className="factory-itech-theme min-w-0 gap-0 rounded-xl border bg-card py-0 text-foreground shadow-sm">
+            <CardHeader className="border-b px-4 py-3 [.border-b]:pb-3">
+              <CardTitle className="text-base font-semibold"><h2>ข้อมูลที่บันทึก</h2></CardTitle>
+            </CardHeader>
+            <CardContent className="min-w-0 space-y-3 p-4">
+              <div className="grid items-start gap-3 sm:grid-cols-2 @[900px]/main:grid-cols-[1.35fr_1fr_1fr_0.65fr]">
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="history-search" className="leading-relaxed">ค้นหา</Label>
+                  <Input id="history-search" className="h-9 rounded-lg" value={historySearch}
+                    onChange={(event) => { setHistorySearch(event.target.value); setPage(1); }}
+                    placeholder="ค้นหา (เลขที่เอกสาร/โรงงาน/สูตรปุ๋ย)" />
+                </div>
+                <div className="min-w-0 [&>div>label]:leading-relaxed [&>div>button]:h-9 [&>div>button]:rounded-lg">
+                  <ThaiBuddhistDatePicker label="จากวันที่" value={historyFrom}
+                    onChange={(value) => { setHistoryFrom(value); setPage(1); }} />
+                </div>
+                <div className="min-w-0 [&>div>label]:leading-relaxed [&>div>button]:h-9 [&>div>button]:rounded-lg">
+                  <ThaiBuddhistDatePicker label="ถึงวันที่" value={historyTo}
+                    onChange={(value) => { setHistoryTo(value); setPage(1); }}
+                    error={historyDateError ? "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้น" : undefined} />
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="history-page-size" className="leading-relaxed">ต่อหน้า</Label>
+                  <Select value={pageSize} onValueChange={(value) => { setPageSize(value); setPage(1); }}>
+                    <SelectTrigger id="history-page-size" className="h-9 w-full rounded-lg"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["5", "10", "20", "50", "100"].map((size) => (
+                        <SelectItem key={size} value={size}>{size} รายการ</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2 xl:col-span-3">
-                <Label htmlFor="history-from">วันที่เริ่มค้นหา</Label>
-                <Input id="history-from" type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} />
-              </div>
-              <div className="space-y-2 xl:col-span-3">
-                <Label htmlFor="history-to">วันที่สิ้นสุด</Label>
-                <Input id="history-to" type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} />
-              </div>
-              <div className="space-y-2 xl:col-span-2">
-                <Label>แสดงต่อหน้า</Label>
-                <Select value={pageSize} onValueChange={setPageSize}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["5", "10", "20", "50", "100"].map((size) => (
-                      <SelectItem key={size} value={size}>{size}</SelectItem>
+
+              <Table className="min-w-[1780px] table-fixed text-foreground" containerProps={{ className: "rounded-lg border", role: "region", "aria-label": "ตารางประวัติใบสั่งผลิตสินค้า เลื่อนแนวนอนเพื่อดูข้อมูล", tabIndex: 0 }}>
+                <TableHeader>
+                  <TableRow className="border-0 bg-[#173b63] hover:bg-[#173b63]">
+                    {historyColumns.map((label, index) => (
+                      <TableHead key={label} className={`h-11 whitespace-nowrap px-4 py-3 text-sm font-semibold text-white ${index === 0 ? "w-20" : index === historyColumns.length - 1 ? "w-28 text-center" : index >= 5 && index <= 7 ? "text-right" : ""}`}>
+                        {index === 0 ? <span className="flex items-center gap-3"><Checkbox disabled aria-label="เลือกทั้งหมด" />{label}</span> : label}
+                      </TableHead>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize)).map((order, index) => {
+                    const actual = data?.produced[order.id] ?? 0;
+                    const values = [
+                      (currentPage - 1) * Number(pageSize) + index + 1,
+                      order.documentNumber,
+                      order.location,
+                      order.date ? formatThaiDate(order.date) || order.date : "—",
+                      order.sheet.lines[0].productName,
+                      order.amount,
+                      actual.toFixed(3),
+                      Math.max(0, Number(order.amount) - actual).toFixed(3),
+                      order.rows.filter((row) => row.date).map((row) => formatThaiDate(row.date) || row.date).join(", ") || "—",
+                      order.note || "—",
+                      order.signers.preparedBy,
+                      order.signers.qaOfficer,
+                      order.signers.productionOfficer,
+                      order.signers.manager,
+                    ];
+                    return (
+                      <TableRow key={order.id} className="border-border/60 hover:bg-muted/40">
+                        {values.map((value, columnIndex) => (
+                          <TableCell key={historyColumns[columnIndex]} className={`whitespace-normal wrap-break-word px-4 py-3 align-top text-sm ${columnIndex >= 5 && columnIndex <= 7 ? "text-right tabular-nums" : ""}`}>
+                            {columnIndex === 1 ? (
+                              <Button type="button" variant="link" className="block h-auto w-full overflow-hidden text-ellipsis whitespace-nowrap p-0 text-left font-medium text-foreground" title={order.documentNumber} onClick={() => setView(order)}>{order.documentNumber}</Button>
+                            ) : value}
+                          </TableCell>
+                        ))}
+                        <TableCell className="px-4 py-3 text-center align-top text-sm">
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl border-[#a6bf49] bg-muted/40 px-2.5 text-xs font-medium text-[#173b63]! shadow-none hover:bg-muted hover:text-[#173b63]! data-[state=open]:border-[#a6bf49] data-[state=open]:bg-muted dark:text-foreground! dark:hover:text-foreground!" aria-label={`จัดการ ${order.documentNumber}`}>
+                                จัดการ <ChevronDown aria-hidden="true" className="size-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" sideOffset={8} className="w-52 max-w-[calc(100vw-24px)] rounded-xl border bg-card p-1.5 text-foreground shadow-md">
+                              <DropdownMenuItem className="min-h-10 cursor-pointer gap-2.5 rounded-lg px-3 py-2 text-sm focus:bg-muted focus:text-foreground" onSelect={() => setView(order)}>
+                                <FileText aria-hidden="true" className="text-current" />ดูรายละเอียด
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {!filtered.length && (
+                    <TableRow><TableCell colSpan={historyColumns.length} className="py-12 text-center text-sm text-muted-foreground">
+                      {loading ? "กำลังโหลดข้อมูล..." : historyDateError ? "กรุณาตรวจสอบช่วงวันที่" : "ไม่พบข้อมูลตามเงื่อนไข"}
+                    </TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <p role="status">ทั้งหมด <strong>{filtered.length}</strong> รายการ{activeHistoryFilter && <span className="ml-1 text-muted-foreground">(จาก {data?.documents.length ?? 0})</span>}</p>
+                <div className="flex items-center gap-2">
+                  <Button className="factory-itech-button-outline" type="button" variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>ก่อนหน้า</Button>
+                  <span className="whitespace-nowrap">หน้า {currentPage} / {historyPages}</span>
+                  <Button className="factory-itech-button-outline" type="button" variant="outline" size="sm" disabled={currentPage >= historyPages} onClick={() => setPage(currentPage + 1)}>ถัดไป</Button>
+                </div>
               </div>
-            </div>
-
-            <FactoryDataTable
-              variant="history"
-              minWidth={1780}
-              rows={filtered.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize)).map((order, index) => {
-                const actual = data?.produced[order.id] ?? 0;
-                return {
-                  order,
-                  values: [
-                    (currentPage - 1) * Number(pageSize) + index + 1, order.documentNumber,
-                    order.location, order.date, order.sheet.lines[0].productName, order.amount,
-                    actual.toFixed(3), Math.max(0, Number(order.amount) - actual).toFixed(3),
-                    order.rows.filter((row) => row.date).map((row) => row.date).join(", ") || "—",
-                    order.note || "—", order.signers.preparedBy, order.signers.qaOfficer,
-                    order.signers.productionOfficer, order.signers.manager,
-                  ],
-                };
-              })}
-              rowKey={({ order }) => order.id}
-              state={loading && !filtered.length ? "loading" : "normal"}
-              emptyMessage="ไม่พบข้อมูลตามเงื่อนไข"
-              columns={historyColumns.map((label, index) => ({
-                key: label,
-                label,
-                textOverflow: "wrap",
-                numeric: index >= 5 && index <= 7,
-                header: index === 0 ? (
-                  <span className="flex items-center gap-3">
-                    <Checkbox disabled aria-label="เลือกทั้งหมด" />
-                    {label}
-                  </span>
-                ) : undefined,
-                render: ({ order, values }) => index < values.length ? values[index] : (
-                  <RowActionMenu readOnly label={`จัดการ ${order.documentNumber}`}>
-                    <RowActionItem onClick={() => setView(order)}>ดูรายละเอียด</RowActionItem>
-                  </RowActionMenu>
-                ),
-              }))}
-              pagination={<Pagination page={currentPage} pageSize={Number(pageSize)} total={filtered.length} onChange={setPage} />}
-            />
-          </DocumentSection>
-        </div>)}
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       <Dialog open={view !== null} onOpenChange={(open) => { if (!open) setView(null); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader><DialogTitle>{view?.documentNumber}</DialogTitle>
@@ -629,7 +669,7 @@ export function ProductProductionOrdersV1Workspace() {
           </div>
           <DialogFooter className="border-t px-5 py-4">
             <DialogClose asChild>
-              <Button variant="outline">ปิด</Button>
+              <Button className="factory-itech-button-outline" variant="outline">ปิด</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -650,7 +690,7 @@ export function ProductProductionOrdersV1Workspace() {
               placeholder="ค้นหาด้วยรหัสสินค้า ชื่อสินค้า หรือประเภทการใช้งาน"
             />
             <div className="overflow-hidden rounded-lg border">
-              <Table className="min-w-[760px]">
+              <Table className="min-w-190">
                 <TableHeader className="bg-gray-100">
                   <TableRow className="hover:bg-gray-100">
                     {["รหัสสินค้า", "สินค้าหลัก", "ประเภทการใช้งาน", "สูตรค่าเริ่มต้น", "การทำงาน"].map(
@@ -662,7 +702,7 @@ export function ProductProductionOrdersV1Workspace() {
                   {formulaOptions.filter(({ row, product }) => `${row.code} ${row.name} ${product.code} ${product.name}`.toLowerCase().includes(formulaSearch.trim().toLowerCase())).map(({ row, product }) => (
                     <TableRow key={row.id}><TableCell>{product.code}</TableCell><TableCell>{product.name}</TableCell>
                     <TableCell>{product.usageType || "—"}</TableCell><TableCell>{row.code} · {row.version}</TableCell>
-                    <TableCell><Button size="sm" variant="outline" onClick={() => { setFormula(row.id); setFormulaOpen(false); }}>เลือกสูตร</Button></TableCell></TableRow>
+                    <TableCell><Button className="factory-itech-button-outline" size="sm" variant="outline" onClick={() => { setFormula(row.id); setFormulaOpen(false); }}>เลือกสูตร</Button></TableCell></TableRow>
                   ))}
                   {(!formulaOptions.length || formulasError) && <TableRow>
                     <TableCell colSpan={5} className="h-28 text-center text-gray-500">
@@ -675,7 +715,7 @@ export function ProductProductionOrdersV1Workspace() {
           </div>
           <DialogFooter className="border-t px-5 py-4">
             <DialogClose asChild>
-              <Button variant="outline">ปิด</Button>
+              <Button className="factory-itech-button-outline" variant="outline">ปิด</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -713,9 +753,9 @@ export function ProductProductionOrdersV1Workspace() {
             <span className="text-sm text-gray-600">เลือกแล้ว 0 เอกสาร</span>
             <div className="flex gap-2">
               <DialogClose asChild>
-                <Button variant="outline">ยกเลิก</Button>
+                <Button className="factory-itech-button-outline" variant="outline">ยกเลิก</Button>
               </DialogClose>
-              <Button disabled className="bg-[#84CAED] text-white">
+              <Button disabled className="factory-itech-button-primary">
                 ยืนยันเลือก (0)
               </Button>
             </div>
@@ -740,9 +780,9 @@ export function ProductProductionOrdersV1Workspace() {
           </div>
           <DialogFooter className="border-t px-5 py-4">
             <DialogClose asChild>
-              <Button variant="outline">ปิด</Button>
+              <Button className="factory-itech-button-outline" variant="outline">ปิด</Button>
             </DialogClose>
-            <Button disabled className="bg-[#84CAED] text-white">
+            <Button disabled className="factory-itech-button-primary">
               ยืนยันนำเข้า
             </Button>
           </DialogFooter>
