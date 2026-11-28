@@ -35,6 +35,7 @@ function useProductionBom(enabled: boolean) {
     saveMaster: (row: Master) => mutate({ action: "master", row }),
     saveFormula: (row: Formula, selected: boolean) => mutate({ action: "formula", row, default: selected }),
     setDefault: (masterId: string, formulaId: string | null) => mutate({ action: "default", masterId, formulaId }),
+    importBatch: (commands: Record<string, unknown>[]) => mutate({ action: "import-batch", commands }),
     removeMaster: (id: string) => mutate({ action: "delete-master", id }),
     removeFormula: (id: string) => mutate({ action: "delete-formula", id }),
   };

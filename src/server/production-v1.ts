@@ -68,7 +68,22 @@ function ensureEditorTimestamp(old: { updatedAt: string } | undefined, incoming:
   if (old && old.updatedAt !== incoming) stale();
 }
 
-async function updateBOM(client: PoolClient, user: AuthenticatedFactoryUser, command: Record<string, unknown>) {
+async function updateBOM(client: PoolClient, user: AuthenticatedFactoryUser, command: Record<string, unknown>): Promise<{ state: BOMState; savedId?: string }> {
+  if (command.action === "import-batch") {
+    const commands = command.commands;
+    if (!Array.isArray(commands) || commands.length < 1 || commands.length > 100) invalid("นำเข้าได้ 1–100 รายการต่อครั้ง");
+    let result: { state: BOMState; savedId?: string } | undefined;
+    for (const value of commands) {
+      const item = obj(value);
+      if (item.action !== "master" && item.action !== "formula") invalid("ประเภทการนำเข้าไม่ถูกต้อง");
+      const row = obj(item.row);
+      if (row.id !== "") invalid("นำเข้าสร้างรายการใหม่เท่านั้น");
+      if (item.action === "formula" && item.default !== false) invalid("กำหนดสูตรเริ่มต้นผ่านหน้าจัดการสูตร");
+      result = await updateBOM(client, user, item);
+    }
+    if (!result) invalid();
+    return result;
+  }
   const state = await productionBOM(client);
   const at = new Date().toISOString();
   const id = crypto.randomUUID();
