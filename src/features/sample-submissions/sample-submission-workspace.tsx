@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { useLocalTablePreview } from "@/src/components/factory/use-local-table-preview";
+import { localSubmissionExamples } from "@/src/features/qc-documents/local-history-examples";
 import { DocumentViewActions, PageHeader } from "@/src/components/factory/patterns";
 import {
   AlertDialog,
@@ -24,6 +26,8 @@ import { SampleSubmissionDetail } from "./sample-submission-detail";
 
 export function SampleSubmissionWorkspace() {
   const { records, persist, remove, loading, loadError, busy } = useQcDocuments<SampleSubmission>("sample_submissions");
+  const localPreview = useLocalTablePreview() && !loading && !loadError && records.length === 0;
+  const historyRecords = localPreview ? localSubmissionExamples : records;
   const
     [report, setReport] = useState(newSubmission);
   const [baseline, setBaseline] = useState(() =>
@@ -90,7 +94,8 @@ export function SampleSubmissionWorkspace() {
         </div>)}
         {tab === "history" && (<div className="mt-3 min-w-0">
           <SampleSubmissionHistory
-            records={records}
+            records={historyRecords}
+            readOnly={localPreview}
             onEdit={request}
             onView={(r) => setView({ id: r.id, print: false })}
             onPrint={(r) => setView({ id: r.id, print: true })}
@@ -136,7 +141,7 @@ export function SampleSubmissionWorkspace() {
         </AlertDialogContent>
       </AlertDialog>
       <SampleSubmissionDetail
-        report={records.find((r) => r.id === view?.id) ?? null}
+        report={historyRecords.find((r) => r.id === view?.id) ?? null}
         print={view?.print ?? false}
         onClose={() => setView(null)}
       />

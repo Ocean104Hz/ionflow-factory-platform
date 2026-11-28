@@ -2,9 +2,10 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   FactoryAuthError,
-  csrfTokensMatch,
+  csrfTokenFailure,
   type AuthenticatedFactoryUser,
 } from "./auth-service.ts";
+import { FactoryAuthBoundaryError } from "./auth-boundary.ts";
 export { assertTrustedAuthRequest } from "./auth-boundary.ts";
 
 export const SESSION_COOKIE = "ionflow_factory_session";
@@ -13,8 +14,8 @@ export const CSRF_COOKIE = "ionflow_factory_csrf";
 export function assertCsrf(request: NextRequest): void {
   const cookieToken = request.cookies.get(CSRF_COOKIE)?.value ?? "";
   const headerToken = request.headers.get("x-csrf-token") ?? "";
-  if (!csrfTokensMatch(cookieToken, headerToken))
-    throw new FactoryAuthError("ACCESS_DENIED", 403);
+  const reason = csrfTokenFailure(cookieToken, headerToken);
+  if (reason) throw new FactoryAuthBoundaryError(reason);
 }
 
 export function publicUser(user: AuthenticatedFactoryUser) {

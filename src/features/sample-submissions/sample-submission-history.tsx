@@ -10,7 +10,6 @@ import {
   Pagination,
   SelectField,
   SectionCard,
-  EmptyState,
 } from "@/src/components/factory/patterns";
 import {
   emptySubmissionFilters,
@@ -24,12 +23,14 @@ import {
 
 export function SampleSubmissionHistory({
   records,
+  readOnly = false,
   onEdit,
   onView,
   onPrint,
   onDelete,
 }: {
   records: SampleSubmission[];
+  readOnly?: boolean;
   onEdit: (r: SampleSubmission) => void;
   onView: (r: SampleSubmission) => void;
   onPrint: (r: SampleSubmission) => void;
@@ -45,7 +46,7 @@ export function SampleSubmissionHistory({
     <div className="min-w-0 space-y-4">
       <SectionCard
         title="ประวัติใบส่งตัวอย่าง"
-        subtitle={`พบ ${rows.length} จาก ${records.length} เอกสาร`}
+        subtitle={readOnly ? "ข้อมูลทดสอบบนเครื่อง · ดูและพิมพ์ตัวอย่างได้" : `พบ ${rows.length} จาก ${records.length} เอกสาร`}
       >
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
@@ -117,94 +118,90 @@ export function SampleSubmissionHistory({
           </div>
         </div>
       </SectionCard>
-      {records.length === 0 ? (
-        <EmptyState
-          title="ยังไม่มีใบส่งตัวอย่าง"
-          description="สร้างเอกสารได้จากแท็บสร้างใบส่งตัวอย่าง"
-        />
-      ) : (
-        <FactoryDataTable variant="history"
-          rows={paged.rows}
-          rowKey={(r) => r.id}
-          minWidth={1000}
-          columns={[
-            {
-              key: "doc",
-              label: "เลขที่เอกสาร",
-              render: (r) => (
-                <Button
-                  variant="link"
-                  className="h-auto max-w-48 whitespace-normal break-all p-0 text-left"
-                  onClick={() => onView(r)}
-                >
-                  {r.doc_no}
-                </Button>
-              ),
-            },
-            {
-              key: "date",
-              label: "วันที่",
-              render: (r) => sampleDate(r.doc_date),
-            },
-            {
-              key: "samples",
-              label: "ตัวอย่าง / Lot",
-              render: (r) => (
-                <div className="max-w-64 space-y-1 whitespace-normal [overflow-wrap:anywhere]">
-                  {r.rows.map((s) => (
-                    <p key={s.id}>
-                      {s.product_name}
-                      <span className="block text-xs text-muted-foreground">
-                        {s.lot_no} · {resultLabel(s.analysis_result_status)}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              ),
-            },
-            {
-              key: "count",
-              label: "จำนวนตัวอย่าง",
-              render: (r) => String(r.rows.length),
-            },
-            {
-              key: "actions",
-              label: "จัดการ",
-              render: (r) => (
-                <RowActionMenu containsDialog>
-                  <RowActionItem onClick={() => onView(r)}>
-                    ดูรายละเอียด
-                  </RowActionItem>
-                  <RowActionItem onClick={() => onEdit(r)}>
-                    แก้ไข
-                  </RowActionItem>
-                  <RowActionItem onClick={() => onPrint(r)}>
-                    พรีวิวพิมพ์
-                  </RowActionItem>
-                  <ConfirmDialog
-                    title={`ลบ ${r.doc_no}?`}
-                    description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
-                    trigger={
-                      <RowActionItem className="w-full justify-start text-destructive">
-                        ลบ
-                      </RowActionItem>
-                    }
-                    onConfirm={() => onDelete(r)}
-                  />
-                </RowActionMenu>
-              ),
-            },
-          ]}
-          pagination={
-            <Pagination
-              page={paged.page}
-              pageSize={size}
-              total={rows.length}
-              onChange={setPage}
-            />
-          }
-        />
-      )}
+      <FactoryDataTable
+        variant="history"
+        emptyMessage={records.length ? "ไม่พบรายการที่ตรงกับตัวกรอง" : "ยังไม่มีใบส่งตัวอย่าง"}
+        rows={paged.rows}
+        rowKey={(r) => r.id}
+        minWidth={1000}
+        columns={[
+          {
+            key: "doc",
+            label: "เลขที่เอกสาร",
+            render: (r) => (
+              <Button
+                variant="link"
+                className="h-auto max-w-48 whitespace-normal break-all p-0 text-left"
+                onClick={() => onView(r)}
+              >
+                {r.doc_no}
+              </Button>
+            ),
+          },
+          {
+            key: "date",
+            label: "วันที่",
+            render: (r) => sampleDate(r.doc_date),
+          },
+          {
+            key: "samples",
+            textOverflow: "wrap",
+            label: "ตัวอย่าง / Lot",
+            render: (r) => (
+              <div className="max-w-64 space-y-1 whitespace-normal [overflow-wrap:anywhere]">
+                {r.rows.map((s) => (
+                  <p key={s.id}>
+                    {s.product_name}
+                    <span className="block text-xs text-muted-foreground">
+                      {s.lot_no} · {resultLabel(s.analysis_result_status)}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            ),
+          },
+          {
+            key: "count",
+            label: "จำนวนตัวอย่าง",
+            render: (r) => String(r.rows.length),
+          },
+          {
+            key: "actions",
+            label: "จัดการ",
+            render: (r) => (
+              <RowActionMenu readOnly={readOnly} containsDialog>
+                <RowActionItem onClick={() => onView(r)}>
+                  ดูรายละเอียด
+                </RowActionItem>
+                {!readOnly && <RowActionItem onClick={() => onEdit(r)}>
+                  แก้ไข
+                </RowActionItem>}
+                <RowActionItem onClick={() => onPrint(r)}>
+                  พรีวิวพิมพ์
+                </RowActionItem>
+                {!readOnly && <ConfirmDialog
+                  title={`ลบ ${r.doc_no}?`}
+                  description="นำเอกสารออกจากรายการและเก็บประวัติการลบ"
+                  trigger={
+                    <RowActionItem className="w-full justify-start text-destructive">
+                      ลบ
+                    </RowActionItem>
+                  }
+                  onConfirm={() => onDelete(r)}
+                />}
+              </RowActionMenu>
+            ),
+          },
+        ]}
+        pagination={
+          <Pagination
+            page={paged.page}
+            pageSize={size}
+            total={rows.length}
+            onChange={setPage}
+          />
+        }
+      />
     </div>
   );
 }
