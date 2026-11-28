@@ -19,22 +19,25 @@ import {
   TableRow,
 } from "@/src/components/ui/table";
 import type { ProductionFormulaSheet } from "./production-flow-domain";
+import { formatThaiDate } from "@/src/lib/date/thai-date";
 
 const number = (value: number) =>
   value.toLocaleString("th-TH", { maximumFractionDigits: 6 });
 
 export function ProductionFormulaDocument({
   sheet,
+  thaiDates = false,
 }: {
   sheet: ProductionFormulaSheet;
+  thaiDates?: boolean;
 }) {
   return (
     <article data-production-formula className="space-y-5 rounded-lg bg-background p-4 sm:p-6">
       <header className="space-y-2 border-b pb-4 text-center">
         <h2 className="text-xl font-semibold">ใบสูตรผลิต</h2>
-        <p>อ้างอิงใบสั่งผลิต {sheet.orderNumber} · วันที่ {sheet.orderDate}</p>
+        <p>อ้างอิงใบสั่งผลิต {sheet.orderNumber} · วันที่ {thaiDates ? formatThaiDate(sheet.orderDate) || sheet.orderDate : sheet.orderDate}</p>
         <p className="text-sm text-muted-foreground">
-          Snapshot สูตร ณ {new Date(sheet.issuedAt).toLocaleString("th-TH")} · ออกโดย {sheet.issuedBy}
+          Snapshot สูตร ณ {new Date(sheet.issuedAt).toLocaleString("th-TH", thaiDates ? { calendar: "buddhist", timeZone: "Asia/Bangkok" } : undefined)} · ออกโดย {sheet.issuedBy}
         </p>
       </header>
       {sheet.lines.map((line, index) => (

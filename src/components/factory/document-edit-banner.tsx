@@ -1,38 +1,32 @@
+
 "use client";
 
-import { Button } from "@/src/components/ui/button";
-
 type DocumentEditBannerProps = {
-  documentNo: string;
-  label?: string;
-  disabled?: boolean;
+  documentNumber: string;
   onCancel: () => void;
+  disabled?: boolean;
 };
 
 export function DocumentEditBanner({
-  documentNo,
-  label = "กำลังแก้ไขเอกสาร:",
-  disabled = false,
+  documentNumber,
   onCancel,
+  disabled = false,
 }: DocumentEditBannerProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
-      <p className="text-sm text-primary">
-        {label}{" "}
-        <span className="font-medium">
-          {documentNo}
-        </span>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+      <p role="status">
+        กำลังแก้ไขเอกสาร:{" "}
+        <strong>{documentNumber}</strong>
       </p>
 
-      <Button
+      <button
         type="button"
-        variant="outline"
-        size="sm"
-        disabled={disabled}
         onClick={onCancel}
+        disabled={disabled}
+        className="font-medium underline underline-offset-2 hover:text-amber-950 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-100"
       >
-        ยกเลิกเอกสาร
-      </Button>
+        ยกเลิกการแก้ไข
+      </button>
     </div>
   );
 }

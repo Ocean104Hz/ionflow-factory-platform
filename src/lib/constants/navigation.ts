@@ -182,7 +182,7 @@ export const navigation: FactoryNavigationItem[] = [
   },
   {
     group: "PRODUCTION",
-    title: "ใบสั่งผลิตสินค้า V1",
+    title: "ใบสั่งผลิตสินค้า",
     href: "/product-production-orders-v1",
     icon: Factory,
   },

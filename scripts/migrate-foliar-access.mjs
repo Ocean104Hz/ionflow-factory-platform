@@ -19,6 +19,26 @@ const client = new pg.Client({
 
 try {
   await client.connect();
+  const prdMigration = process.argv[2] === "--production-order-doc-no";
+  if (prdMigration) {
+    const identity = await client.query(`SELECT current_database() AS db, current_user AS role,
+      to_regclass('foliar_fertilizer.production_v1_documents') IS NOT NULL AS base,
+      to_regclass('foliar_fertilizer.production_order_doc_no_counters') IS NOT NULL AS counters,
+      to_regclass('foliar_fertilizer.production_order_doc_no_reservations') IS NOT NULL AS reservations`);
+    const target = identity.rows[0];
+    console.log("PRD migration target:", target);
+    if (target.db !== "production" || target.role !== "foliar_fertilizer_owner" || !target.base || target.counters !== target.reservations) throw new Error("PRD migration preflight failed");
+    if (process.argv.includes("--check")) process.exitCode = 0;
+    else if (!process.argv.includes("--confirm-target")) throw new Error("Verify target and backups first; --confirm-target is required");
+    if (!process.argv.includes("--check") && !target.counters) {
+      const sql = await readFile(resolve("migrations/0012_production_order_doc_no.up.sql"), "utf8");
+      await client.query(sql);
+      const verification = await client.query(`SELECT to_regclass('foliar_fertilizer.production_order_doc_no_counters') IS NOT NULL AS counters,
+        to_regclass('foliar_fertilizer.production_order_doc_no_reservations') IS NOT NULL AS reservations`);
+      if (!verification.rows[0].counters || !verification.rows[0].reservations) throw new Error("PRD migration verification failed");
+      console.log("PRD migration applied; both tables present.");
+    }
+  } else {
   const migration = process.argv[2] === "--warehouse"
     ? ["warehouse_receipts", "0010_factory_warehouse_documents"]
     : process.argv[2] === "--qc"
@@ -51,6 +71,7 @@ try {
     );
     await client.query(sql);
     console.log(`ลง migration ${migration[1]} สำเร็จ`);
+  }
   }
 } finally {
   await client.end();
