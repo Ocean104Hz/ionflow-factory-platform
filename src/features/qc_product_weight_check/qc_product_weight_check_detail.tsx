@@ -1,3 +1,4 @@
+// NAN_QC_WEIGHT_ITECH_V1
 "use client";
 
 import { Pencil, Printer } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   QC_WEIGHT_GROUP_KEYS,
   QC_WEIGHT_READING_INDEXES,
   formatQcWeightDate,
+  formatQcWeightGroupHeading,
   qcWeightResultLabel,
   type QcProductWeightCheckDocument,
 } from "./qc_product_weight_check_domain";
@@ -62,6 +64,7 @@ function displayDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Asia/Bangkok",
+    hourCycle: "h23",
   }).format(new Date(value));
 }
 
@@ -83,7 +86,7 @@ export function QcProductWeightCheckDetail({
         }
       }}
     >
-      <DialogContent className="flex max-h-[94dvh] w-[96vw] min-w-0 flex-col gap-4 overflow-hidden p-4 sm:max-w-6xl sm:p-6">
+      <DialogContent className={`${print ? "" : "factory-itech-theme "}flex max-h-[94dvh] w-[96vw] min-w-0 flex-col gap-4 overflow-hidden p-4 sm:max-w-6xl sm:p-6`}>
         {/* Header */}
 
         <DialogHeader className="shrink-0 pr-8">
@@ -199,13 +202,13 @@ export function QcProductWeightCheckDetail({
                         {/* Measurement Groups */}
 
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          {QC_WEIGHT_GROUP_KEYS.map((group, groupIndex) => (
+                          {QC_WEIGHT_GROUP_KEYS.map((group) => (
                             <div
                               key={group}
                               className="min-w-0 rounded-lg border bg-muted/20 p-3"
                             >
                               <h4 className="mb-3 text-sm font-semibold">
-                                กลุ่มที่ {groupIndex + 1}
+                                {formatQcWeightGroupHeading(document, group)}
                               </h4>
 
                               <div className="grid grid-cols-4 gap-2">

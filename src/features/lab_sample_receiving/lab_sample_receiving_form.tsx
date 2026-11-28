@@ -1,3 +1,4 @@
+// NAN_LAB_ITECH_THEME_V1
 
 "use client";
 
@@ -6,6 +7,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
+import ThaiTimePicker from "@/src/components/ui/thai-time-picker";
 
 import {
   Table,
@@ -33,7 +36,6 @@ type Props = {
   errors: LabSampleErrors;
   onChange: (sheet: LabSampleReceivingSheet) => void;
   onSave: () => void;
-  onReset: () => void;
 };
 
 type CellFieldProps = {
@@ -51,7 +53,7 @@ type CellFieldProps = {
 /* ---------------- styles ---------------- */
 
 const tableClass =
-  "w-full min-w-[2420px] table-fixed border-collapse text-sm";
+  "factory-itech-form-table w-full min-w-[2420px] table-fixed border-collapse text-sm";
 
 const headerClass =
   "border border-border bg-muted/40 px-3 py-3 " +
@@ -81,7 +83,19 @@ function CellField({
 
   return (
     <div className="min-w-0 space-y-1.5">
-      {multiline ? (
+      {type === "date" ? (
+        <div className="factory-itech-date-cell">
+          <ThaiBuddhistDatePicker label={label} value={value} onChange={onChange} error={error} placeholder={placeholder} />
+        </div>
+      ) : type === "time" ? (
+        <ThaiTimePicker
+          label={label}
+          value={value}
+          onChange={onChange}
+          error={error}
+          allowEmpty={!required}
+        />
+      ) : multiline ? (
         <Textarea
           id={id}
           aria-label={label}
@@ -113,7 +127,7 @@ function CellField({
         />
       )}
 
-      {error && (
+      {error && type !== "date" && type !== "time" && (
         <p
           id={errorId}
           role="alert"
@@ -133,7 +147,6 @@ export function LabSampleReceivingForm({
   errors,
   onChange,
   onSave,
-  onReset,
 }: Props) {
   /* ---------------- update row ---------------- */
 
@@ -246,15 +259,6 @@ export function LabSampleReceivingForm({
               </span>{" "}
               รายการ
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addRow}
-            >
-              <Plus className="size-4" />
-              เพิ่มแถว
-            </Button>
           </div>
 
           {errors.rows && (
@@ -434,7 +438,7 @@ export function LabSampleReceivingForm({
                     <TableCell className={cellClass}>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="min-w-0 space-y-1">
-                      
+
 
                           {renderField(
                             row,
@@ -449,7 +453,7 @@ export function LabSampleReceivingForm({
                         </div>
 
                         <div className="min-w-0 space-y-1">
-                      
+
 
                           {renderField(
                             row,
@@ -620,20 +624,11 @@ export function LabSampleReceivingForm({
       {/* Form Actions */}
 
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onReset}
-        >
-          {sheet.id
-            ? "ยกเลิกการแก้ไข / เริ่มใหม่"
-            : "ล้างข้อมูล"}
-        </Button>
 
         <Button type="submit">
           {sheet.id
             ? "บันทึกการแก้ไข"
-            : "บันทึกข้อมูล"}
+            : "บันทึก"}
         </Button>
       </div>
 

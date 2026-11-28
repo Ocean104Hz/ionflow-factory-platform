@@ -6,7 +6,7 @@ import {
   useRef,
 } from "react";
 
-import { X } from "lucide-react";
+import { Printer, X } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
 
@@ -81,7 +81,7 @@ export function MaterialIssueDetailModal({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-6xl overflow-hidden rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40"
+      className="factory-itech-theme fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-6xl overflow-hidden rounded-xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -178,7 +178,7 @@ export function MaterialIssueDetailModal({
             </h3>
 
             <div className="overflow-x-auto rounded-md border">
-              <Table className="min-w-212.5">
+              <Table className="factory-itech-form-table min-w-212.5">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead
@@ -324,17 +324,15 @@ export function MaterialIssueDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t px-5 py-4">
-          <p className="text-xs text-muted-foreground">
-            ข้อมูลตัวอย่าง (Mock Data)
-          </p>
-
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t px-5 py-4">
           <Button
             type="button"
-            variant="outline"
-            onClick={onClose}
+            onClick={() => {
+              window.alert("ยังไม่ได้พัฒนาระบบพิมพ์เอกสาร");
+            }}
           >
-            ปิด
+            <Printer className="size-4" aria-hidden="true" />
+            พิมพ์
           </Button>
         </div>
       </div>

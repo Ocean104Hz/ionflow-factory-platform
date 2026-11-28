@@ -4,11 +4,11 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { AuditEntry } from "../lib/mock-data/audit-log.ts";
 import { blankReport, saveReport, timeSlots, validateReport } from "../features/qc-organic-fertilizer/qc-organic-domain.ts";
-import { blankNC, saveNC, validateNC } from "../features/nc-reports/nc-report-mock-helpers.ts";
+import { blankNC, saveNC, validateNC, withNCSignerFields } from "../features/nc-reports/nc-report-mock-helpers.ts";
 import { newSubmission, saveSubmission, validateSubmission } from "../features/sample-submissions/sample-submission-domain.ts";
-import { blankLog, saveLog, validateLog } from "../features/sample_submission_log/submission_log_domain.ts";
+import { blankLog, saveLog, validateLog, withLogDocumentDate } from "../features/sample_submission_log/submission_log_domain.ts";
 import { blankLabSheet, saveLabSheet, validateLabSheet } from "../features/lab_sample_receiving/lab_sample_receiving_domain.ts";
-import { blankQcWeightDocument, saveQcWeightDocument, validateQcWeightDocument } from "../features/qc_product_weight_check/qc_product_weight_check_domain.tsx";
+import { blankQcWeightDocument, saveQcWeightDocument, validateQcWeightDocument, withQcWeightGroupTimes } from "../features/qc_product_weight_check/qc_product_weight_check_domain.tsx";
 import { getFactoryDatabasePool } from "./auth/access-repository.ts";
 import { requireFactoryModule, type AuthenticatedFactoryUser } from "./auth/auth-service.ts";
 
@@ -60,6 +60,10 @@ function define<T extends Document>(
 const organicTemplate = blankReport();
 organicTemplate.fertilizer[0].extra_times = [timeSlots[0]];
 organicTemplate.stop_start = [{ id: "", machine_stop_time: "", machine_run_time: "", machine_stop_reason: "" }];
+const ncDefinition = define("ใบ NC", blankNC(), validateNC, saveNC);
+// NAN_SAMPLE_LOG_DEFAULT_DATES_V6
+const sampleLogDefinition = define("แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์", blankLog(), validateLog, saveLog);
+const weightDefinition = define("QC ตรวจเช็คน้ำหนักผลิตภัณฑ์", blankQcWeightDocument("template"), validateQcWeightDocument, saveQcWeightDocument);
 export const qcKinds = {
   qc_organic_fertilizer: define("ตรวจคุณภาพปุ๋ยอินทรีย์เคมี", organicTemplate, (draft, records) => {
     if (draft.profile !== "itech" && draft.profile !== "ifoam") return { profile: "โรงงานไม่ถูกต้อง" };
@@ -67,11 +71,32 @@ export const qcKinds = {
     if (records.some(row => row.id === draft.id && row.profile !== draft.profile)) return { profile: "เปลี่ยนโรงงานของเอกสารเดิมไม่ได้" };
     return validateReport(draft, records);
   }, saveReport),
-  nc_reports: define("ใบ NC", blankNC(), validateNC, saveNC),
+  nc_reports: {
+    ...ncDefinition,
+    save(input: unknown, records: Document[], at: string): Document {
+      const raw = object(input);
+      const previous = records.find(row => row.id === raw.id);
+      return ncDefinition.save(withNCSignerFields(raw, previous), records, at);
+    },
+  },
   sample_submissions: define("ใบส่งตัวอย่าง", newSubmission(), validateSubmission, saveSubmission),
-  sample_submission_log: define("แบบบันทึกการนำเข้าส่งตัวอย่างวิเคราะห์", blankLog(), validateLog, saveLog),
+  sample_submission_log: {
+    ...sampleLogDefinition,
+    save(input: unknown, records: Document[], at: string): Document {
+      const raw = object(input);
+      const previous = records.find(row => row.id === raw.id);
+      return sampleLogDefinition.save(withLogDocumentDate(raw, previous ? object(previous) : undefined), records, at);
+    },
+  },
   lab_sample_receiving: define("i-Lab แบบบันทึกรับตัวอย่าง", blankLabSheet("template"), validateLabSheet, saveLabSheet),
-  qc_product_weight_check: define("QC ตรวจเช็คน้ำหนักผลิตภัณฑ์", blankQcWeightDocument("template"), validateQcWeightDocument, saveQcWeightDocument),
+  qc_product_weight_check: {
+    ...weightDefinition,
+    save(input: unknown, records: Document[], at: string): Document {
+      const raw = object(input);
+      const previous = records.find(row => row.id === raw.id);
+      return weightDefinition.save(withQcWeightGroupTimes(raw, previous), records, at);
+    },
+  },
 };
 export type QcKind = keyof typeof qcKinds;
 
@@ -85,7 +110,7 @@ async function rows(kind: QcKind, database: Pick<PoolClient, "query">) {
 export async function readQcDocuments(user: AuthenticatedFactoryUser, kind: QcKind, database: Pick<PoolClient, "query"> = getFactoryDatabasePool()): Promise<QcSnapshot<Document>> {
   requireFactoryModule(user, kind);
   const stored = await rows(kind, database);
-  return { records: stored.map(row => row.payload), versions: Object.fromEntries(stored.map(row => [row.payload.id, row.version])) };
+  return { records: stored.map(row => kind === "nc_reports" ? withNCSignerFields(row.payload) : kind === "qc_product_weight_check" ? withQcWeightGroupTimes(row.payload) : row.payload), versions: Object.fromEntries(stored.map(row => [row.payload.id, row.version])) };
 }
 
 function changes(before: Document | undefined, after: Document | undefined): AuditEntry["changes"] {

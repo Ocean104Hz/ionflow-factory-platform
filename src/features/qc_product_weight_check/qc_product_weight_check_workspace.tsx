@@ -1,4 +1,4 @@
-
+// NAN_QC_WEIGHT_ITECH_V1
 "use client";
 
 import { useRef, useState } from "react";
@@ -17,14 +17,12 @@ import {
   AlertDialogTitle,
 } from "@/src/components/ui/alert-dialog";
 
-import { DocumentViewActions,
-  PageHeader,
-} from "@/src/components/factory/patterns";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/tabs";
 
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
-
+import { todayInBangkok } from "@/src/lib/date/thai-date";
 import {
-  blankQcWeightDocument,
+  blankQcWeightEntryDocument,
   validateQcWeightDocument,
   type QcProductWeightCheckDocument,
   type QcWeightErrors,
@@ -46,9 +44,19 @@ type ActiveView = {
 /* ---------------- constants ---------------- */
 
 const INITIAL_ROW_ID = "qc-weight-initial-row";
+function createNewDocument(
+  rowId: string,
+): QcProductWeightCheckDocument {
+  const today = todayInBangkok();
 
-/* ---------------- component ---------------- */
-
+  return {
+    ...blankQcWeightEntryDocument(rowId),
+    doc_no: "",
+    doc_date: today,
+    prepared_date: today,
+    checked_date: today,
+  };
+}
 export function QcProductWeightCheckWorkspace() {
   /* ---------------- document state ---------------- */
 
@@ -56,28 +64,17 @@ export function QcProductWeightCheckWorkspace() {
 
   const [draft, setDraft] =
     useState<QcProductWeightCheckDocument>(() =>
-      blankQcWeightDocument(INITIAL_ROW_ID),
+      createNewDocument(INITIAL_ROW_ID),
     );
-
-  const [baseline, setBaseline] = useState(() =>
-    JSON.stringify(
-      blankQcWeightDocument(INITIAL_ROW_ID),
-    ),
-  );
 
   /* ---------------- UI state ---------------- */
 
-  const [tab, setTab] = useState<TabKey>("history");
+  const [tab, setTab] = useState<TabKey>("form");
 
   const [errors, setErrors] =
     useState<QcWeightErrors>({});
 
   const [message, setMessage] = useState("");
-
-  const [pendingDocument, setPendingDocument] =
-    useState<QcProductWeightCheckDocument | null>(
-      null,
-    );
 
   const [documentToDelete, setDocumentToDelete] =
     useState<QcProductWeightCheckDocument | null>(
@@ -93,13 +90,10 @@ export function QcProductWeightCheckWorkspace() {
 
   const isEditing = Boolean(draft.id);
 
-  const hasUnsavedChanges =
-    JSON.stringify(draft) !== baseline;
-
   const activeDocument = activeView
     ? (records.find(
-        (document) => document.id === activeView.id,
-      ) ?? null)
+      (document) => document.id === activeView.id,
+    ) ?? null)
     : null;
 
   /* ---------------- open document ---------------- */
@@ -110,7 +104,6 @@ export function QcProductWeightCheckWorkspace() {
     const next = structuredClone(document);
 
     setDraft(next);
-    setBaseline(JSON.stringify(next));
 
     setErrors({});
     setMessage("");
@@ -120,11 +113,6 @@ export function QcProductWeightCheckWorkspace() {
   function requestOpenDocument(
     document: QcProductWeightCheckDocument,
   ) {
-    if (hasUnsavedChanges) {
-      setPendingDocument(structuredClone(document));
-      return;
-    }
-
     openDocument(document);
   }
 
@@ -132,7 +120,7 @@ export function QcProductWeightCheckWorkspace() {
 
   function handleNew() {
     requestOpenDocument(
-      blankQcWeightDocument(crypto.randomUUID()),
+      createNewDocument(crypto.randomUUID()),
     );
   }
 
@@ -157,7 +145,6 @@ export function QcProductWeightCheckWorkspace() {
       const saved = await persist(draft);
       setDraft(saved);
 
-      setBaseline(JSON.stringify(saved));
 
       setErrors({});
       setMessage(
@@ -221,12 +208,11 @@ export function QcProductWeightCheckWorkspace() {
     }
 
     if (draft.id === deletedId) {
-      const next = blankQcWeightDocument(
+      const next = blankQcWeightEntryDocument(
         crypto.randomUUID(),
       );
 
       setDraft(next);
-      setBaseline(JSON.stringify(next));
       setErrors({});
     }
 
@@ -241,155 +227,110 @@ export function QcProductWeightCheckWorkspace() {
   /* ---------------- render ---------------- */
 
   return (
-    <div className="min-w-0 space-y-5">
-      {/* Page Header */}
-
-      <PageHeader
-        title="ใบบันทึกการตรวจเช็ค QC น้ำหนักของผลิตภัณฑ์"
-        description="บันทึกผลการตรวจสอบน้ำหนักผลิตภัณฑ์ตามรอบการตรวจ"
-        actions={<DocumentViewActions showingForm={tab === "form"} createLabel="สร้างใบตรวจเช็ค" disabled={busy || loading || !!loadError} onCreate={handleNew} onHistory={() => setTab("history")} />}
-      />
-
+    <div className="factory-itech-theme min-w-0 space-y-3 pt-3">
       {loading && <p role="status">กำลังโหลดเอกสาร…</p>}
       {loadError && <p role="alert" className="text-danger">{loadError} กรุณารีเฟรชหน้าเพื่อโหลดอีกครั้ง</p>}
       <fieldset disabled={busy} className="min-w-0">
-      <div className="min-w-0">
+        <Tabs value={tab} activationMode="manual" className="min-w-0 gap-3" onValueChange={(value) => {
+          if (busy || loading || loadError) return;
+          if (value === "form") setTab("form");
+          else if (value === "history") setTab("history");
+        }}>
+          <TabsList aria-label="ใบบันทึกการตรวจเช็ค QC น้ำหนักผลิตภัณฑ์" className="factory-itech-tabs">
+            <TabsTrigger value="form" disabled={busy || loading || !!loadError}>กรอกข้อมูล</TabsTrigger>
+            <TabsTrigger value="history" disabled={busy || loading || !!loadError}>ดูประวัติ</TabsTrigger>
+          </TabsList>
 
+          {/* Status Message */}
 
-        {/* Status Message */}
-
-        {message && (
-          <p
-            role="status"
-            className="text-sm text-primary"
-          >
-            {message}
-          </p>
-        )}
-
-        {/* Form Tab */}
-
-        {tab === "form" && (<div className="mt-3 min-w-0 space-y-4">
-          {isEditing && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
-              <div className="min-w-0 text-sm text-foreground">
-                กำลังแก้ไขเอกสาร
-                <span className="ml-2 font-semibold">
-                  {draft.doc_no}
-                </span>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleNew}
-              >
-                สร้างเอกสารใหม่
-              </Button>
-            </div>
+          {message && (
+            <p
+              role="status"
+              className="text-sm text-primary"
+            >
+              {message}
+            </p>
           )}
 
-          {/* Error Summary */}
+          {/* Form Tab */}
 
-          <div
-            ref={errorSummaryRef}
-            tabIndex={-1}
-            className="scroll-mt-20 outline-none"
-          >
-            {Object.keys(errors).length > 0 && (
-              <div
-                role="alert"
-                className="rounded-lg border border-danger/30 bg-danger/5 p-4"
-              >
-                <p className="font-medium text-danger">
-                  กรุณาตรวจสอบข้อมูลต่อไปนี้
-                </p>
+          <TabsContent value="form" className="min-w-0 space-y-4">
+            {isEditing && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+                <div className="min-w-0 text-sm text-foreground">
+                  กำลังแก้ไขเอกสาร
+                  <span className="ml-2 font-semibold">
+                    {draft.doc_no}
+                  </span>
+                </div>
 
-                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-danger">
-                  {Object.entries(errors).map(
-                    ([key, error]) => (
-                      <li key={key}>
-                        {error}
-                      </li>
-                    ),
-                  )}
-                </ul>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleNew}
+                >
+                  สร้างเอกสารใหม่
+                </Button>
               </div>
             )}
-          </div>
 
-          {/* Form */}
+            {/* Error Summary */}
 
-          <QcProductWeightCheckForm
-            document={draft}
-            errors={errors}
-            onChange={(nextDocument) => {
-              setDraft(nextDocument);
-              setMessage("");
-            }}
-            onSave={handleSave}
-            onReset={handleNew}
-          />
-        </div>)}
-
-        {/* History Tab */}
-
-        {tab === "history" && (<div className="mt-3 min-w-0">
-          <QcProductWeightCheckHistory
-            records={records}
-            onEdit={handleEdit}
-            onView={handleView}
-            onPrint={handlePrint}
-            onDelete={(document) =>
-              setDocumentToDelete(document)
-            }
-          />
-        </div>)}
-      </div>
-      </fieldset>
-
-      {/* Confirm Unsaved Changes */}
-
-      <AlertDialog
-        open={pendingDocument !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingDocument(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ต้องการละทิ้งข้อมูลที่ยังไม่ได้บันทึก?
-            </AlertDialogTitle>
-
-            <AlertDialogDescription>
-              คุณมีข้อมูลที่แก้ไขค้างอยู่
-              หากดำเนินการต่อ
-              การเปลี่ยนแปลงที่ยังไม่ได้บันทึกจะหายไป
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              กลับไปแก้ไข
-            </AlertDialogCancel>
-
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingDocument) {
-                  openDocument(pendingDocument);
-                }
-
-                setPendingDocument(null);
-              }}
+            <div
+              ref={errorSummaryRef}
+              tabIndex={-1}
+              className="scroll-mt-20 outline-none"
             >
-              ยืนยันละทิ้งข้อมูล
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {Object.keys(errors).length > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-danger/30 bg-danger/5 p-4"
+                >
+                  <p className="font-medium text-danger">
+                    กรุณาตรวจสอบข้อมูลต่อไปนี้
+                  </p>
+
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-danger">
+                    {Object.entries(errors).map(
+                      ([key, error]) => (
+                        <li key={key}>
+                          {error}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Form */}
+
+            <QcProductWeightCheckForm
+              document={draft}
+              errors={errors}
+              onChange={(nextDocument) => {
+                setDraft(nextDocument);
+                setMessage("");
+              }}
+              onSave={handleSave}
+            />
+          </TabsContent>
+
+          {/* History Tab */}
+
+          <TabsContent value="history" className="min-w-0">
+            <QcProductWeightCheckHistory
+              records={records}
+              onEdit={handleEdit}
+              onView={handleView}
+              onPrint={handlePrint}
+              onDelete={(document) =>
+                setDocumentToDelete(document)
+              }
+            />
+          </TabsContent>
+        </Tabs>
+      </fieldset>
 
       {/* Confirm Delete */}
 

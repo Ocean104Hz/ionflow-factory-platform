@@ -29,6 +29,7 @@ export function BOMMasterForm({
   const { state, saveMaster } = useBOM();
   const [form, setForm] = useState(initial ?? blankMaster());
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
   const input = (
     key:
       | "code"
@@ -69,6 +70,8 @@ export function BOMMasterForm({
           {required && " *"}
         </Label>
         <Input
+          className="h-11 rounded-xl bg-card"
+          placeholder={key === "code" ? "เช่น FG-1002" : key === "name" ? "ระบุชื่อรายการหลัก" : key === "usageType" ? "ระบุประเภทการใช้งาน" : undefined}
           id={`bom-master-${key}`}
           required={required}
           value={form[key]}
@@ -88,9 +91,11 @@ export function BOMMasterForm({
       className="space-y-5"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (saving) return;
         const issues = masterErrors(state, form);
         setErrors(issues);
         if (Object.keys(issues).length) return;
+        setSaving(true);
         try {
           onSaved(await saveMaster(form));
         } catch (error) {
@@ -102,11 +107,10 @@ export function BOMMasterForm({
                     error instanceof Error ? error.message : "บันทึกไม่สำเร็จ",
                 },
           );
-        }
+        } finally { setSaving(false); }
       }}
     >
-      <SectionCard title="ข้อมูลสินค้า / วัตถุดิบ">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 px-1 sm:grid-cols-2">
           {input("code", "รหัสสินค้า/วัตถุดิบ", true)}
           {input("name", "ชื่อสินค้า/วัตถุดิบ", true)}
           <div>
@@ -126,17 +130,18 @@ export function BOMMasterForm({
             )}
           </div>
           {input("unit", "หน่วยหลัก", true)}
-          {input("usageType", "ประเภทการใช้งาน")}
-        </div>
-        <div className="mt-4 grid gap-2">
+          <div className="sm:col-span-2">{input("usageType", "ประเภทการใช้งาน")}</div>
+        <div className="grid gap-2 sm:col-span-2">
           <Label htmlFor="bom-master-notes">หมายเหตุ</Label>
           <Textarea
+            className="h-24 resize-none rounded-xl"
+            placeholder="รายละเอียดเพิ่มเติมของรายการหลัก"
             id="bom-master-notes"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </div>
-      </SectionCard>
+      </div>
       <SectionCard
         title="ข้อมูลเพิ่มเติม"
         subtitle="ไม่บังคับ · ใช้สำหรับค้นหาและกรองรายการในโมดูล BOM"
@@ -155,10 +160,10 @@ export function BOMMasterForm({
         </p>
       )}
       <div className="sticky -bottom-5 flex justify-end gap-2 border-t bg-background py-4">
-        <Button variant="outline" type="button" onClick={onClose}>
+        <Button variant="outline" type="button" disabled={saving} onClick={onClose}>
           ยกเลิก
         </Button>
-        <Button type="submit">บันทึกข้อมูลหลัก</Button>
+        <Button type="submit" className="factory-itech-button-primary" disabled={saving}>{saving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</Button>
       </div>
     </form>
   );

@@ -6,7 +6,6 @@ import {
     Eye,
     Pencil,
     Printer,
-    Search,
     Trash2,
 } from "lucide-react";
 
@@ -52,20 +51,15 @@ export function MaterialIssueHistory({
             ...EMPTY_MATERIAL_ISSUE_FILTERS,
         });
 
-    const [filters, setFilters] =
-        useState<MaterialIssueHistoryFilters>({
-            ...EMPTY_MATERIAL_ISSUE_FILTERS,
-        });
-
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(5);
-    const [error, setError] = useState("");
+    const error = draft.dateFrom && draft.dateTo && draft.dateFrom > draft.dateTo
+        ? "วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด"
+        : "";
 
-    const filteredRecords =
-        filterMaterialIssueRecords(
-            records,
-            filters,
-        );
+    const filteredRecords = error
+        ? []
+        : filterMaterialIssueRecords(records, draft);
 
     const totalPages = Math.max(
         1,
@@ -85,53 +79,20 @@ export function MaterialIssueHistory({
             currentPage * pageSize,
         );
 
-    function handleSearch(): void {
-        if (
-            draft.dateFrom &&
-            draft.dateTo &&
-            draft.dateFrom > draft.dateTo
-        ) {
-            setError(
-                "วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด",
-            );
-
-            return;
-        }
-
-        setFilters({ ...draft });
-        setPage(1);
-        setError("");
-    }
-
-    function handleClearFilters(): void {
-        setDraft({
-            ...EMPTY_MATERIAL_ISSUE_FILTERS,
-        });
-
-        setFilters({
-            ...EMPTY_MATERIAL_ISSUE_FILTERS,
-        });
-
-        setPage(1);
-        setError("");
-    }
 
     return (
         <div className="min-w-0 space-y-4">
 
             {/* ตัวกรองประวัติ */}
             <SectionCard
-                title="ประวัติใบเบิกจ่ายวัสดุ"
-                subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสารสาธิต`}
+                title="ข้อมูลที่บันทึก"
+                contentClassName="space-y-3"
             >
                 <form
                     className="space-y-3"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        handleSearch();
-                    }}
+                    onSubmit={(event) => event.preventDefault()}
                 >
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,.65fr)]">
 
                         {/* ค้นหา */}
                         <div className="grid content-start gap-2">
@@ -143,56 +104,62 @@ export function MaterialIssueHistory({
                                 id="material-issue-history-search"
                                 value={draft.search}
                                 placeholder="เลขที่เอกสาร ชื่อผลิตภัณฑ์ หรือผู้เบิก"
-                                onChange={(event) =>
+                                onChange={(event) => {
                                     setDraft((previous) => ({
                                         ...previous,
                                         search: event.target.value,
-                                    }))
-                                }
+                                    }));
+                                    setPage(1);
+                                }}
                             />
                         </div>
 
                         {/* ตั้งแต่วันที่ */}
-                        <ThaiBuddhistDatePicker
-                            label="ตั้งแต่วันที่"
-                            value={draft.dateFrom}
-                            onChange={(value) =>
-                                setDraft((previous) => ({
-                                    ...previous,
-                                    dateFrom: value,
-                                }))
-                            }
-                        />
+                        <div className="factory-itech-date-filter min-w-0">
+                            <ThaiBuddhistDatePicker
+                                label="ตั้งแต่วันที่"
+                                value={draft.dateFrom}
+                                onChange={(value) => {
+                                    setDraft((previous) => ({
+                                        ...previous,
+                                        dateFrom: value,
+                                    }));
+                                    setPage(1);
+                                }}
+                            />
+                        </div>
 
                         {/* ถึงวันที่ */}
-                        <ThaiBuddhistDatePicker
-                            label="ถึงวันที่"
-                            value={draft.dateTo}
-                            onChange={(value) =>
-                                setDraft((previous) => ({
-                                    ...previous,
-                                    dateTo: value,
-                                }))
-                            }
-                        />
+                        <div className="factory-itech-date-filter min-w-0">
+                            <ThaiBuddhistDatePicker
+                                label="ถึงวันที่"
+                                value={draft.dateTo}
+                                onChange={(value) => {
+                                    setDraft((previous) => ({
+                                        ...previous,
+                                        dateTo: value,
+                                    }));
+                                    setPage(1);
+                                }}
+                            />
+                        </div>
 
-                        {/* ปุ่มค้นหา */}
-                        <div className="flex flex-wrap items-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleClearFilters}
-                            >
-                                ล้างตัวกรอง
-                            </Button>
-
-                            <Button type="submit">
-                                <Search
-                                    className="size-4"
-                                    aria-hidden="true"
-                                />
-                                ค้นหา
-                            </Button>
+                        {/* จำนวนต่อหน้า */}
+                        <div className="min-w-0">
+                            <SelectField
+                                label="จำนวนต่อหน้า"
+                                value={String(pageSize)}
+                                onChange={(value) => {
+                                    setPageSize(Number(value));
+                                    setPage(1);
+                                }}
+                                options={[5, 10, 20].map(
+                                    (size) => ({
+                                        value: String(size),
+                                        label: `${size} รายการ`,
+                                    }),
+                                )}
+                            />
                         </div>
                     </div>
 
@@ -205,25 +172,6 @@ export function MaterialIssueHistory({
                         </p>
                     )}
                 </form>
-            </SectionCard>
-
-            {/* จำนวนต่อหน้า */}
-            <div className="ml-auto w-36">
-                <SelectField
-                    label="จำนวนต่อหน้า"
-                    value={String(pageSize)}
-                    onChange={(value) => {
-                        setPageSize(Number(value));
-                        setPage(1);
-                    }}
-                    options={[5, 10, 20].map(
-                        (size) => ({
-                            value: String(size),
-                            label: `${size} รายการ`,
-                        }),
-                    )}
-                />
-            </div>
 
             {/* ตารางประวัติ */}
             <FactoryDataTable variant="history"
@@ -298,7 +246,7 @@ export function MaterialIssueHistory({
                         key: "actions",
                         label: "จัดการ",
                         render: (record) => (
-                            <RowActionMenu containsDialog>
+                            <RowActionMenu appearance="itech" containsDialog>
                                 {/* ดูรายละเอียด */}
                                 <RowActionItem type="button" title="ดูรายละเอียด" aria-label="ดูรายละเอียด" onClick={() => onView(record)}>
                                     <Eye className="size-4" />
@@ -340,6 +288,7 @@ export function MaterialIssueHistory({
                     />
                 }
             />
+            </SectionCard>
         </div>
     );
 }

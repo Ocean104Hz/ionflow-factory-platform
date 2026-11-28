@@ -1,0 +1,106 @@
+/* Only the raw-material paper workspace; no sidebar/global palette changes. */
+@media screen {
+  .nan-qc-paper {
+    --background: #f8fafc;
+    --foreground: #172033;
+    --surface: #fff;
+    --card: #fff;
+    --primary: #173b63;
+    --primary-ink: #173b63;
+    --primary-foreground: #fff;
+    --border: #e2e8f0;
+    --input: #d1d5db;
+    --ring: #9ec23a;
+    --accent: #edf4d7;
+    --accent-foreground: #173b63;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --table-header: #f3f4f6;
+  }
+  .factory-content:has(> .factory-qc-itech > .nan-qc-paper) { background: #f8fafc; }
+}
+
+/* History only: paper workspace, no shared table or sidebar styles. */
+@media screen {
+  .nan-qc-history-filters { display:grid; grid-template-columns:minmax(0,1fr); align-items:end; gap:12px; }
+  .nan-qc-history-scroll { max-height:clamp(260px,58vh,680px); overflow:auto; scrollbar-width:thin; }
+  .nan-qc-history-table { min-width:1080px; border-collapse:separate; border-spacing:0; font-size:13px; }
+  .nan-qc-history-table thead { position:sticky; top:0; z-index:2; }
+  .nan-qc-history-table thead th { height:48px; background:#173b63; color:#fff !important; text-align:center; padding:8px 10px; white-space:normal; font-size:12px; font-weight:600; border-right:1px solid #ffffff18; }
+  .nan-qc-history-table tbody td { padding:10px 9px; height:52px; text-align:center; border-bottom:1px solid #e5e7eb; color:#172033; }
+  .nan-qc-history-table tbody tr:hover { background:#f5f8fc; }
+  .nan-qc-history-table tbody tr[data-state="selected"] { background:#edf4fa; }
+  .nan-qc-history-table .nan-qc-code-cell { min-width:100px; max-width:175px; white-space:normal; overflow-wrap:anywhere; }
+  .nan-qc-count { display:inline-flex; align-items:center; justify-content:center; border:1px solid; border-radius:999px; font-size:11px; font-weight:500; padding:2px 7px; white-space:nowrap; }
+  .nan-qc-pass { color:#047857; background:#ecfdf5; border-color:#a7f3d0; }
+  .nan-qc-acceptable { color:#92400e; background:#fffbeb; border-color:#fde68a; }
+  .nan-qc-fail { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
+  .nan-qc-history .nan-qc-manage { font-size:12px; font-weight:600; color:#173b63; border-color:#e2e8f0; border-radius:8px; background:white; }
+  .nan-qc-history .nan-qc-manage[data-state="open"] { border-color:#9ec23a; background:#f8fafc; }
+  .nan-qc-history-menu [data-slot="dropdown-menu-item"] { min-height:36px; cursor:pointer; border-radius:6px; }
+  .nan-qc-history-menu [data-variant="destructive"] { color:#dc2626; }
+  @media (min-width:640px) { .nan-qc-history-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (min-width:1100px) { .nan-qc-history-filters { grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.65fr); } }
+}
+
+/* Inspection entry grid only. History, document header and print are unchanged. */
+@media screen {
+  .nan-qc-paper .nan-qc-inspection-grid {
+    scrollbar-width: thin;
+    outline-offset: 3px;
+  }
+  .nan-qc-paper .nan-qc-inspection-grid:focus-visible { outline: 2px solid #9ec23a; }
+  .nan-qc-paper .nan-qc-inspection-grid > [data-slot="table-container"] { overflow: visible; }
+  .nan-qc-paper .nan-qc-inspection-table {
+    min-width: 1320px;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .nan-qc-paper .nan-qc-inspection-table thead tr { border: 0; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-head {
+    background: #173b63;
+    padding: 10px 6px;
+    font-size: 13px;
+    line-height: 1.4;
+    border: 0;
+    border-right: 1px solid #ffffff26;
+  }
+  .nan-qc-paper .nan-qc-inspection-table thead tr:first-child th:first-child { border-top-left-radius: 10px; }
+  .nan-qc-paper .nan-qc-inspection-table thead tr:first-child th:last-child { border-top-right-radius: 10px; border-right: 0; }
+  .nan-qc-paper .nan-qc-inspection-table thead tr:first-child th[colspan] { border-bottom: 1px solid #ffffff33; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-row { border: 0; background: #fff; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-row:nth-child(even) { background: #f1f6fc; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-row:focus-within { background: #e9f1fb; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-cell,
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-index {
+    border: 0;
+    border-bottom: 1px solid #e5edf5;
+    padding: 7px 5px;
+    vertical-align: middle;
+  }
+  .nan-qc-paper .nan-qc-inspection-table tbody tr:last-child > * { border-bottom: 0; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-index span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #deebfa;
+    color: #173b63;
+    font-weight: 600;
+  }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-control {
+    height: 36px;
+    min-width: 0;
+    width: 100%;
+    font-size: 13px;
+    border-radius: 8px;
+    border-color: #d1dbe6;
+    background: #fff;
+    box-shadow: none;
+  }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-control:focus-visible { border-color: #9ec23a; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-control[data-slot="select-trigger"] { gap: 3px; padding-inline: 7px; }
+  .nan-qc-paper .nan-qc-inspection-table .nan-qc-inspection-control:disabled { opacity: .65; }
+}

@@ -7,15 +7,7 @@ import {
   type CSSProperties,
   useState,
 } from "react";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "../ui/breadcrumb";
-import { Bell, ChevronDown, CircleHelp, X } from "lucide-react";
+import { Archive, Bell, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Factory, FlaskConical, Package, Receipt, ShoppingCart, X, type LucideIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 
@@ -32,7 +24,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarSeparator,
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
@@ -132,7 +123,7 @@ export function AppShell({
     <SidebarProvider
       open={sidebarOpen}
       onOpenChange={updateSidebarOpen}
-      style={{ "--sidebar-width-icon": "4rem" } as CSSProperties}
+      style={{ "--sidebar-width": "18rem", "--sidebar-width-icon": "5rem" } as CSSProperties}
     >
       <FactoryShell currentUser={currentUser}>{children}</FactoryShell>
     </SidebarProvider>
@@ -167,14 +158,18 @@ function FactoryShell({
         <SiteHeader
           currentUser={currentUser}
           title={
-            pathname.startsWith("/settings")
-              ? "ตั้งค่า"
-              : (current?.title ?? branding.factoryName)
+            pathname === "/qc_raw_material"
+              ? "ใบตรวจสอบคุณภาพวัตถุดิบ"
+              : pathname === "/nc-reports"
+                ? "รายงานข้อบกพร่อง"
+                : pathname.startsWith("/settings")
+                  ? "ตั้งค่า"
+                  : (current?.title ?? branding.factoryName)
           }
         />
         <div
           id="main-content"
-          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""}`}
+          className={`factory-content @container/main mx-auto w-full max-w-none space-y-5 px-4 py-5 ${isSettingsPage ? "lg:p-0" : ""} ${pathname === "/nc-reports" ? "bg-[#f7f8fa] dark:bg-background" : ""}`}
         >
           {previewMenu && (
             <Alert role="status">
@@ -201,6 +196,17 @@ function FactoryShell({
     </>
   );
 }
+// Match the i-Tech section icons without changing Factory navigation or permissions.
+const ITECH_SECTION_ICONS: Readonly<Partial<Record<string, LucideIcon>>> = {
+  PURCHASING: ShoppingCart,
+  QC: FlaskConical,
+  WAREHOUSE: Package,
+  PRODUCTION: Factory,
+  PACKING: Archive,
+  LOGISTICS: Receipt,
+  "SALES DOCUMENTS": Receipt,
+};
+
 function AppSidebar({
   currentUser,
   onPreview,
@@ -210,8 +216,15 @@ function AppSidebar({
 }) {
   const pathname = usePathname();
   const { branding } = useBranding();
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
   const compact = !isMobile && state === "collapsed";
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  function toggleGroup(key: string) {
+    setCollapsedGroups((previous) => ({
+      ...previous,
+      [key]: !(previous[key] ?? false),
+    }));
+  }
   function menu(group: string) {
     return (
       <SidebarMenu>
@@ -230,8 +243,9 @@ function AppSidebar({
                   isActive={
                     !item.alias && isNavigationActive(pathname, item.href)
                   }
-                  tooltip={item.title}
-                  className="h-9"
+                  tooltip={compact ? { children: item.title, className: "factory-itech-tooltip", sideOffset: 10 } : undefined}
+                  appearance="factory-itech"
+                  className="factory-itech-nav-item"
                   aria-label={item.title}
                 >
                   <Link
@@ -247,7 +261,7 @@ function AppSidebar({
                     }
                   >
                     <item.icon aria-hidden="true" />
-                    {!compact && <span>{item.title}</span>}
+                    {!compact && <span className="factory-itech-nav-label">{item.title}</span>}
                   </Link>
                 </SidebarMenuButton>
               ) : null}
@@ -261,12 +275,27 @@ function AppSidebar({
     <Sidebar
       id="factory-sidebar"
       collapsible="icon"
-      className="factory-sidebar no-print"
+      className="factory-sidebar factory-sidebar-itech no-print"
+      mobileClassName="factory-sidebar factory-sidebar-itech no-print"
     >
-      <SidebarHeader className="px-3 py-5">
+      {!isMobile && (
+        <button
+          type="button"
+          className="factory-itech-edge-toggle"
+          onClick={toggleSidebar}
+          aria-controls="factory-sidebar"
+          aria-expanded={!compact}
+          aria-label={compact ? "ขยายแถบเมนู" : "ยุบแถบเมนู"}
+          title={compact ? "ขยายแถบเมนู" : "ยุบแถบเมนู"}
+        >
+          {compact ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+        </button>
+      )}
+      <SidebarHeader className="factory-itech-brand">
         <Link
           href="/dashboard"
           aria-label={branding.factoryName}
+          className="factory-itech-brand-link"
           onClick={() => setOpenMobile(false)}
         >
           <FactoryLogo compact={compact} />
@@ -276,25 +305,65 @@ function AppSidebar({
             variant="ghost"
             size="icon"
             aria-label="ปิดเมนู"
+            className="factory-itech-mobile-close"
             onClick={() => setOpenMobile(false)}
           >
             <X />
           </Button>
         )}
       </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
+      <SidebarContent className="factory-itech-scroll group-data-[collapsible=icon]:overflow-y-auto">
         <nav aria-label="เมนูโรงงาน">
-          {navigationGroups.filter((group) => group.key !== "MAINTENANCE").map((group) => (
-            <SidebarGroup key={group.key}>
-              {!compact && (
-                <SidebarGroupLabel className="text-[11px] tracking-wide text-muted-foreground">
-                  {group.title}
-                </SidebarGroupLabel>
-              )}
-              <SidebarGroupContent>{menu(group.key)}</SidebarGroupContent>
-            </SidebarGroup>
-          ))}
+          {navigationGroups.filter((group) => group.key !== "MAINTENANCE").map((group) => {
+            const visible = navigation.some(
+              (item) => item.group === group.key && item.href &&
+                currentUser.modules.includes(navigationModuleKey(item.href)),
+            );
+            if (!visible) return null;
+            if (group.key === "OVERVIEW") {
+              return (
+                <div key={group.key} className="factory-itech-overview-links">
+                  {menu(group.key)}
+                  {!compact && <div aria-hidden="true" className="factory-itech-overview-divider" />}
+                </div>
+              );
+            }
+            const GroupIcon = ITECH_SECTION_ICONS[group.key] ?? navigation.find((item) => item.group === group.key)?.icon;
+            const isCollapsed = collapsedGroups[group.key] ?? false;
+            const contentId = `factory-sidebar-group-${group.key.toLowerCase().replaceAll(" ", "-")}`;
+            return (
+              <SidebarGroup key={group.key} className="factory-itech-group">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SidebarGroupLabel asChild className="factory-itech-group-trigger">
+                      <button
+                        type="button"
+                        aria-label={group.title}
+                        aria-expanded={!isCollapsed}
+                        aria-controls={contentId}
+                        onClick={() => toggleGroup(group.key)}
+                      >
+                        {GroupIcon && <GroupIcon aria-hidden="true" className="factory-itech-group-icon" />}
+                        {!compact && <span className="factory-itech-group-title">{group.title}</span>}
+                        {!compact && <ChevronDown aria-hidden="true" className="factory-itech-group-chevron" />}
+                      </button>
+                    </SidebarGroupLabel>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="center" sideOffset={10} hidden={!compact} className="factory-itech-tooltip">
+                    {group.title}
+                  </TooltipContent>
+                </Tooltip>
+                <SidebarGroupContent
+                  id={contentId}
+                  inert={isCollapsed}
+                  aria-hidden={isCollapsed}
+                  className="factory-itech-group-content"
+                >
+                  <div className="factory-itech-group-items">{menu(group.key)}</div>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            );
+          })}
         </nav>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-3">
@@ -320,6 +389,27 @@ function AppSidebar({
     </Sidebar>
   );
 }
+const headerDateFormatter = new Intl.DateTimeFormat("th-TH-u-ca-buddhist-nu-latn", {
+  timeZone: "Asia/Bangkok",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+function getHeaderDate(): string {
+  return headerDateFormatter.format(new Date());
+}
+
+function getServerHeaderDate(): string {
+  return "";
+}
+
+function subscribeHeaderDate(onChange: () => void): () => void {
+  const timer = window.setInterval(onChange, 60_000);
+  return () => window.clearInterval(timer);
+}
+
 function SiteHeader({
   title,
   currentUser,
@@ -330,32 +420,22 @@ function SiteHeader({
   const { branding } = useBranding();
   const router = useRouter();
   const [logoutPending, setLogoutPending] = useState(false);
-  const { state, isMobile, openMobile } = useSidebar();
-  const compact = !isMobile && state === "collapsed";
+  const { isMobile, openMobile } = useSidebar();
+  const dateLabel = useSyncExternalStore(subscribeHeaderDate, getHeaderDate, getServerHeaderDate);
   return (
     <header className="no-print sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card/95 px-4 backdrop-blur lg:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <SidebarTrigger
-          aria-label={
-            isMobile ? "เปิดเมนู" : compact ? "ขยาย sidebar" : "ยุบ sidebar"
-          }
-          aria-expanded={isMobile ? openMobile : !compact}
+          className="md:hidden"
+          aria-label={openMobile ? "ปิดเมนู" : "เปิดเมนู"}
+          aria-expanded={isMobile && openMobile}
           aria-controls="factory-sidebar"
         />
-        <Separator orientation="vertical" className="mx-1 h-4" />
-        <Breadcrumb>
-          <BreadcrumbList className="flex-nowrap text-sm">
-            <BreadcrumbItem className="hidden sm:block">
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Factory</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden sm:block" />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{title}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <Separator orientation="vertical" className="mx-1 h-4 md:hidden" />
+        <h1 className="min-w-0 truncate text-xl font-bold leading-tight tracking-tight text-[#173b63] sm:text-2xl dark:text-foreground" title={title}>
+          {title}
+        </h1>
+        <p className="hidden shrink-0 text-xs font-medium text-slate-400 sm:block dark:text-muted-foreground">{dateLabel}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <Tooltip>

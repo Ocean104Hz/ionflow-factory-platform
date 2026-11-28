@@ -1,3 +1,6 @@
+import { formatThaiDate, todayInBangkok } from "../../lib/date/thai-date.ts";
+
+// NAN_SAMPLE_LOG_THAI_DATE_V5
 export const analysisItems = [
   ["ph", "ความเป็นกรด - ด่าง(pH)"],
   ["moisture", "ความชื้น (Moisture)"],
@@ -48,6 +51,8 @@ export const formOptions = [
 export interface SubmissionLog {
   id: string;
   doc_no: string;
+  // Legacy saved records may not yet contain this field.
+  doc_date?: string;
   sample_code: string;
   requester_name: string;
   requester_address: string;
@@ -101,6 +106,7 @@ export function blankLog(): SubmissionLog {
   return {
     id: "",
     doc_no: "",
+    doc_date: "",
     sample_code: "",
     requester_name: "",
     requester_address: "",
@@ -147,6 +153,28 @@ export function blankLog(): SubmissionLog {
     },
   };
 }
+// NAN_SAMPLE_LOG_DEFAULT_DATES_V6
+// Keep blankLog deterministic: it is also the server's payload template.
+export function newLogDraft(today = todayInBangkok()): SubmissionLog {
+  const row = blankLog();
+  row.doc_date = today;
+  row.sender_sign.signed_date = today;
+  row.staff_section.received_date = today;
+  row.staff_section.accepted_date = today;
+  return row;
+}
+
+// Old clients/records may omit doc_date; never substitute the current day.
+// Explicit edits (including clearing the field) take precedence.
+export function withLogDocumentDate(
+  draft: Record<string, unknown>,
+  previous?: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.hasOwn(draft, "doc_date")
+    ? draft
+    : { ...draft, doc_date: previous?.doc_date ?? "" };
+}
+
 export function setLogType(r: SubmissionLog, value: string): SubmissionLog {
   return {
     ...r,
@@ -201,12 +229,7 @@ export function validLogDate(value: string) {
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 export function logDate(value: string) {
-  return validLogDate(value)
-    ? new Intl.DateTimeFormat("th-TH", {
-        dateStyle: "medium",
-        timeZone: "Asia/Bangkok",
-      }).format(new Date(`${value}T00:00:00Z`))
-    : "—";
+  return validLogDate(value) ? (formatThaiDate(value) || "—") : "—";
 }
 export const selectedAnalysis = (r: SubmissionLog) =>
   analysisItems.filter(([key]) => r.requested_items[key]);
@@ -215,6 +238,8 @@ export function validateLog(
   records: readonly SubmissionLog[],
 ): LogErrors {
   const e: LogErrors = {};
+  if (r.doc_date && !validLogDate(r.doc_date))
+    e.doc_date = "วันที่เอกสารไม่ถูกต้อง";
   for (const [key, label] of [
     ["doc_no", "เลขที่คำขอ"],
     ["sample_code", "รหัสตัวอย่าง"],

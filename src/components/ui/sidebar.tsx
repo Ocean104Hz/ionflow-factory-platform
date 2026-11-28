@@ -156,12 +156,14 @@ function Sidebar({
   variant = "sidebar",
   collapsible = "offcanvas",
   className,
+  mobileClassName,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
+  mobileClassName?: string;
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
@@ -188,7 +190,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className={cn("w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden", mobileClassName)}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -476,11 +478,15 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 
 const sidebarMenuButtonVariants = cva(
   [
-    "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+    "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden group-has-data-[sidebar=menu-action]/menu-item:pr-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
     "origin-left transition-[scale,background-color,color,width,height,padding] duration-200 ease-out motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98] group-data-[collapsible=icon]:origin-center group-data-[collapsible=icon]:justify-center motion-reduce:transition-none [&>svg]:origin-center [&>svg]:transition-[scale] [&>svg]:duration-200 [&>svg]:ease-out motion-safe:hover:[&>svg]:scale-110 motion-reduce:[&>svg]:transition-none [&>span]:origin-left [&>span]:transition-[scale] [&>span]:duration-200 [&>span]:ease-out motion-safe:hover:[&>span]:scale-[1.03] motion-reduce:[&>span]:transition-none",
   ],
   {
     variants: {
+      appearance: {
+        default: "group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2!",
+        "factory-itech": "",
+      },
       variant: {
         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         outline:
@@ -493,6 +499,7 @@ const sidebarMenuButtonVariants = cva(
       },
     },
     defaultVariants: {
+      appearance: "default",
       variant: "default",
       size: "default",
     },
@@ -504,6 +511,7 @@ function SidebarMenuButton({
   isActive = false,
   variant = "default",
   size = "default",
+  appearance = "default",
   tooltip,
   className,
   ...props
@@ -521,7 +529,7 @@ function SidebarMenuButton({
       data-sidebar="menu-button"
       data-size={size}
       data-active={isActive}
-      className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+      className={cn(sidebarMenuButtonVariants({ variant, size, appearance }), className)}
       {...props}
     />
   );

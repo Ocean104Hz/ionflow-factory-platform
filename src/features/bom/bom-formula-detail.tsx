@@ -13,6 +13,7 @@ import {
 } from "@/src/components/factory/patterns";
 import { date, dateTime } from "@/src/lib/formatters";
 import { useBOM } from "./bom-provider";
+import { BOMExcelActions } from "./bom-excel-import";
 import {
   productTypes,
   formulaStatuses,
@@ -87,7 +88,8 @@ export function BOMMasterDetail({
     },
   ];
   return (
-    <div className="space-y-5">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="min-w-0 [&_[data-slot=card-content]>div]:grid-cols-1">
       <SectionCard
         title={`${master.code} · ${master.name}`}
         action={fromSettings ? undefined : (
@@ -121,8 +123,10 @@ export function BOMMasterDetail({
         </p>
         {fromSettings && <p className="mt-2 text-sm text-muted-foreground">แก้ไขวัตถุดิบนี้ได้ที่ทะเบียนวัตถุดิบในตั้งค่าระบบ</p>}
       </SectionCard>
+      </div>
+      <div className="min-w-0 space-y-4">
       <SectionCard
-        title={`สูตรที่เชื่อมโยง (${formulas.length})`}
+        title={`สูตรการผลิตภายใต้รายการนี้ (${formulas.length})`}
         subtitle={
           canHaveFormula(master)
             ? "ทุกเวอร์ชันยังคงแสดงอยู่ ไม่เขียนทับเวอร์ชันเก่า"
@@ -130,10 +134,10 @@ export function BOMMasterDetail({
         }
         action={
           canHaveFormula(master) ? (
-            <Button onClick={onNewFormula}>
-              <Plus />
-              สร้างสูตร / เวอร์ชันใหม่
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <BOMExcelActions masterId={master.id} onImported={() => setError("")} />
+              <Button className="factory-itech-button-primary" onClick={onNewFormula}><Plus />เพิ่มสูตรใหม่</Button>
+            </div>
           ) : undefined
         }
       >
@@ -167,6 +171,7 @@ export function BOMMasterDetail({
           }
         }}
       />}
+      </div>
     </div>
   );
 }

@@ -68,7 +68,22 @@ function ensureEditorTimestamp(old: { updatedAt: string } | undefined, incoming:
   if (old && old.updatedAt !== incoming) stale();
 }
 
-async function updateBOM(client: PoolClient, user: AuthenticatedFactoryUser, command: Record<string, unknown>) {
+async function updateBOM(client: PoolClient, user: AuthenticatedFactoryUser, command: Record<string, unknown>): Promise<{ state: BOMState; savedId?: string }> {
+  if (command.action === "import-batch") {
+    const commands = command.commands;
+    if (!Array.isArray(commands) || commands.length < 1 || commands.length > 100) invalid("นำเข้าได้ 1–100 รายการต่อครั้ง");
+    let result: { state: BOMState; savedId?: string } | undefined;
+    for (const value of commands) {
+      const item = obj(value);
+      if (item.action !== "master" && item.action !== "formula") invalid("ประเภทการนำเข้าไม่ถูกต้อง");
+      const row = obj(item.row);
+      if (row.id !== "") invalid("นำเข้าสร้างรายการใหม่เท่านั้น");
+      if (item.action === "formula" && item.default !== false) invalid("กำหนดสูตรเริ่มต้นผ่านหน้าจัดการสูตร");
+      result = await updateBOM(client, user, item);
+    }
+    if (!result) invalid();
+    return result;
+  }
   const state = await productionBOM(client);
   const at = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -135,7 +150,7 @@ async function updateBOM(client: PoolClient, user: AuthenticatedFactoryUser, com
 
 async function listDocuments<T>(client: PoolClient, kind: Exclude<ProductionArea, "bom">): Promise<T[]> {
   const result = await client.query(
-    "SELECT payload FROM foliar_fertilizer.production_v1_documents WHERE kind=$1 ORDER BY document_date DESC, document_no DESC",
+    "SELECT payload FROM foliar_fertilizer.production_v1_documents WHERE kind=$1 AND (kind <> 'order' OR NOT (payload ? 'deletedAt')) ORDER BY document_date DESC, document_no DESC",
     [kind],
   );
   return result.rows.map((row) => row.payload as T);
@@ -164,15 +179,108 @@ async function writeDocument(
   );
 }
 
+// PRD number allocation. All writes run under withProduction's transaction lock.
+async function nextPrdCandidate(client: PoolClient, date: string) {
+  const yy = date.slice(2, 4), mm = date.slice(5, 7);
+  const prefix = `PRD-${yy}${mm}`;
+  const result = await client.query<{ seq: string; reused: boolean }>(`
+    WITH reusable AS (
+      SELECT r.seq FROM foliar_fertilizer.production_order_doc_no_reservations r
+      WHERE r.prefix='PRD' AND r.yy=$1 AND r.mm=$2
+        AND r.status='reserved' AND r.expires_at <= now()
+        AND NOT EXISTS (SELECT 1 FROM foliar_fertilizer.production_v1_documents d WHERE d.kind='order' AND d.document_no=r.doc_no)
+      ORDER BY r.seq LIMIT 1
+    ), highest AS (
+      SELECT greatest(
+        coalesce((SELECT last_seq FROM foliar_fertilizer.production_order_doc_no_counters WHERE prefix='PRD' AND yy=$1 AND mm=$2),0),
+        coalesce((SELECT max(seq) FROM foliar_fertilizer.production_order_doc_no_reservations WHERE prefix='PRD' AND yy=$1 AND mm=$2),0),
+        coalesce((SELECT max(substring(document_no from 9)::integer) FROM foliar_fertilizer.production_v1_documents
+          WHERE kind='order' AND document_no ~ '^PRD-[0-9]{2}(0[1-9]|1[0-2])[0-9]{3,}$' AND left(document_no,8)=$3),0)
+      ) AS seq
+    )
+    SELECT seq::text, true AS reused FROM reusable
+    UNION ALL SELECT (seq+1)::text, false FROM highest WHERE NOT EXISTS (SELECT 1 FROM reusable)
+  `, [yy, mm, prefix]);
+  const seq = Number(result.rows[0]?.seq);
+  if (!Number.isSafeInteger(seq) || seq < 1 || seq > 2147483647) invalid("ไม่สามารถสร้างลำดับ PRD ได้");
+  return { docNo: prefix + String(seq).padStart(3,"0"), yy, mm, seq };
+}
+
+async function reservePrdNumber(client: PoolClient, user: AuthenticatedFactoryUser, date: string, expected: string) {
+  const candidate = await nextPrdCandidate(client, date);
+  if (candidate.docNo !== expected) return { reserved: false as const, candidate };
+  await client.query(`INSERT INTO foliar_fertilizer.production_order_doc_no_counters (prefix,yy,mm,last_seq)
+    VALUES ('PRD',$1,$2,$3) ON CONFLICT (prefix,yy,mm) DO UPDATE
+    SET last_seq=greatest(production_order_doc_no_counters.last_seq,EXCLUDED.last_seq), updated_at=now()`,
+    [candidate.yy,candidate.mm,candidate.seq]);
+  const id = crypto.randomUUID();
+  const result = await client.query<{ expires_at: Date }>(`INSERT INTO foliar_fertilizer.production_order_doc_no_reservations
+    (id,doc_no,prefix,yy,mm,seq,reserved_by,reserved_at,expires_at)
+    VALUES ($1,$2,'PRD',$3,$4,$5,$6,now(),now()+interval '24 hours')
+    ON CONFLICT (doc_no) DO UPDATE SET id=EXCLUDED.id,reserved_by=EXCLUDED.reserved_by,
+      reserved_at=EXCLUDED.reserved_at,expires_at=EXCLUDED.expires_at,updated_at=now()
+    WHERE production_order_doc_no_reservations.status='reserved' AND production_order_doc_no_reservations.expires_at<=now()
+    RETURNING expires_at`, [id,candidate.docNo,candidate.yy,candidate.mm,candidate.seq,user.id]);
+  if (!result.rows[0]) throw new ProductionError(409,"เลข PRD ถูกจองแล้ว กรุณาลองใหม่");
+  return { reserved: true as const, reservation: { ...candidate, reservationId:id, expiresAt:result.rows[0].expires_at.toISOString() } };
+}
+
+async function requirePrdReservation(client: PoolClient, user: AuthenticatedFactoryUser, date: string, reservationId: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reservationId)) invalid("กรุณาจองเลข PRD ก่อนบันทึก");
+  const result = await client.query<{ doc_no: string }>(`SELECT r.doc_no FROM foliar_fertilizer.production_order_doc_no_reservations r
+    WHERE r.id=$1 AND r.reserved_by=$2 AND r.yy=$3 AND r.mm=$4 AND r.status='reserved' AND r.expires_at>now()
+    AND NOT EXISTS (SELECT 1 FROM foliar_fertilizer.production_v1_documents d WHERE d.kind='order' AND d.document_no=r.doc_no)
+    FOR UPDATE`, [reservationId,user.id,date.slice(2,4),date.slice(5,7)]);
+  if (!result.rows[0]) throw new ProductionError(409,"เลข PRD ไม่สามารถใช้ได้ กรุณาล้างเลขและสร้างใหม่");
+  return result.rows[0].doc_no;
+}
+
 function decimal(value: string) {
   if (!/^\d{1,9}(?:\.\d{1,3})?$/.test(value)) invalid("จำนวนต้องเป็นตัวเลขและมีทศนิยมไม่เกิน 3 ตำแหน่ง");
   return Number(value);
 }
 
-async function createOrder(client: PoolClient, user: AuthenticatedFactoryUser, input: unknown): Promise<ProductionOrderV1> {
+type ManagedProductionOrder = ProductionOrderV1 & { revision?: string };
+
+async function manageableOrder(client: PoolClient, command: Record<string, unknown>) {
+  const id = str(command.id, 36);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) invalid("รหัสใบสั่งผลิตไม่ถูกต้อง");
+  const result = await client.query<{ payload: ManagedProductionOrder }>(`
+    SELECT payload FROM foliar_fertilizer.production_v1_documents
+    WHERE id=$1 AND kind='order' AND NOT (payload ? 'deletedAt') FOR UPDATE`, [id]);
+  const order = result.rows[0]?.payload;
+  if (!order) throw new ProductionError(404, "ไม่พบใบสั่งผลิตหรือเอกสารถูกลบแล้ว");
+  if ((order.revision ?? order.createdAt) !== command.expectedRevision) stale();
+  const linked = await client.query<{ linked: boolean }>(`
+    SELECT EXISTS (SELECT 1 FROM foliar_fertilizer.production_v1_documents
+      WHERE order_id=$1 AND kind IN ('report','receipt')) AS linked`, [id]);
+  if (linked.rows[0]?.linked) throw new ProductionError(409, "ไม่สามารถแก้ไขหรือลบใบสั่งผลิตที่มีรายงานการผลิตหรือใบรับยอดผลิตอ้างอิงแล้ว");
+  return order;
+}
+
+async function updateStoredOrder(client: PoolClient, user: AuthenticatedFactoryUser, order: ManagedProductionOrder & { deletedAt?: string; deletedBy?: string }) {
+  const result = await client.query(`UPDATE foliar_fertilizer.production_v1_documents
+    SET document_date=$2, payload=$3, actor_id=$4, saved_at=now()
+    WHERE id=$1 AND kind='order' AND NOT (payload ? 'deletedAt')`,
+    [order.id, order.date, JSON.stringify(order), user.id]);
+  if (result.rowCount !== 1) stale();
+}
+
+async function deleteOrder(client: PoolClient, user: AuthenticatedFactoryUser, command: Record<string, unknown>) {
+  const order = await manageableOrder(client, command);
+  // Keep both the original document number and its used reservation forever.
+  await updateStoredOrder(client, user, {
+    ...order, revision: crypto.randomUUID(), deletedAt: new Date().toISOString(), deletedBy: user.id,
+  });
+  return { id: order.id, documentNumber: order.documentNumber };
+}
+
+async function createOrder(client: PoolClient, user: AuthenticatedFactoryUser, input: unknown, previous?: ManagedProductionOrder): Promise<ManagedProductionOrder> {
   const raw = obj(input);
   const head = fields(raw, ["date", "location", "formulaId", "amount", "note", "mixingReference"]);
   if (!validDay(head.date) || !head.location) invalid("กรุณาระบุวันที่และสถานที่ผลิต");
+  if (previous && head.date.slice(0, 7) !== previous.date.slice(0, 7))
+    invalid("แก้ไขวันที่ข้ามเดือนหรือปีของเลข PRD เดิมไม่ได้");
   const amount = decimal(head.amount);
   if (amount <= 0) invalid("จำนวนที่สั่งผลิตต้องมากกว่า 0");
   const signers = fields(obj(raw.signers), ["preparedBy", "qaOfficer", "productionOfficer", "manager"]);
@@ -184,6 +292,28 @@ async function createOrder(client: PoolClient, user: AuthenticatedFactoryUser, i
     return row;
   });
   if (new Set(rows.map((row) => row.id)).size !== rows.length) invalid("รหัสแถวผลิตซ้ำ");
+  if (previous && previous.formulaId === head.formulaId) {
+    if (previous.sheet.lines.length !== 1) invalid("โครงสร้างใบสูตรเดิมไม่รองรับการแก้ไข");
+    const oldAmount = decimal(previous.amount);
+    if (oldAmount <= 0) invalid("จำนวนเดิมของใบสั่งผลิตไม่ถูกต้อง");
+    const ratio = amount / oldAmount;
+    const scale = (value: number) => {
+      const next = value * ratio;
+      if (!Number.isFinite(next)) invalid("ปริมาณวัตถุดิบตามสูตรสูงเกินขอบเขตที่รองรับ");
+      return next;
+    };
+    const sheet: ProductionFormulaSheet = {
+      ...previous.sheet, orderDate: head.date,
+      lines: ratio === 1 ? previous.sheet.lines : previous.sheet.lines.map((line) => ({
+        ...line, plannedQuantity: amount, batchCount: scale(line.batchCount),
+        ingredients: line.ingredients.map((item) => ({ ...item, quantity: scale(item.quantity) })),
+        packaging: line.packaging.map((item) => ({ ...item, quantity: scale(item.quantity) })),
+      })),
+    };
+    const order = { ...previous, ...head, sheet, rows, signers, revision: crypto.randomUUID() };
+    await updateStoredOrder(client, user, order);
+    return order;
+  }
   const bom = await productionBOM(client);
   const formula = bom.formulas.find((item) => item.id === head.formulaId && item.status === "ACTIVE");
   const product = bom.masters.find((item) => item.id === formula?.masterId);
@@ -199,8 +329,9 @@ async function createOrder(client: PoolClient, user: AuthenticatedFactoryUser, i
     if (!Number.isFinite(quantity)) invalid("ปริมาณวัตถุดิบตามสูตรสูงเกินขอบเขตที่รองรับ");
     return { ...item, code: material.code, name: material.name, quantity };
   });
-  const id = crypto.randomUUID();
-  const number = await numberFor(client, "order", "PRD", head.date);
+  const id = previous?.id ?? crypto.randomUUID();
+  const reservationId = previous ? "" : str(raw.reservationId, 36);
+  const number = previous?.documentNumber ?? await requirePrdReservation(client, user, head.date, reservationId);
   const at = new Date().toISOString();
   const sheet: ProductionFormulaSheet = {
     id, orderId: id, orderNumber: number, orderDate: head.date, issuedAt: at, issuedBy: user.displayName,
@@ -211,8 +342,16 @@ async function createOrder(client: PoolClient, user: AuthenticatedFactoryUser, i
       batchUnit: formula.unit, batchCount, ingredients: snapshot(formula.ingredients), packaging: snapshot(formula.packaging),
     }],
   };
-  const order = { ...head, id, documentNumber: number, sheet, rows, signers, createdAt: at };
+  const order = { ...head, id, documentNumber: number, sheet, rows, signers, createdAt: previous?.createdAt ?? at, revision: crypto.randomUUID() };
+  if (previous) {
+    await updateStoredOrder(client, user, order);
+    return order;
+  }
   await writeDocument(client, user, "order", id, number, head.date, null, order);
+  const used = await client.query(`UPDATE foliar_fertilizer.production_order_doc_no_reservations
+    SET status='used',used_at=now(),production_order_id=$2,updated_at=now()
+    WHERE id=$1 AND reserved_by=$3 AND status='reserved'`, [reservationId,id,user.id]);
+  if (used.rowCount !== 1) throw new ProductionError(409,"ไม่สามารถยืนยันการใช้เลข PRD ได้");
   return order;
 }
 
@@ -316,8 +455,21 @@ export function readProduction(user: AuthenticatedFactoryUser, area: ProductionA
 export function saveProduction(user: AuthenticatedFactoryUser, area: ProductionArea, input: unknown, connect?: () => Promise<PoolClient>) {
   requireFactoryModule(user, productionModules[area]);
   const command = obj(input);
+  if (area === "order" && (command.action === "preview_doc_no" || command.action === "reserve_doc_no")) {
+    const date = str(command.date, 10);
+    if (!validDay(date)) invalid("กรุณาระบุวันที่เอกสารให้ถูกต้อง");
+    if (command.action === "preview_doc_no") return withProduction(false, async (client) => nextPrdCandidate(client, date), connect);
+    const expected = str(command.expectedDocNo, 32);
+    if (!/^PRD-[0-9]{7,}$/.test(expected)) invalid("หมายเลข PRD ไม่ถูกต้อง");
+    return withProduction(true, async (client) => reservePrdNumber(client, user, date, expected), connect);
+  }
   return withProduction(true, async (client) => {
     if (area === "bom") return updateBOM(client, user, command);
+    if (area === "order" && command.action === "edit") {
+      const previous = await manageableOrder(client, command);
+      return createOrder(client, user, command.row, previous);
+    }
+    if (area === "order" && command.action === "delete") return deleteOrder(client, user, command);
     if (command.action !== "save") invalid();
     if (area === "order") return createOrder(client, user, command.row);
     if (area === "report") return updateReport(client, user, command.row);

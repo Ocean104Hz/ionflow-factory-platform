@@ -33,10 +33,33 @@ export const descriptionFields = [
   ["countermeasure", "การแก้ไข / ป้องกัน"],
 ] as const;
 export const reviewerFields = [
-  ["reviewer_name_1", "ผู้ทบทวน (คนที่ 1)"],
-  ["reviewer_name_2", "ผู้ทบทวน (คนที่ 2)"],
+  ["discoverer_signer_name", "ผู้พบข้อบกพร่อง"],
+  ["responsible_reviewer_name", "ผู้รับผิดชอบ/ผู้ทบทวน"],
   ["approver_name", "ผู้อนุมัติ"],
 ] as const;
+// Historical names are retained verbatim, not assigned to a different role.
+export const legacyReviewerFields = [
+  ["reviewer_name_1", "ผู้ทบทวนเดิม (คนที่ 1)"],
+  ["reviewer_name_2", "ผู้ทบทวนเดิม (คนที่ 2)"],
+] as const;
+
+// JSONB compatibility: supply missing fields only. Explicit invalid values
+// must still reach the server's existing strict template validator.
+export function withNCSignerFields<T extends object>(input: T, previous?: object) {
+  const raw = input as Record<string, unknown>;
+  const old = previous as Record<string, unknown> | undefined;
+  return {
+    ...input,
+    discoverer_signer_name: Object.hasOwn(raw, "discoverer_signer_name")
+      ? raw.discoverer_signer_name : old?.discoverer_signer_name ?? "",
+    responsible_reviewer_name: Object.hasOwn(raw, "responsible_reviewer_name")
+      ? raw.responsible_reviewer_name : old?.responsible_reviewer_name ?? "",
+    reviewer_name_1: Object.hasOwn(raw, "reviewer_name_1")
+      ? raw.reviewer_name_1 : old?.reviewer_name_1 ?? "",
+    reviewer_name_2: Object.hasOwn(raw, "reviewer_name_2")
+      ? raw.reviewer_name_2 : old?.reviewer_name_2 ?? "",
+  };
+}
 export function blankNC(): NCReport {
   return {
     id: "",
@@ -58,6 +81,8 @@ export function blankNC(): NCReport {
       reproduce: false,
       scrap: false,
     },
+    discoverer_signer_name: "",
+    responsible_reviewer_name: "",
     reviewer_name_1: "",
     reviewer_name_2: "",
     approver_name: "",

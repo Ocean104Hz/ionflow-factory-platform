@@ -14,6 +14,7 @@ import {
   QC_WEIGHT_GROUP_KEYS,
   QC_WEIGHT_READING_INDEXES,
   formatQcWeightDate,
+  formatQcWeightGroupHeading,
   type QcProductWeightCheckDocument,
   type QcProductWeightCheckRow,
 } from "./qc_product_weight_check_domain";
@@ -234,13 +235,13 @@ export function QcProductWeightCheckPaper({
                     </TableHead>
 
                     {QC_WEIGHT_GROUP_KEYS.map(
-                      (group, groupIndex) => (
+                      (group) => (
                         <TableHead
                           key={group}
                           colSpan={4}
                           className={headerCellClass}
                         >
-                          กลุ่มที่ {groupIndex + 1}
+                          {formatQcWeightGroupHeading(document, group)}
                         </TableHead>
                       ),
                     )}

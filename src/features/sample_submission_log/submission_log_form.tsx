@@ -1,5 +1,7 @@
 "use client";
 import { Input } from "@/src/components/ui/input";
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
+import { cn } from "@/src/lib/utils";
 import { Textarea } from "@/src/components/ui/textarea";
 import { Label } from "@/src/components/ui/label";
 import { Checkbox } from "@/src/components/ui/checkbox";
@@ -24,14 +26,20 @@ import {
   type LogErrors,
 } from "./submission_log_domain";
 
+// NAN_SAMPLE_LOG_CHECKBOX_V4
+const squareChoiceClass = "relative rounded-none border-input data-[state=checked]:border-[#173b63] data-[state=checked]:bg-[#173b63] [&_svg]:hidden after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-2.5 after:w-1.5 after:-translate-x-1/2 after:-translate-y-[60%] after:rotate-45 after:border-r-2 after:border-b-2 after:border-white after:content-[''] data-[state=checked]:after:block";
+
+// NAN_SAMPLE_LOG_THAI_DATE_V5
 export function SubmissionLogSections({
   row,
   onChange,
   errors = {},
+  disabled = false,
 }: {
   row: SubmissionLog;
   onChange?: (row: SubmissionLog) => void;
   errors?: LogErrors;
+  disabled?: boolean;
 }) {
   const readOnly = !onChange,
     prefix = readOnly ? "read-log" : "log",
@@ -60,13 +68,20 @@ export function SubmissionLogSections({
       issue = errors[key === "sample_code_info" ? "sample_code" : key];
     return (
       <div
-        className="grid min-w-0 content-start gap-2"
+        className={cn(
+          "grid min-w-0 content-start gap-2",
+          !readOnly && type === "date" && "[&>div>label]:leading-none",
+          !readOnly && key === "sample_characteristics" && "sm:col-span-2",
+          !readOnly && (key === "received_by" || key === "received_date") && "order-2",
+          !readOnly && (key === "accepted_by" || key === "accepted_date") && "order-4",
+        )}
         key={key}
         data-log-field={key}
+        id={!readOnly && type === "date" ? id : undefined}
       >
         {readOnly ? (
           <p className="text-xs text-muted-foreground">{label}</p>
-        ) : (
+        ) : type === "date" ? null : (
           <Label htmlFor={id}>
             {label}
             {required && <span className="text-danger"> *</span>}
@@ -76,10 +91,19 @@ export function SubmissionLogSections({
           <p className="whitespace-pre-wrap wrap-break-word text-sm">
             {type === "date" ? logDate(value) : value || "—"}
           </p>
+        ) : type === "date" ? (
+          <ThaiBuddhistDatePicker
+            label={required ? `${label} *` : label}
+            value={value}
+            onChange={(nextValue) => { if (!disabled) set(nextValue); }}
+            error={issue}
+            disabled={disabled}
+          />
         ) : multiline ? (
           <Textarea
             id={id}
-            rows={3}
+            rows={!readOnly && key === "sample_name" ? 1 : 3}
+            className={key === "sample_name" ? "min-h-9" : undefined}
             value={value}
             aria-required={required}
             aria-invalid={!!issue}
@@ -91,6 +115,7 @@ export function SubmissionLogSections({
             id={id}
             type={type}
             inputMode={key === "quantity_amount" ? "decimal" : undefined}
+            placeholder={key === "doc_no" ? "เช่น SA-0001" : key === "sample_code" ? "เช่น S-0001" : key === "requester_phone" ? "08x-xxx-xxxx" : key === "requester_email" ? "name@email.com" : key === "quantity_amount" ? "เช่น 1" : key === "quantity_packaging" ? "เช่น ถุง" : undefined}
             value={value}
             aria-required={required}
             aria-invalid={!!issue}
@@ -98,7 +123,7 @@ export function SubmissionLogSections({
             onChange={(e) => set(e.target.value)}
           />
         )}
-        {fieldError(key)}
+        {(readOnly || type !== "date") && fieldError(key)}
       </div>
     );
   }
@@ -127,18 +152,18 @@ export function SubmissionLogSections({
           value={value}
           onValueChange={set}
           disabled={readOnly}
-          className="grid gap-3 sm:grid-cols-2"
+          className={readOnly ? "grid gap-3 sm:grid-cols-2" : "grid gap-2"}
         >
           {items.map(([v, text]) => (
             <Label
               htmlFor={`${id}-${v}`}
               key={v}
-              className={`flex min-w-0 items-start gap-2 rounded-lg border p-3 text-sm leading-relaxed ${value === v ? "border-primary/30 bg-primary/5" : ""} ${!readOnly ? "cursor-pointer" : ""}`}
+              className={cn("flex min-w-0 items-start gap-2 text-sm leading-relaxed", readOnly ? "rounded-lg border p-3" : "cursor-pointer py-1", readOnly && value === v && "border-primary/30 bg-primary/5")}
             >
               <RadioGroupItem
                 id={`${id}-${v}`}
                 value={v}
-                className="mt-0.5 disabled:opacity-100"
+                className={cn("mt-0.5 disabled:opacity-100", !readOnly && squareChoiceClass)}
               />
               <span>{text}</span>
             </Label>
@@ -161,7 +186,7 @@ export function SubmissionLogSections({
     const otherKey = `${key}_other`;
 
     return (
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[11rem_minmax(0,1fr)]">
+      <div className={readOnly ? "grid min-w-0 gap-3 lg:grid-cols-[11rem_minmax(0,1fr)]" : "grid min-w-0 gap-2"}>
         <p id={`${id}-label`} className="pt-2 text-sm font-medium">
           {label}
           {!readOnly && <span className="text-danger"> *</span>}
@@ -177,30 +202,31 @@ export function SubmissionLogSections({
             value={value}
             onValueChange={set}
             disabled={readOnly}
-            className="grid gap-2 sm:grid-cols-3"
+            className={readOnly ? "grid gap-2 sm:grid-cols-3" : "flex flex-wrap items-center gap-x-6 gap-y-2"}
           >
             {options.map(([option, text]) => (
               <div
                 key={option}
                 className={
                   option === "other"
-                    ? "flex min-w-0 flex-wrap items-center gap-2 sm:col-span-3"
+                    ? readOnly ? "flex min-w-0 flex-wrap items-center gap-2 sm:col-span-3" : "flex w-full min-w-0 flex-wrap items-center gap-2"
                     : "min-w-0"
                 }
               >
                 <Label
                   htmlFor={`${id}-${option}`}
                   className={[
-                    "flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-                    option === "other" ? "shrink-0" : "h-full w-full",
-                    value === option ? "border-primary/30 bg-primary/5" : "",
+                    "flex min-w-0 items-center gap-2 text-sm",
+                    readOnly ? "rounded-lg border px-3 py-2" : "py-1",
+                    option === "other" ? "shrink-0" : readOnly ? "h-full w-full" : "",
+                    readOnly && value === option ? "border-primary/30 bg-primary/5" : "",
                     !readOnly ? "cursor-pointer" : "",
                   ].join(" ")}
                 >
                   <RadioGroupItem
                     id={`${id}-${option}`}
                     value={option}
-                    className="disabled:opacity-100"
+                    className={cn("disabled:opacity-100", !readOnly && squareChoiceClass)}
                   />
                   <span>{text}</span>
                 </Label>
@@ -221,7 +247,7 @@ export function SubmissionLogSections({
                       aria-describedby={
                         errors[otherKey] ? `log-error-${otherKey}` : undefined
                       }
-                      className="min-w-48 flex-1"
+                      className={cn("min-w-48 flex-1", !readOnly && "max-w-xl")}
                     />
                   ))}
               </div>
@@ -234,10 +260,15 @@ export function SubmissionLogSections({
       </div>
     );
   }
+  const requesterEmail = field(
+    "requester_email", "อีเมล", row.requester_email,
+    (requester_email) => patch({ requester_email }), false, "email",
+  );
   return (
-    <div className="min-w-0 space-y-4 wrap-anywhere">
-      <SectionCard title="ข้อมูลเอกสาร">
-        <div className="grid gap-4 sm:grid-cols-2">
+    <div className={cn("min-w-0 space-y-4 wrap-anywhere", !readOnly && "[&_[data-slot=card]]:gap-0 [&_[data-slot=card]]:rounded-xl [&_[data-slot=card]]:bg-white [&_[data-slot=card]]:py-0 [&_[data-slot=card]]:shadow-sm [&_[data-slot=card-header]]:border-b [&_[data-slot=card-header]]:px-4 [&_[data-slot=card-header]]:py-3 [&_[data-slot=card-content]]:p-4")}>
+      {/* NAN_SUBMISSION_LOG_ICON_FORM_V1 */}
+      <SectionCard title={readOnly ? "ข้อมูลเอกสาร" : "แบบบันทึกการนำส่งตัวอย่างวิเคราะห์"} subtitle={readOnly ? undefined : "กรอกข้อมูลให้ครบตามแบบฟอร์ม"}>
+        <div className={readOnly ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]"}>
           {field(
             "doc_no",
             "เลขที่คำขอ",
@@ -252,10 +283,19 @@ export function SubmissionLogSections({
             (sample_code) => patch({ sample_code }),
             true,
           )}
+          {/* NAN_SAMPLE_LOG_DEFAULT_DATES_V6 */}
+          {field(
+            "doc_date",
+            "วันที่เอกสาร",
+            row.doc_date ?? "",
+            (doc_date) => patch({ doc_date }),
+            false,
+            "date",
+          )}
         </div>
       </SectionCard>
-      <SectionCard title="รายละเอียดผู้นำส่งตัวอย่าง">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <SectionCard title={readOnly ? "รายละเอียดผู้นำส่งตัวอย่าง" : "ข้อมูลผู้ส่งตัวอย่าง"} subtitle={readOnly ? undefined : "ชื่อ-ที่อยู่-ติดต่อ"}>
+        <div className={readOnly ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "grid gap-4 sm:grid-cols-2"}>
           {field(
             "requester_name",
             "ชื่อผู้ส่ง",
@@ -271,15 +311,8 @@ export function SubmissionLogSections({
             false,
             "tel",
           )}
-          {field(
-            "requester_email",
-            "อีเมล",
-            row.requester_email,
-            (requester_email) => patch({ requester_email }),
-            false,
-            "email",
-          )}
-          <div className="sm:col-span-2 xl:col-span-3">
+          {readOnly && requesterEmail}
+          <div className={readOnly ? "sm:col-span-2 xl:col-span-3" : "sm:col-span-2"}>
             {field(
               "requester_address",
               "รายละเอียดที่อยู่",
@@ -352,16 +385,16 @@ export function SubmissionLogSections({
               }),
           )}
         </div>
+        {!readOnly && <div className="mt-4">{requesterEmail}</div>}
       </SectionCard>
-      <SectionCard title="รายละเอียดตัวอย่าง">
+      <SectionCard title={readOnly ? "รายละเอียดตัวอย่าง" : "ข้อมูลตัวอย่าง"} subtitle={readOnly ? undefined : "รหัส / ชื่อ / ลักษณะ / ประเภท"}>
         <div className="grid gap-4 sm:grid-cols-2">
-          {/* {field(
-            "sample_code_info",
-            "รหัสตัวอย่าง",
-            row.sample_code,
-            (sample_code) => patch({ sample_code }),
-            true,
-          )} */}
+          {!readOnly && (
+            <div className="grid min-w-0 content-start gap-2">
+              <Label htmlFor="log-sample-code-display">รหัสตัวอย่าง</Label>
+              <Input id="log-sample-code-display" value={row.sample_code} readOnly placeholder="อ้างอิงจากข้อมูลเอกสาร" />
+            </div>
+          )}
           {field(
             "sample_name",
             "ชื่อตัวอย่าง",
@@ -423,24 +456,24 @@ export function SubmissionLogSections({
             errors.requested_items ? "log-error-requested_items" : undefined
           }
           tabIndex={-1}
-          className={[
+          className={readOnly ? [
             "grid grid-flow-col grid-cols-1 gap-3",
             "grid-rows-[repeat(32,auto)]",
             "sm:grid-cols-2 sm:grid-rows-[repeat(16,auto)]",
             "lg:grid-cols-3 lg:grid-rows-[repeat(11,auto)]",
-          ].join(" ")}
+          ].join(" ") : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"}
         >
           {analysisItems.map(([key, label], index) => (
             <Label
               key={key}
               htmlFor={`${prefix}-analysis-${key}`}
-              className={`flex min-w-0 items-start gap-3 rounded-lg border p-3 text-sm leading-relaxed ${row.requested_items[key] ? "border-primary/30 bg-primary/5" : ""} ${!readOnly ? "cursor-pointer" : ""}`}
+              className={cn("flex min-w-0 items-start gap-2 rounded-lg border text-sm leading-relaxed", readOnly ? "gap-3 p-3" : "cursor-pointer px-3 py-2 hover:bg-muted/30", row.requested_items[key] && "border-primary/30 bg-primary/5")}
             >
               <Checkbox
                 id={`${prefix}-analysis-${key}`}
                 checked={row.requested_items[key]}
                 disabled={readOnly}
-                className="mt-0.5 disabled:opacity-100"
+                className={cn("mt-0.5 disabled:opacity-100", !readOnly && "rounded-none border-input data-[state=checked]:bg-[#173b63] data-[state=checked]:border-[#173b63]")}
                 onCheckedChange={(v) =>
                   patch({
                     requested_items: {
@@ -451,7 +484,7 @@ export function SubmissionLogSections({
                 }
               />
               <span>
-                {index + 1}. {label}
+                {readOnly && `${index + 1}. `}{label}
               </span>
             </Label>
           ))}
@@ -472,7 +505,7 @@ export function SubmissionLogSections({
           </div>
         )}
       </SectionCard>
-      <SectionCard title="ปริมาณและการรับผลทดสอบ">
+      <SectionCard title={readOnly ? "ปริมาณและการรับผลทดสอบ" : "การรับผลการทดสอบ"} subtitle={readOnly ? undefined : "ปริมาณตัวอย่าง / วิธีรับผลการทดสอบ"}>
         <div className="grid gap-4 sm:grid-cols-2">
           {field(
             "quantity_amount",
@@ -493,7 +526,7 @@ export function SubmissionLogSections({
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           {labSampleNote}
         </p>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div className={readOnly ? "mt-5 grid gap-5 lg:grid-cols-2" : "mt-5 grid gap-5 rounded-lg border p-4 lg:grid-cols-2"}>
           {choice(
             "sample_return",
             "การรับคืนตัวอย่าง",
@@ -566,10 +599,11 @@ export function SubmissionLogSections({
       <SectionCard
         title="สำหรับเจ้าหน้าที่"
         subtitle="กรอกเมื่อเจ้าหน้าที่รับตัวอย่างหรือตรวจรับงาน"
-        className="border-primary/20 bg-muted/20"
+        className={readOnly ? "border-primary/20 bg-muted/20" : undefined}
+        contentClassName={readOnly ? undefined : "grid gap-4 sm:grid-cols-2"}
       >
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div className="space-y-3">
+        <div className={readOnly ? "grid gap-5 lg:grid-cols-2" : "contents"}>
+          <div className={readOnly ? "space-y-3" : "order-1 grid gap-3 rounded-lg border p-4 sm:col-span-2 lg:grid-cols-2"}>
             {choice(
               "sample_condition",
               "สภาพตัวอย่าง",
@@ -615,10 +649,10 @@ export function SubmissionLogSections({
                 true,
               )}
           </div>
-          <div className="space-y-3">
+          <div className={readOnly ? "space-y-3" : "order-3 grid gap-3 rounded-lg border p-4 sm:col-span-2 lg:grid-cols-2"}>
             {choice(
               "job_acceptance",
-              "",
+              readOnly ? "" : "การรับงาน",
               staff.job_acceptance.accepted
                 ? "accepted"
                 : staff.job_acceptance.rejected
@@ -662,7 +696,7 @@ export function SubmissionLogSections({
               )}
           </div>
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className={readOnly ? "mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" : "contents"}>
           {field(
             "received_by",
             "ลงชื่อผู้รับตัวอย่าง",

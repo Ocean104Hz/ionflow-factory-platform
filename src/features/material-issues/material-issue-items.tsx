@@ -80,7 +80,7 @@ export function MaterialIssueItems({
     <>
       <SectionCard title="รายการวัสดุ">
         <div className="overflow-x-auto rounded-md border">
-          <Table className="min-w-250">
+          <Table className="factory-itech-form-table min-w-250">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead
