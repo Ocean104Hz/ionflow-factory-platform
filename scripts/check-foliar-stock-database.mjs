@@ -14,7 +14,7 @@ const timestamps = {
 };
 
 const expectedColumns = {
-  m_customers: {
+  m_stock_customers: {
     ...id,
     customer_code: ["text", true],
     name: ["text", false],
@@ -22,7 +22,7 @@ const expectedColumns = {
     ...active,
     ...timestamps,
   },
-  m_items: {
+  m_stock_items: {
     ...id,
     item_code: ["text", true],
     legacy_code: ["text", true],
@@ -93,25 +93,25 @@ const expectedColumns = {
 const tables = Object.keys(expectedColumns);
 
 const expectedUnique = [
-  ["m_customers", ["customer_code"]],
+  ["m_stock_customers", ["customer_code"]],
   ["m_stock_locations", ["location_code"]],
   ["r_stock_document_lines", ["document_id", "line_no"]],
 ];
 
 const expectedForeignKeys = [
-  ["m_stock_documents", "customer_id", "m_customers"],
+  ["m_stock_documents", "customer_id", "m_stock_customers"],
   ["m_stock_documents", "reference_document_id", "m_stock_documents"],
   ["r_stock_document_lines", "document_id", "m_stock_documents"],
-  ["r_stock_document_lines", "item_id", "m_items"],
+  ["r_stock_document_lines", "item_id", "m_stock_items"],
   ["r_stock_document_lines", "source_line_id", "r_stock_document_lines"],
-  ["r_stock_document_lines", "owner_customer_id", "m_customers"],
+  ["r_stock_document_lines", "owner_customer_id", "m_stock_customers"],
   ["r_stock_document_lines", "from_location_id", "m_stock_locations"],
   ["r_stock_document_lines", "to_location_id", "m_stock_locations"],
   ["r_stock_document_lines", "count_location_id", "m_stock_locations"],
 ];
 
 const expectedChecks = [
-  ["m_items", ["item_type"]],
+  ["m_stock_items", ["item_type"]],
   ["m_stock_documents", ["document_type"]],
   ["m_stock_documents", ["status"]],
   ["r_stock_document_lines", ["line_no"]],
@@ -123,7 +123,7 @@ const expectedChecks = [
 ];
 
 const expectedIndexes = [
-  ["idx_m_items_item_type", "m_items", ["item_type"], null],
+  ["idx_m_stock_items_item_type", "m_stock_items", ["item_type"], null],
   [
     "idx_m_stock_documents_type_status_date",
     "m_stock_documents",

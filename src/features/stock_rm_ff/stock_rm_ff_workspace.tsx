@@ -7,6 +7,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Trash2,
 } from "lucide-react";
 
 import { PageHeader } from "@/src/components/factory/patterns";
@@ -74,6 +75,12 @@ const UNCERTAIN_SAVE =
   "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาตรวจสอบข้อมูลล่าสุดก่อนบันทึกซ้ำ";
 
 type StockRmSnapshot = { sheet: StockRmSheet; revision: string };
+
+type PendingRmDeleteSave = {
+  snapshot: StockRmSnapshot;
+  draft: StockRmSheet;
+  rows: StockRmRow[];
+};
 
 class StockRmApiError extends Error {
   constructor(
@@ -331,8 +338,18 @@ function changedRows(saved: StockRmSheet, draft: StockRmSheet) {
 async function persistRmSheet(
   saved: StockRmSnapshot,
   draft: StockRmSheet,
+  confirmedDeletedRefs: readonly string[],
 ): Promise<StockRmSnapshot> {
   const { changes, deletedRefs } = changedRows(saved.sheet, draft);
+  const confirmed = new Set(confirmedDeletedRefs);
+  // A disappearance in the draft is not sufficient consent for a database delete.
+  if (
+    confirmed.size !== confirmedDeletedRefs.length ||
+    confirmed.size !== deletedRefs.length ||
+    deletedRefs.some((code) => !confirmed.has(code))
+  ) {
+    throw new StockRmApiError("กรุณายืนยันการลบวัตถุดิบถาวรก่อนบันทึก");
+  }
   if (changes.length === 0 && deletedRefs.length === 0) return saved;
   const body = JSON.stringify({
     action: "save_sheet",
@@ -340,6 +357,7 @@ async function persistRmSheet(
     expected_revision: saved.revision,
     changes,
     deleted_refs: deletedRefs,
+    ...(deletedRefs.length > 0 ? { confirm_hard_delete: true } : {}),
   });
   if (
     changes.length + deletedRefs.length > MAX_CHANGED_ROWS ||
@@ -362,6 +380,12 @@ async function persistRmSheet(
     true,
   );
   const snapshot = readApiSnapshot(payload, draft.period, true);
+  if (
+    deletedRefs.length > 0 &&
+    (!isRecord(payload) || payload.deleted !== deletedRefs.length)
+  ) {
+    throw new StockRmApiError(UNCERTAIN_SAVE, true);
+  }
   const expected = rowsByCode(draft.rows);
   const actual = rowsByCode(snapshot.sheet.rows);
   if (
@@ -439,6 +463,8 @@ export function StockRmWorkspace() {
     null,
   );
   const [deleteCode, setDeleteCode] = useState<string | null>(null);
+  const [pendingDeleteSave, setPendingDeleteSave] =
+    useState<PendingRmDeleteSave | null>(null);
   const [pendingFilters, setPendingFilters] =
     useState<StockRmFilterValues | null>(null);
   const [errors, setErrors] = useState<StockRmValidationErrors>({});
@@ -466,22 +492,21 @@ export function StockRmWorkspace() {
     deleteCode === null
       ? undefined
       : draft.rows.find((row) => row.item.code_new === deleteCode);
-  const pendingDeleteCount = useMemo(() => {
+  const pendingDeletedRows = useMemo(() => {
     const codes = new Set(draft.rows.map((row) => row.item.code_new));
-    return (
-      savedSheet?.rows.filter((row) => !codes.has(row.item.code_new)).length ??
-      0
-    );
+    return savedSheet?.rows.filter((row) => !codes.has(row.item.code_new)) ?? [];
   }, [draft.rows, savedSheet]);
+  const pendingDeleteCount = pendingDeletedRows.length;
   const errorCount = Object.keys(errors).length;
   const busy = loadState.loading || isSaving;
   const readOnly =
     busy || Boolean(loadState.error) || refreshRequired || !savedSnapshot;
-  const dialogOpen =
+  const editorDialogOpen =
     createOpen ||
     Boolean(selectedDailyRow) ||
     Boolean(deleteRow) ||
     pendingFilters !== null;
+  const dialogOpen = editorDialogOpen || pendingDeleteSave !== null;
   const reloadPending =
     pendingFilters !== null &&
     stockRmPeriodKey(pendingFilters.period) ===
@@ -535,6 +560,7 @@ export function StockRmWorkspace() {
     setCreateOpen(false);
     setSelectedDailyCode(null);
     setDeleteCode(null);
+    setPendingDeleteSave(null);
     setPendingFilters(null);
     setErrors({});
     setNotice(null);
@@ -588,7 +614,7 @@ export function StockRmWorkspace() {
       return false;
     // Removing and re-creating the same saved code in one batch is ambiguous:
     // the API identifies an existing row by Code New and preserves its item.
-    // Require the pending cancellation to be saved or discarded first.
+    // Require the pending deletion to be saved or discarded first.
     const code = input.code_new.trim();
     if (
       savedSheet?.rows.some((row) => row.item.code_new.trim() === code) &&
@@ -691,7 +717,7 @@ export function StockRmWorkspace() {
       tone: "info",
       title: "นำวัตถุดิบออกจากฉบับร่างแล้ว",
       text: wasSaved
-        ? `รหัส ${code} รอลบเฉพาะงวดนี้ กรุณากดบันทึกข้อมูลเพื่อยืนยันการลบ`
+        ? `รหัส ${code} รอลบถาวรเฉพาะงวดนี้ กรุณากดบันทึกข้อมูลเพื่อยืนยันการลบ`
         : `นำรหัส ${code} ที่ยังไม่ได้บันทึกออกแล้ว ไม่มีการเขียนข้อมูลลงฐานข้อมูล`,
     });
   }
@@ -710,16 +736,27 @@ export function StockRmWorkspace() {
     });
   }
 
-  async function handleSave() {
+  async function handleSave(confirmation?: PendingRmDeleteSave) {
     if (
       readOnly ||
       loadLock.current ||
       saveLock.current ||
       !savedSnapshot ||
       !hasUnsavedChanges ||
-      dialogOpen
+      editorDialogOpen
     )
       return;
+    if (confirmation) {
+      if (
+        confirmation !== pendingDeleteSave ||
+        confirmation.snapshot !== savedSnapshot ||
+        confirmation.draft !== draft
+      ) {
+        return;
+      }
+    } else if (pendingDeleteSave !== null) {
+      return;
+    }
     const nextErrors = validateStockRmSheet(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -729,11 +766,26 @@ export function StockRmWorkspace() {
       });
       return;
     }
+    if (pendingDeleteCount > 0 && !confirmation) {
+      setPendingDeleteSave({
+        snapshot: savedSnapshot,
+        draft,
+        rows: pendingDeletedRows,
+      });
+      return;
+    }
+    const confirmedDeletedRefs =
+      confirmation?.rows.map((row) => row.item.code_new) ?? [];
     saveLock.current = true;
     setIsSaving(true);
+    setPendingDeleteSave(null);
     setNotice(null);
     try {
-      const snapshot = await persistRmSheet(savedSnapshot, draft);
+      const snapshot = await persistRmSheet(
+        savedSnapshot,
+        draft,
+        confirmedDeletedRefs,
+      );
       setSavedSnapshot(snapshot);
       setDraft(structuredClone(snapshot.sheet));
       setErrors({});
@@ -741,7 +793,7 @@ export function StockRmWorkspace() {
         tone: "success",
         text:
           pendingDeleteCount > 0
-            ? `บันทึกข้อมูลเรียบร้อยแล้ว รวมการลบวัตถุดิบ ${pendingDeleteCount.toLocaleString("th-TH")} รายการจากงวดนี้`
+            ? `บันทึกข้อมูลเรียบร้อยแล้ว รวมการลบวัตถุดิบถาวร ${pendingDeleteCount.toLocaleString("th-TH")} รายการจากงวดนี้`
             : "บันทึกข้อมูลสต็อกวัตถุดิบลงฐานข้อมูลเรียบร้อยแล้ว",
       });
     } catch (error) {
@@ -855,7 +907,7 @@ export function StockRmWorkspace() {
           </p>
           {pendingDeleteCount > 0 && (
             <p className="text-xs font-medium text-danger">
-              รอลบ {pendingDeleteCount.toLocaleString("th-TH")} รายการ ·
+              รอลบถาวร {pendingDeleteCount.toLocaleString("th-TH")} รายการ ·
               ต้องกดบันทึกข้อมูล
             </p>
           )}
@@ -994,6 +1046,59 @@ export function StockRmWorkspace() {
       </p>
 
       <AlertDialog
+        open={pendingDeleteSave !== null}
+        onOpenChange={(open) => {
+          if (!open && !saveLock.current) setPendingDeleteSave(null);
+        }}
+      >
+        <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันบันทึกและลบวัตถุดิบถาวร</AlertDialogTitle>
+            <AlertDialogDescription>
+              ระบบจะลบทะเบียนวัตถุดิบ ยอดสรุป และรายละเอียดการเคลื่อนไหวของรายการด้านล่างออกจากฐานข้อมูลในงวดที่เลือก พร้อมบันทึกการเพิ่มและแก้ไขทั้งหมด การลบที่บันทึกสำเร็จแล้วไม่สามารถเรียกคืนจากหน้านี้ได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 rounded-lg border bg-muted/25 p-3 text-sm">
+            <p className="font-medium">
+              {periodLabel(draft.period)} ({(pendingDeleteSave?.rows.length ?? 0).toLocaleString("th-TH")} รายการ)
+            </p>
+            <ul className="max-h-48 space-y-2 overflow-y-auto">
+              {pendingDeleteSave?.rows.map((row) => (
+                <li
+                  key={row.item.code_new}
+                  className="wrap-break-word border-b pb-2 last:border-b-0 last:pb-0"
+                >
+                  <span className="font-medium">{row.item.code_new}</span>
+                  {row.item.name && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {row.item.name}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>กลับไปยังฉบับร่าง</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={
+                readOnly ||
+                pendingDeleteSave === null ||
+                pendingDeleteSave.rows.length === 0
+              }
+              onClick={() => {
+                if (pendingDeleteSave) void handleSave(pendingDeleteSave);
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              บันทึกและลบถาวร
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
         open={pendingFilters !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -1031,11 +1136,11 @@ export function StockRmWorkspace() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยืนยันการลบวัตถุดิบ</AlertDialogTitle>
+            <AlertDialogTitle>นำวัตถุดิบออกจากฉบับร่าง</AlertDialogTitle>
             <AlertDialogDescription>
               ต้องการนำวัตถุดิบออกจากฉบับร่างของ {periodLabel(draft.period)}{" "}
-              หรือไม่? เมื่อกดบันทึกข้อมูล ระบบจะยกเลิกรายการเฉพาะงวดนี้
-              โดยยังเก็บทะเบียนวัตถุดิบและรายละเอียดเดิมในฐานข้อมูล
+              หรือไม่? หากเคยบันทึกไว้แล้ว ระบบจะลบถาวรเมื่อยืนยันบันทึกจากหน้าหลักเท่านั้น
+              สามารถยกเลิกการแก้ไขเพื่อคืนข้อมูลได้ก่อนบันทึก
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteRow && (
@@ -1055,7 +1160,7 @@ export function StockRmWorkspace() {
               variant="destructive"
               onClick={confirmDeleteMaterial}
             >
-              ยืนยันการลบ
+              นำออกจากฉบับร่าง
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

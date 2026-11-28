@@ -324,16 +324,6 @@ export function StockProductsForm({
             />
           </section>
 
-          {/* Local storage information */}
-
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              ข้อมูลสำหรับทดลองใช้งาน UI Mock
-              จัดเก็บภายในเบราว์เซอร์เมื่อบันทึกสำเร็จ
-              ไม่มีการเชื่อมต่อฐานข้อมูลจริง และไม่คำนวณยอดสต็อกอัตโนมัติ
-            </p>
-          </div>
-
           {/* Actions */}
 
           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">

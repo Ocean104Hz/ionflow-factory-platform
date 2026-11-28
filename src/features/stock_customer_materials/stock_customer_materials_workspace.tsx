@@ -1,6 +1,9 @@
 "use client";
 
-import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
+import {
+  RowActionItem,
+  RowActionMenu,
+} from "@/src/components/factory/row-action-menu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
@@ -104,7 +107,10 @@ const UNCERTAIN_SAVE =
   "ไม่สามารถยืนยันผลการบันทึกได้ กรุณาโหลดข้อมูลใหม่และตรวจสอบก่อนบันทึกซ้ำ";
 
 class CustomerMaterialsApiError extends Error {
-  constructor(message: string, readonly reloadRequired = false) {
+  constructor(
+    message: string,
+    readonly reloadRequired = false,
+  ) {
     super(message);
     this.name = "CustomerMaterialsApiError";
   }
@@ -152,17 +158,26 @@ async function requestJson(
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok || !isRecord(payload) || payload.ok !== true) {
-    const reloadRequired = writing && (
-      response.ok || response.status >= 500 ||
-      response.status === 409 || response.status === 404 ||
-      response.status === 401 || response.status === 403 ||
-      !isRecord(payload) || payload.ok !== false
-    );
-    const message = response.status === 401 || response.status === 403
-      ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน stock_customer_materials"
-      : isRecord(payload) && typeof payload.message === "string" && payload.message
-        ? payload.message
-        : writing ? UNCERTAIN_SAVE : LOAD_FAILED;
+    const reloadRequired =
+      writing &&
+      (response.ok ||
+        response.status >= 500 ||
+        response.status === 409 ||
+        response.status === 404 ||
+        response.status === 401 ||
+        response.status === 403 ||
+        !isRecord(payload) ||
+        payload.ok !== false);
+    const message =
+      response.status === 401 || response.status === 403
+        ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน stock_customer_materials"
+        : isRecord(payload) &&
+            typeof payload.message === "string" &&
+            payload.message
+          ? payload.message
+          : writing
+            ? UNCERTAIN_SAVE
+            : LOAD_FAILED;
     throw new CustomerMaterialsApiError(message, reloadRequired);
   }
   return payload;
@@ -180,25 +195,59 @@ async function loadSnapshot(
 async function saveSnapshot(
   baseline: CustomerMaterialsSnapshot,
   draft: CustomerMaterialsSheet,
+  confirmedDeletedRefs: readonly string[],
 ) {
   const request = buildCustomerMaterialsSaveRequest(baseline, draft);
-  if (request.changes.length + request.deleted_refs.length > MAX_CHANGED_ROWS) {
-    throw new CustomerMaterialsApiError("รายการเปลี่ยนแปลงเกิน 2,000 รายการต่อการบันทึก");
+  // Confirmation belongs to this complete draft, not to a filtered table.
+  if (
+    request.deleted_refs.length !== confirmedDeletedRefs.length ||
+    request.deleted_refs.some(
+      (ref, index) => ref !== confirmedDeletedRefs[index],
+    )
+  ) {
+    throw new CustomerMaterialsApiError(
+      "กรุณายืนยันรายการที่จะลบถาวรก่อนบันทึกข้อมูล",
+    );
   }
-  const body = JSON.stringify(request);
+  if (request.changes.length + request.deleted_refs.length > MAX_CHANGED_ROWS) {
+    throw new CustomerMaterialsApiError(
+      "รายการเปลี่ยนแปลงเกิน 2,000 รายการต่อการบันทึก",
+    );
+  }
+  const body = JSON.stringify({
+    ...request,
+    ...(request.deleted_refs.length > 0 ? { confirm_hard_delete: true } : {}),
+  });
   if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
     throw new CustomerMaterialsApiError("ข้อมูลที่บันทึกมีขนาดเกิน 4 MB");
   }
-  const payload = await requestJson(STOCK_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrf-token": getCsrfToken(),
+  const payload = await requestJson(
+    STOCK_API,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": getCsrfToken(),
+      },
+      body,
     },
-    body,
-  }, true);
+    true,
+  );
   try {
-    return readCustomerMaterialsSaveResponse(payload, baseline.sheet.name);
+    const saved = readCustomerMaterialsSaveResponse(
+      payload,
+      baseline.sheet.name,
+    );
+    const savedKeys = new Set(saved.sheet.rows.map(customerMaterialsRowKey));
+    if (
+      saved.deleted !== request.deleted_refs.length ||
+      request.deleted_refs.some((ref) => savedKeys.has(ref)) ||
+      savedKeys.size !== draft.rows.length ||
+      draft.rows.some((row) => !savedKeys.has(customerMaterialsRowKey(row)))
+    ) {
+      throw new CustomerMaterialsApiError(UNCERTAIN_SAVE, true);
+    }
+    return saved;
   } catch {
     // A successful HTTP status alone cannot confirm the write result.
     throw new CustomerMaterialsApiError(UNCERTAIN_SAVE, true);
@@ -238,11 +287,23 @@ type EditorState = EditorBase &
 type DialogState =
   | EditorState
   | { kind: "DETAIL"; key: string }
-  | { kind: "DELETE"; row: CustomerMaterialsRow; snapshot: CustomerMaterialsSheet }
+  | {
+      kind: "DELETE";
+      row: CustomerMaterialsRow;
+      snapshot: CustomerMaterialsSheet;
+    }
+  | { kind: "SAVE_DELETE"; snapshot: LoadedSheet; deletedRefs: string[] }
   | null;
 
 function displayValue(value: string | null | undefined): string {
   return value === null || value === undefined || value === "" ? "-" : value;
+}
+
+function pendingDeletedRows(snapshot: LoadedSheet): CustomerMaterialsRow[] {
+  const draftKeys = new Set(snapshot.draft.rows.map(customerMaterialsRowKey));
+  return snapshot.baseline.sheet.rows.filter(
+    (row) => !draftKeys.has(customerMaterialsRowKey(row)),
+  );
 }
 
 /* ---------------- workspace ---------------- */
@@ -272,13 +333,16 @@ export function StockCustomerMaterialsWorkspace() {
   const active = loaded?.request === loadRequest ? loaded : null;
   const displayed = loaded?.request.name === selectedSheet ? loaded : null;
   const sheet = displayed?.draft;
-  const loadError = loadFailure?.request === loadRequest ? loadFailure.message : "";
+  const loadError =
+    loadFailure?.request === loadRequest ? loadFailure.message : "";
   const isLoading = active === null && loadError === "";
   const readOnly = active === null || isSaving || reloadRequired;
   const hasUnsavedChanges = useMemo(
-    () => displayed !== null &&
+    () =>
+      displayed !== null &&
       displayed.draft !== displayed.baseline.sheet &&
-      JSON.stringify(displayed.draft.rows) !== JSON.stringify(displayed.baseline.sheet.rows),
+      JSON.stringify(displayed.draft.rows) !==
+        JSON.stringify(displayed.baseline.sheet.rows),
     [displayed],
   );
 
@@ -325,6 +389,10 @@ export function StockCustomerMaterialsWorkspace() {
   const dailyCount = useMemo(
     () => sheet?.rows.reduce((total, row) => total + row.daily.length, 0) ?? 0,
     [sheet],
+  );
+  const pendingDeletions = useMemo(
+    () => (displayed ? pendingDeletedRows(displayed) : []),
+    [displayed],
   );
   const period = CUSTOMER_MATERIALS_PERIODS[selectedSheet];
   const detailRow =
@@ -375,26 +443,89 @@ export function StockCustomerMaterialsWorkspace() {
   }
 
   function handleDiscard() {
-    if (!active || savingRef.current || dialog !== null || pendingLoad !== null || !hasUnsavedChanges) return;
+    if (
+      !active ||
+      savingRef.current ||
+      dialog !== null ||
+      pendingLoad !== null ||
+      !hasUnsavedChanges
+    )
+      return;
     setLoaded({ ...active, draft: active.baseline.sheet });
     setSaveError("");
-    setNotice("ยกเลิกการแก้ไขแล้ว คืนค่าจากข้อมูลที่โหลดหรือบันทึกสำเร็จล่าสุด");
+    setNotice(
+      "ยกเลิกการแก้ไขแล้ว คืนค่าจากข้อมูลที่โหลดหรือบันทึกสำเร็จล่าสุด",
+    );
   }
 
-  async function handleSave() {
-    if (!active || readOnly || savingRef.current || dialog !== null || pendingLoad !== null || !hasUnsavedChanges) return;
+  function handleSave() {
+    if (
+      !active ||
+      readOnly ||
+      savingRef.current ||
+      dialog !== null ||
+      pendingLoad !== null ||
+      !hasUnsavedChanges
+    )
+      return;
     clearFeedback();
+    try {
+      const request = buildCustomerMaterialsSaveRequest(
+        active.baseline,
+        active.draft,
+      );
+      if (request.deleted_refs.length > 0) {
+        setDialog({
+          kind: "SAVE_DELETE",
+          snapshot: active,
+          deletedRefs: request.deleted_refs,
+        });
+        return;
+      }
+      void persistDraft(active, []);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : UNCERTAIN_SAVE);
+    }
+  }
+
+  async function persistDraft(
+    target: LoadedSheet,
+    confirmedDeletedRefs: readonly string[],
+  ) {
+    if (
+      active !== target ||
+      readOnly ||
+      savingRef.current ||
+      pendingLoad !== null ||
+      !hasUnsavedChanges
+    )
+      return;
+    if (confirmedDeletedRefs.length > 0) {
+      if (
+        dialog?.kind !== "SAVE_DELETE" ||
+        dialog.snapshot !== target ||
+        dialog.deletedRefs !== confirmedDeletedRefs
+      )
+        return;
+    } else if (dialog !== null) return;
+
     savingRef.current = true;
     setIsSaving(true);
+    setDialog(null);
+    clearFeedback();
     try {
-      const saved = await saveSnapshot(active.baseline, active.draft);
+      const saved = await saveSnapshot(
+        target.baseline,
+        target.draft,
+        confirmedDeletedRefs,
+      );
       const baseline: CustomerMaterialsSnapshot = {
         sheet: saved.sheet,
         revision: saved.revision,
       };
-      setLoaded({ request: active.request, baseline, draft: baseline.sheet });
+      setLoaded({ request: target.request, baseline, draft: baseline.sheet });
       setNotice(
-        `บันทึกลงฐานข้อมูลสำเร็จ · เพิ่ม ${saved.inserted} · แก้ไข ${saved.updated} · ลบ ${saved.deleted} รายการ`,
+        `บันทึกลงฐานข้อมูลสำเร็จ · เพิ่ม ${saved.inserted} · แก้ไข ${saved.updated} · ลบถาวร ${saved.deleted} รายการ`,
       );
     } catch (error) {
       if (error instanceof CustomerMaterialsApiError && error.reloadRequired) {
@@ -405,6 +536,11 @@ export function StockCustomerMaterialsWorkspace() {
       savingRef.current = false;
       setIsSaving(false);
     }
+  }
+
+  function confirmHardDeleteSave() {
+    if (dialog?.kind !== "SAVE_DELETE") return;
+    void persistDraft(dialog.snapshot, dialog.deletedRefs);
   }
 
   function chooseSo(value: string) {
@@ -458,12 +594,20 @@ export function StockCustomerMaterialsWorkspace() {
 
   function openDailyEditor(row: CustomerMaterialsRow, day: number) {
     if (
-      readOnly || !sheet || savingRef.current ||
+      readOnly ||
+      !sheet ||
+      savingRef.current ||
       !customerMaterialsDaysInPeriod(row.sheet_name).includes(day)
     )
       return;
     clearFeedback();
-    setDialog({ kind: "DAILY", row, day, snapshot: sheet, returnToDetail: true });
+    setDialog({
+      kind: "DAILY",
+      row,
+      day,
+      snapshot: sheet,
+      returnToDetail: true,
+    });
   }
 
   function openCountEditor(row: CustomerMaterialsRow, returnToDetail = false) {
@@ -502,7 +646,9 @@ export function StockCustomerMaterialsWorkspace() {
       throw new Error("ระบบยังไม่พร้อมแก้ไขข้อมูล กรุณาโหลดข้อมูลใหม่");
     }
     if (nextSheet.name !== selectedSheet || active.draft !== expectedSnapshot) {
-      throw new Error("ข้อมูลมีการเปลี่ยนแปลง กรุณาปิดฟอร์มและเปิดใหม่ก่อนบันทึก");
+      throw new Error(
+        "ข้อมูลมีการเปลี่ยนแปลง กรุณาปิดฟอร์มและเปิดใหม่ก่อนบันทึก",
+      );
     }
     setLoaded({ ...active, draft: nextSheet });
   }
@@ -558,7 +704,9 @@ export function StockCustomerMaterialsWorkspace() {
       }
 
       stageSheet(nextSheet, dialog.snapshot);
-      setNotice(`${message} กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล`);
+      setNotice(
+        `${message} กรุณากดบันทึกข้อมูลจากหน้าหลักเพื่อจัดเก็บลงฐานข้อมูล`,
+      );
       if (dialog.kind === "MATERIAL") {
         setSearch("");
         // Locate the saved row within the filtered table, not the full sheet.
@@ -597,10 +745,17 @@ export function StockCustomerMaterialsWorkspace() {
       if (!sheet.rows.some((row) => customerMaterialsRowKey(row) === key)) {
         throw new Error("ไม่พบรายการวัสดุที่ต้องการลบ");
       }
+      const wasSaved = active?.baseline.sheet.rows.some(
+        (row) => customerMaterialsRowKey(row) === key,
+      );
       stageSheet(removeCustomerMaterialsRow(sheet, key), dialog.snapshot);
       setDialog(null);
       setPage(currentPage);
-      setNotice("นำรายการวัสดุออกจากฉบับร่างแล้ว ฐานข้อมูลจะเปลี่ยนเมื่อกดบันทึกข้อมูลจากหน้าหลัก");
+      setNotice(
+        wasSaved
+          ? "นำวัสดุออกจากฉบับร่างแล้ว จะลบถาวรเมื่อยืนยันบันทึกข้อมูล"
+          : "นำวัสดุที่ยังไม่ได้บันทึกออกจากฉบับร่างแล้ว ไม่มีการลบข้อมูลในฐานข้อมูล",
+      );
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : "ไม่สามารถลบข้อมูลได้",
@@ -613,14 +768,22 @@ export function StockCustomerMaterialsWorkspace() {
       <PageHeader
         title="วัสดุคงเหลือลูกค้า"
         description="จัดการวัสดุของลูกค้า ยอดสรุป รับ-จ่ายรายวัน และตรวจนับ แยกตามงวดข้อมูล"
-        actions={<><Badge variant="outline">ฐานข้อมูล</Badge> {sheet && (<Button variant="outline"
-            type="button"
-            disabled={readOnly || !sheet}
-            onClick={openCreate}
-            className="w-full xl:w-auto"
-          >
-            <Plus className="size-4" aria-hidden="true" /> เพิ่มวัสดุ
-          </Button>)}</>}
+        actions={
+          <>
+            <Badge variant="outline">ฐานข้อมูล</Badge>{" "}
+            {sheet && (
+              <Button
+                variant="outline"
+                type="button"
+                disabled={readOnly || !sheet}
+                onClick={openCreate}
+                className="w-full xl:w-auto"
+              >
+                <Plus className="size-4" aria-hidden="true" /> เพิ่มวัสดุ
+              </Button>
+            )}
+          </>
+        }
       />
 
       {loadError && (
@@ -632,7 +795,10 @@ export function StockCustomerMaterialsWorkspace() {
         </p>
       )}
       {reloadRequired && (
-        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
           ระบบยังไม่ยืนยันสถานะการบันทึกหรือข้อมูลมีการเปลี่ยนแปลง
           ฉบับร่างยังอยู่ กรุณาตรวจสอบข้อมูลและโหลดข้อมูลใหม่ก่อนบันทึกอีกครั้ง
         </p>
@@ -662,7 +828,8 @@ export function StockCustomerMaterialsWorkspace() {
               {period.label} ({selectedSheet})
             </p>
             <p className="text-xs text-muted-foreground">
-              {sheet?.report_caption || (isLoading ? "กำลังโหลดข้อมูล..." : "ยังไม่ได้โหลดข้อมูล")}
+              {sheet?.report_caption ||
+                (isLoading ? "กำลังโหลดข้อมูล..." : "ยังไม่ได้โหลดข้อมูล")}
             </p>
             {sheet?.period_caption && (
               <p className="text-xs text-muted-foreground">
@@ -672,9 +839,15 @@ export function StockCustomerMaterialsWorkspace() {
           </div>
         </div>
         <Badge variant="secondary">
-          {isSaving ? "กำลังบันทึก" : isLoading ? "กำลังโหลด" :
-            loadError || reloadRequired ? "ต้องโหลดข้อมูลใหม่" :
-              hasUnsavedChanges ? "มีการแก้ไขที่ยังไม่ได้บันทึก" : "ข้อมูลที่บันทึกแล้ว"}
+          {isSaving
+            ? "กำลังบันทึก"
+            : isLoading
+              ? "กำลังโหลด"
+              : loadError || reloadRequired
+                ? "ต้องโหลดข้อมูลใหม่"
+                : hasUnsavedChanges
+                  ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
+                  : "ข้อมูลที่บันทึกแล้ว"}
         </Badge>
       </div>
 
@@ -687,7 +860,9 @@ export function StockCustomerMaterialsWorkspace() {
           <Button
             type="button"
             variant="outline"
-            disabled={isLoading || isSaving || dialog !== null || pendingLoad !== null}
+            disabled={
+              isLoading || isSaving || dialog !== null || pendingLoad !== null
+            }
             onClick={handleReload}
           >
             <RefreshCw className="size-4" aria-hidden="true" /> โหลดข้อมูลใหม่
@@ -695,14 +870,25 @@ export function StockCustomerMaterialsWorkspace() {
           <Button
             type="button"
             variant="outline"
-            disabled={!active || !hasUnsavedChanges || isSaving || dialog !== null || pendingLoad !== null}
+            disabled={
+              !active ||
+              !hasUnsavedChanges ||
+              isSaving ||
+              dialog !== null ||
+              pendingLoad !== null
+            }
             onClick={handleDiscard}
           >
             <RotateCcw className="size-4" aria-hidden="true" /> ยกเลิกการแก้ไข
           </Button>
           <Button
             type="button"
-            disabled={readOnly || !hasUnsavedChanges || dialog !== null || pendingLoad !== null}
+            disabled={
+              readOnly ||
+              !hasUnsavedChanges ||
+              dialog !== null ||
+              pendingLoad !== null
+            }
             onClick={handleSave}
           >
             <Save className="size-4" aria-hidden="true" />
@@ -710,6 +896,16 @@ export function StockCustomerMaterialsWorkspace() {
           </Button>
         </div>
       </div>
+
+      {pendingDeletions.length > 0 && (
+        <p
+          role="status"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          รายการรอลบถาวรเมื่อบันทึก:{" "}
+          {pendingDeletions.length.toLocaleString("th-TH")} รายการ
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {[
@@ -783,7 +979,6 @@ export function StockCustomerMaterialsWorkspace() {
               />
             </div>
           </div>
-
         </div>
 
         <div className="rounded-xl border border-border bg-card">
@@ -833,7 +1028,9 @@ export function StockCustomerMaterialsWorkspace() {
                       className="py-10 text-center text-sm text-muted-foreground"
                     >
                       {!sheet
-                        ? isLoading ? "กำลังโหลดข้อมูลจากฐานข้อมูล..." : "ยังไม่สามารถแสดงข้อมูลได้ กรุณาโหลดข้อมูลใหม่"
+                        ? isLoading
+                          ? "กำลังโหลดข้อมูลจากฐานข้อมูล..."
+                          : "ยังไม่สามารถแสดงข้อมูลได้ กรุณาโหลดข้อมูลใหม่"
                         : search.trim() || selectedSo !== "ALL"
                           ? "ไม่พบวัสดุที่ตรงกับตัวกรอง"
                           : "ยังไม่มีรายการวัสดุในงวดนี้"}
@@ -887,18 +1084,40 @@ export function StockCustomerMaterialsWorkspace() {
                           >
                             <Eye className="size-4" aria-hidden="true" />
                           </Button>
-                          <RowActionItem type="button" disabled={readOnly} aria-label={`แก้ไข ${name}`} title="แก้ไขวัสดุ" onClick={() => openMaterialEditor(row)}>
+                          <RowActionItem
+                            type="button"
+                            disabled={readOnly}
+                            aria-label={`แก้ไข ${name}`}
+                            title="แก้ไขวัสดุ"
+                            onClick={() => openMaterialEditor(row)}
+                          >
                             <Pencil className="size-4" aria-hidden="true" />
-                          แก้ไขวัสดุ</RowActionItem>
-                          <RowActionItem type="button" disabled={readOnly} aria-label={`ตรวจนับ ${name}`} title="บันทึกตรวจนับ" onClick={() => openCountEditor(row)}>
+                            แก้ไขวัสดุ
+                          </RowActionItem>
+                          <RowActionItem
+                            type="button"
+                            disabled={readOnly}
+                            aria-label={`ตรวจนับ ${name}`}
+                            title="บันทึกตรวจนับ"
+                            onClick={() => openCountEditor(row)}
+                          >
                             <ClipboardCheck
                               className="size-4"
                               aria-hidden="true"
                             />
-                          บันทึกตรวจนับ</RowActionItem>
-                          <RowActionItem type="button" disabled={readOnly} aria-label={`ลบ ${name}`} title="ลบวัสดุ" onClick={() => openDelete(row)} className="w-full justify-start text-destructive">
+                            บันทึกตรวจนับ
+                          </RowActionItem>
+                          <RowActionItem
+                            type="button"
+                            disabled={readOnly}
+                            aria-label={`ลบ ${name}`}
+                            title="ลบวัสดุ"
+                            onClick={() => openDelete(row)}
+                            className="w-full justify-start text-destructive"
+                          >
                             <Trash2 className="size-4" aria-hidden="true" />
-                          ลบวัสดุ</RowActionItem>
+                            ลบวัสดุ
+                          </RowActionItem>
                         </RowActionMenu>
                       </TableCell>
                     </TableRow>
@@ -939,8 +1158,8 @@ export function StockCustomerMaterialsWorkspace() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          ข้อมูลจะถูกจัดเก็บลงฐานข้อมูลเมื่อกดบันทึกจากหน้าหลักเท่านั้น
-          ไม่แก้ไข Excel ต้นฉบับ และไม่คำนวณยอดข้ามเดือนอัตโนมัติ
+          ข้อมูลจะถูกจัดเก็บลงฐานข้อมูลเมื่อกดบันทึกจากหน้าหลักเท่านั้น ไม่แก้ไข
+          Excel ต้นฉบับ และไม่คำนวณยอดข้ามเดือนอัตโนมัติ
         </p>
       </section>
 
@@ -959,7 +1178,11 @@ export function StockCustomerMaterialsWorkspace() {
                 : "การเปลี่ยนงวดจะทิ้งฉบับร่างของงวดปัจจุบันโดยไม่บันทึกลงฐานข้อมูล"}
             </DialogDescription>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingLoad(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPendingLoad(null)}
+              >
                 กลับไปตรวจสอบ
               </Button>
               <Button
@@ -968,7 +1191,9 @@ export function StockCustomerMaterialsWorkspace() {
                 disabled={isSaving}
                 onClick={() => beginLoad(pendingLoad)}
               >
-                {pendingLoad.name === selectedSheet ? "โหลดข้อมูลใหม่" : "ทิ้งฉบับร่างและเปลี่ยนงวด"}
+                {pendingLoad.name === selectedSheet
+                  ? "โหลดข้อมูลใหม่"
+                  : "ทิ้งฉบับร่างและเปลี่ยนงวด"}
               </Button>
             </div>
           </DialogContent>
@@ -1016,10 +1241,12 @@ export function StockCustomerMaterialsWorkspace() {
           }}
         >
           <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
-            <DialogTitle>ยืนยันการลบวัสดุ</DialogTitle>
+            <DialogTitle>นำวัสดุออกจากฉบับร่าง</DialogTitle>
             <DialogDescription>
-              นำรายการวัสดุและข้อมูลรับ-จ่ายของงวดที่เลือกออกจากฉบับร่าง
-              เมื่อกดบันทึกจากหน้าหลัก ระบบจะยกเลิกเอกสารแบบ Soft Delete
+              นำวัสดุและข้อมูลรับ-จ่ายของงวดที่เลือกออกจากฉบับร่าง
+              หากเคยบันทึกไว้แล้ว
+              ระบบจะลบถาวรเมื่อยืนยันบันทึกจากหน้าหลักเท่านั้น
+              สามารถยกเลิกการแก้ไขเพื่อคืนรายการก่อนบันทึกได้
               โดยไม่กระทบงวดอื่นหรือ Excel ต้นฉบับ
             </DialogDescription>
             <div className="space-y-1 rounded-lg border border-border bg-muted/25 p-4">
@@ -1038,12 +1265,81 @@ export function StockCustomerMaterialsWorkspace() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                className="border-destructive/30 text-destructive"
+                variant="destructive"
                 disabled={readOnly}
                 onClick={confirmDelete}
               >
-                ยืนยันการลบ
+                นำออกจากฉบับร่าง
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {dialog?.kind === "SAVE_DELETE" && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open && !savingRef.current) setDialog(null);
+          }}
+        >
+          <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-lg">
+            <DialogTitle>ยืนยันบันทึกและลบวัสดุถาวร</DialogTitle>
+            <DialogDescription>
+              รายการที่แสดงด้านล่างจะถูกลบถาวรพร้อมยอดสรุปและข้อมูลรับ-จ่ายของงวดที่เลือก
+              การเพิ่มและแก้ไขจะถูกบันทึกพร้อมกัน
+              ไม่สามารถเรียกคืนรายการที่ลบสำเร็จแล้วจากหน้านี้ได้
+            </DialogDescription>
+            <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-sm font-semibold text-destructive">
+                งวด{" "}
+                {CUSTOMER_MATERIALS_PERIODS[dialog.snapshot.draft.name].label} (
+                {dialog.snapshot.draft.name})
+              </p>
+              <p className="text-sm font-medium">
+                รายการรอลบถาวรเมื่อบันทึก:{" "}
+                {dialog.deletedRefs.length.toLocaleString("th-TH")} รายการ
+              </p>
+              <ul className="max-h-60 space-y-2 overflow-y-auto">
+                {pendingDeletions.map((row) => (
+                  <li
+                    key={customerMaterialsRowKey(row)}
+                    className="space-y-1 rounded-md border border-border bg-card p-2 text-sm"
+                  >
+                    <p className="wrap-break-word font-medium">
+                      {row.item.description || "วัสดุไม่มีรายละเอียด"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      รหัสสินค้า: {displayValue(row.item.code)}
+                    </p>
+                    <p className="wrap-break-word text-xs text-muted-foreground">
+                      รหัสอ้างอิง: {customerMaterialsRowKey(row)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSaving}
+                onClick={() => setDialog(null)}
+              >
+                กลับไปตรวจสอบ
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={
+                  readOnly ||
+                  active !== dialog.snapshot ||
+                  pendingDeletions.length !== dialog.deletedRefs.length
+                }
+                onClick={confirmHardDeleteSave}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                บันทึกและลบถาวร
               </Button>
             </div>
           </DialogContent>

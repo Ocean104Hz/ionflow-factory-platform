@@ -534,10 +534,7 @@ export function StockProductsDailyForm({
               หรือเปลี่ยนแปลงยอดสรุปสต็อกอัตโนมัติ
             </p>
 
-            <p>
-              UI Mock · จัดเก็บภายในเบราว์เซอร์
-              ไม่มีการเชื่อมต่อฐานข้อมูลจริง
-            </p>
+     
           </div>
 
           {errors.form && (

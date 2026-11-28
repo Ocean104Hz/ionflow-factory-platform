@@ -8,6 +8,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  Trash2,
 } from "lucide-react";
 
 import { PageHeader } from "@/src/components/factory/patterns";
@@ -65,6 +66,8 @@ import { StockWipTable } from "./stock_wip_ff_table";
 
 const STOCK_API = "/api/stock/wip-ff";
 const CSRF_COOKIE = "ionflow_factory_csrf";
+const MAX_CHANGED_ROWS = 2000;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const LOAD_FAILED = "ไม่สามารถโหลดข้อมูล Stock WIP จากฐานข้อมูลได้";
 const INVALID_RESPONSE = "รูปแบบข้อมูลจาก API ไม่ถูกต้อง";
 const UNCERTAIN_SAVE =
@@ -79,6 +82,12 @@ type Notice = {
 type SavedSnapshot = {
   sheet: StockWipSheet;
   revision: string;
+};
+
+type PendingWipDeleteSave = {
+  snapshot: SavedSnapshot;
+  draft: StockWipSheet;
+  rows: readonly StockWipRow[];
 };
 
 class StockWipApiError extends Error {
@@ -137,7 +146,9 @@ async function requestStockJson(
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok || !isRecord(payload) || payload.ok !== true) {
-    const reloadRequired = writing && (response.ok || response.status !== 400);
+    const invalidInput =
+      response.status === 400 && isRecord(payload) && payload.ok === false;
+    const reloadRequired = writing && !invalidInput;
     const message =
       response.status === 401 || response.status === 403
         ? "กรุณาตรวจสอบการเข้าสู่ระบบและสิทธิ์การใช้งาน"
@@ -260,29 +271,87 @@ async function loadStockWip(
   return readSnapshot(payload, period, false);
 }
 
+function rowSignature(row: StockWipRow): string {
+  return JSON.stringify([
+    row.item.no,
+    row.item.code_new,
+    row.item.code_old,
+    row.item.name,
+    STOCK_WIP_SUMMARY_FIELDS.map((field) => row.summary[field]),
+    [...row.daily]
+      .sort((left, right) => left.date.localeCompare(right.date))
+      .map((entry) => [
+        entry.date,
+        STOCK_WIP_MOVEMENT_FIELDS.map((field) => entry.values[field]),
+      ]),
+  ]);
+}
+
+function rowsByCode(rows: readonly StockWipRow[]) {
+  return new Map(rows.map((row) => [row.item.code_new, rowSignature(row)]));
+}
+
+function hasUniqueCodes(rows: readonly StockWipRow[]): boolean {
+  return (
+    new Set(rows.map((row) => row.item.code_new.trim())).size === rows.length
+  );
+}
+
 function draftChanges(saved: StockWipSheet, draft: StockWipSheet) {
-  const savedRows = new Map(saved.rows.map((row) => [row.item.code_new, row]));
-  const draftCodes = new Set(draft.rows.map((row) => row.item.code_new));
+  if (
+    saved.id !== draft.id ||
+    stockWipPeriodKey(saved.period) !== stockWipPeriodKey(draft.period) ||
+    !hasUniqueCodes(saved.rows) ||
+    !hasUniqueCodes(draft.rows)
+  ) {
+    throw new StockWipApiError(INVALID_RESPONSE);
+  }
+  const previous = rowsByCode(saved.rows);
+  const current = rowsByCode(draft.rows);
   return {
     changes: draft.rows.filter(
       (row) =>
-        JSON.stringify(row) !==
-        JSON.stringify(savedRows.get(row.item.code_new)),
+        previous.get(row.item.code_new) !== current.get(row.item.code_new),
     ),
-    // Compare the full draft, never the filtered table. Only explicitly removed
-    // rows from the saved snapshot become deletion references.
-    deleted_refs: saved.rows
-      .filter((row) => !draftCodes.has(row.item.code_new))
-      .map((row) => row.item.code_new),
+    // Compare complete snapshots, never a filtered table.
+    deleted_refs: [...previous.keys()].filter((code) => !current.has(code)),
   };
 }
 
 async function saveStockWip(
-  snapshot: SavedSnapshot,
+  saved: SavedSnapshot,
   draft: StockWipSheet,
+  confirmedDeletedRefs: readonly string[],
 ): Promise<SavedSnapshot> {
-  if (snapshot.sheet.id !== draft.id) {
-    throw new StockWipApiError(INVALID_RESPONSE, true);
+  const { changes, deleted_refs: deletedRefs } = draftChanges(
+    saved.sheet,
+    draft,
+  );
+  const confirmed = new Set(confirmedDeletedRefs);
+  // A disappearance in the draft is not sufficient consent for a database delete.
+  if (
+    confirmed.size !== confirmedDeletedRefs.length ||
+    confirmed.size !== deletedRefs.length ||
+    deletedRefs.some((code) => !confirmed.has(code))
+  ) {
+    throw new StockWipApiError("กรุณายืนยันการลบสินค้า WIP ถาวรก่อนบันทึก");
+  }
+  if (changes.length === 0 && deletedRefs.length === 0) return saved;
+  const body = JSON.stringify({
+    action: "save_sheet",
+    period: draft.period,
+    expected_revision: saved.revision,
+    changes,
+    deleted_refs: deletedRefs,
+    ...(deletedRefs.length > 0 ? { confirm_hard_delete: true } : {}),
+  });
+  if (
+    changes.length + deletedRefs.length > MAX_CHANGED_ROWS ||
+    new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES
+  ) {
+    throw new StockWipApiError(
+      "ข้อมูลที่แก้ไขเกินขนาดที่รองรับ (2,000 รายการ หรือ 4 MiB) กรุณาลดจำนวนรายการก่อนบันทึก",
+    );
   }
   const payload = await requestStockJson(
     STOCK_API,
@@ -292,16 +361,23 @@ async function saveStockWip(
         "Content-Type": "application/json",
         "x-csrf-token": getCsrfToken(),
       },
-      body: JSON.stringify({
-        action: "save_sheet",
-        period: draft.period,
-        expected_revision: snapshot.revision,
-        ...draftChanges(snapshot.sheet, draft),
-      }),
+      body,
     },
     true,
   );
-  return readSnapshot(payload, draft.period, true);
+  const snapshot = readSnapshot(payload, draft.period, true);
+  if (deletedRefs.length > 0 && payload.deleted !== deletedRefs.length) {
+    throw new StockWipApiError(UNCERTAIN_SAVE, true);
+  }
+  const expected = rowsByCode(draft.rows);
+  const actual = rowsByCode(snapshot.sheet.rows);
+  if (
+    expected.size !== actual.size ||
+    [...expected].some(([code, signature]) => actual.get(code) !== signature)
+  ) {
+    throw new StockWipApiError(UNCERTAIN_SAVE, true);
+  }
+  return snapshot;
 }
 
 function periodLabel(period: StockWipPeriod): string {
@@ -355,12 +431,16 @@ export function StockWipWorkspace() {
   const [selectedDailyCode, setSelectedDailyCode] = useState<string | null>(
     null,
   );
+  const [deleteCode, setDeleteCode] = useState<string | null>(null);
+  const [pendingDeleteSave, setPendingDeleteSave] =
+    useState<PendingWipDeleteSave | null>(null);
   const [pendingFilters, setPendingFilters] =
     useState<StockWipFilterValues | null>(null);
   const [errors, setErrors] = useState<StockWipValidationErrors>({});
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const saveLock = useRef(false);
 
   const savedSheet = snapshot?.sheet;
   const hasUnsavedChanges = Boolean(
@@ -376,8 +456,25 @@ export function StockWipWorkspace() {
   );
   const selectedDailyRow =
     selectedDailyCode && draft.period.view === "MONTH"
-      ? visibleRows.find((row) => row.item.code_new === selectedDailyCode)
+      ? draft.rows.find((row) => row.item.code_new === selectedDailyCode)
       : undefined;
+  const deleteRow =
+    deleteCode === null
+      ? undefined
+      : draft.rows.find((row) => row.item.code_new === deleteCode);
+  const pendingDeletedRows = useMemo(() => {
+    const codes = new Set(draft.rows.map((row) => row.item.code_new));
+    return (
+      savedSheet?.rows.filter((row) => !codes.has(row.item.code_new)) ?? []
+    );
+  }, [draft.rows, savedSheet]);
+  const pendingDeleteCount = pendingDeletedRows.length;
+  const editorDialogOpen =
+    createOpen ||
+    Boolean(selectedDailyRow) ||
+    Boolean(deleteRow) ||
+    pendingFilters !== null;
+  const dialogOpen = editorDialogOpen || pendingDeleteSave !== null;
   const errorCount = Object.keys(errors).length;
 
   useEffect(() => {
@@ -416,17 +513,29 @@ export function StockWipWorkspace() {
     return () => controller.abort();
   }, [loadTarget]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges && !isSaving) return;
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges, isSaving]);
+
   function openPeriod(nextFilters: StockWipFilterValues) {
-    if (isBusy) return;
+    if (isBusy || saveLock.current) return;
     // Keep the current draft until the requested period loads successfully.
     setCreateOpen(false);
     setSelectedDailyCode(null);
+    setDeleteCode(null);
+    setPendingDeleteSave(null);
     setNotice(null);
     setLoadTarget(copyFilters(nextFilters));
   }
 
   function handleReload() {
-    if (isBusy) return;
+    if (isBusy || saveLock.current || dialogOpen) return;
     if (hasUnsavedChanges) {
       setPendingFilters(copyFilters(filters));
       return;
@@ -435,7 +544,7 @@ export function StockWipWorkspace() {
   }
 
   function handleFiltersChange(nextFilters: StockWipFilterValues) {
-    if (isBusy) return;
+    if (isBusy || saveLock.current || dialogOpen) return;
     const currentKey = stockWipPeriodKey(filters.period);
     const nextKey = stockWipPeriodKey(nextFilters.period);
 
@@ -454,7 +563,12 @@ export function StockWipWorkspace() {
   }
 
   function openCreateForm() {
-    if (!canEdit || draft.period.view !== "MONTH") {
+    if (
+      !canEdit ||
+      saveLock.current ||
+      dialogOpen ||
+      draft.period.view !== "MONTH"
+    ) {
       return;
     }
 
@@ -463,7 +577,28 @@ export function StockWipWorkspace() {
   }
 
   function handleCreate(input: StockWipCreateInput) {
-    if (!canEdit) return false;
+    if (
+      !canEdit ||
+      saveLock.current ||
+      !createOpen ||
+      draft.period.view !== "MONTH"
+    ) {
+      return false;
+    }
+    // Removing and re-creating the same saved code in one batch is ambiguous:
+    // the API identifies an existing row by Code New and preserves its item.
+    // Require the pending deletion to be saved or discarded first.
+    const code = input.code_new.trim();
+    if (
+      savedSheet?.rows.some((row) => row.item.code_new.trim() === code) &&
+      !draft.rows.some((row) => row.item.code_new.trim() === code)
+    ) {
+      setNotice({
+        tone: "error",
+        text: `รหัส ${code} อยู่ในรายการรอลบ กรุณาบันทึกการลบหรือยกเลิกการแก้ไขก่อนเพิ่มรหัสเดิม`,
+      });
+      return false;
+    }
     // Validate synchronously so the form can display creation errors.
     // The saved sheet remains unchanged until the user presses Save.
     const nextDraft = addStockWipRow(draft, input);
@@ -484,7 +619,7 @@ export function StockWipWorkspace() {
     field: StockWipSummaryField,
     value: string,
   ) {
-    if (!canEdit) return;
+    if (!canEdit || saveLock.current || dialogOpen) return;
     setDraft((current) =>
       updateStockWipSummary(current, codeNew, field, value),
     );
@@ -498,7 +633,14 @@ export function StockWipWorkspace() {
     field: StockWipMovementField,
     value: string,
   ) {
-    if (!canEdit) return;
+    if (
+      !canEdit ||
+      saveLock.current ||
+      selectedDailyCode !== codeNew ||
+      draft.period.view !== "MONTH" ||
+      pendingDeleteSave !== null
+    )
+      return;
     setDraft((current) =>
       updateStockWipDaily(current, codeNew, date, field, value),
     );
@@ -506,8 +648,35 @@ export function StockWipWorkspace() {
     setNotice(null);
   }
 
+  function openDeleteWip(row: StockWipRow) {
+    if (!canEdit || saveLock.current || dialogOpen) return;
+    if (draft.rows.some((entry) => entry.item.code_new === row.item.code_new)) {
+      setDeleteCode(row.item.code_new);
+    }
+  }
+
+  function confirmDeleteWip() {
+    if (!deleteRow || !canEdit || saveLock.current) return;
+    const code = deleteRow.item.code_new;
+    const wasSaved = savedSheet?.rows.some((row) => row.item.code_new === code);
+    setDraft((current) => ({
+      ...current,
+      rows: current.rows.filter((row) => row.item.code_new !== code),
+    }));
+    setDeleteCode(null);
+    setSelectedDailyCode(null);
+    setErrors({});
+    setNotice({
+      tone: "info",
+      title: "นำสินค้า WIP ออกจากฉบับร่างแล้ว",
+      text: wasSaved
+        ? `รหัส ${code} รอลบถาวรเฉพาะงวดนี้ กรุณากดบันทึกข้อมูลเพื่อยืนยันการลบ`
+        : `นำรหัส ${code} ที่ยังไม่ได้บันทึกออกแล้ว ไม่มีการเขียนข้อมูลลงฐานข้อมูล`,
+    });
+  }
+
   function handleDiscard() {
-    if (isBusy) return;
+    if (isBusy || saveLock.current || dialogOpen) return;
     if (!savedSheet) {
       setNotice({
         tone: "error",
@@ -519,6 +688,8 @@ export function StockWipWorkspace() {
     setDraft(structuredClone(savedSheet));
     setSelectedDailyCode(null);
     setCreateOpen(false);
+    setDeleteCode(null);
+    setPendingDeleteSave(null);
     setErrors({});
     setNotice({
       tone: "info",
@@ -528,48 +699,79 @@ export function StockWipWorkspace() {
     });
   }
 
-  async function handleSave() {
-    if (!snapshot || !canEdit || !hasUnsavedChanges) return;
-
+  async function handleSave(confirmation?: PendingWipDeleteSave) {
+    if (
+      !canEdit ||
+      saveLock.current ||
+      !snapshot ||
+      !hasUnsavedChanges ||
+      editorDialogOpen
+    )
+      return;
+    if (confirmation) {
+      if (
+        confirmation !== pendingDeleteSave ||
+        confirmation.snapshot !== snapshot ||
+        confirmation.draft !== draft
+      ) {
+        return;
+      }
+    } else if (pendingDeleteSave !== null) {
+      return;
+    }
     const nextErrors = validateStockWipSheet(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setNotice({
         tone: "error",
-        text: "ยังบันทึกไม่ได้ กรุณาแก้ช่องตัวเลขที่ไม่ถูกต้องก่อน",
+        text: "ยังบันทึกไม่ได้ กรุณาแก้ไขช่องตัวเลขที่ไม่ถูกต้องก่อน",
       });
       return;
     }
-
+    if (pendingDeleteCount > 0 && !confirmation) {
+      setPendingDeleteSave({
+        snapshot,
+        draft,
+        rows: pendingDeletedRows,
+      });
+      return;
+    }
+    const confirmedDeletedRefs =
+      confirmation?.rows.map((row) => row.item.code_new) ?? [];
+    saveLock.current = true;
     setIsSaving(true);
+    setPendingDeleteSave(null);
     setNotice(null);
     try {
-      const saved = await saveStockWip(snapshot, draft);
+      const saved = await saveStockWip(snapshot, draft, confirmedDeletedRefs);
       setSnapshot(saved);
       setDraft(structuredClone(saved.sheet));
       setErrors({});
       setNotice({
         tone: "success",
-        text: "บันทึกข้อมูล Stock WIP ลงฐานข้อมูลเรียบร้อยแล้ว",
+        text:
+          pendingDeleteCount > 0
+            ? `บันทึกข้อมูลเรียบร้อยแล้ว รวมการลบสินค้า WIP ถาวร ${pendingDeleteCount.toLocaleString("th-TH")} รายการจากงวดนี้`
+            : "บันทึกข้อมูล Stock WIP ลงฐานข้อมูลเรียบร้อยแล้ว",
       });
     } catch (error) {
-      // Preserve the draft. Never retry a write with an uncertain outcome.
       if (!(error instanceof StockWipApiError) || error.reloadRequired) {
         setReloadRequired(true);
       }
       setNotice({
         tone: "error",
-        title: "บันทึกข้อมูลไม่สำเร็จ",
         text:
           error instanceof StockWipApiError ? error.message : UNCERTAIN_SAVE,
       });
+      // Keep the unsaved draft and original revision. Never retry automatically.
     } finally {
+      saveLock.current = false;
       setIsSaving(false);
     }
   }
 
   function confirmPeriodChange() {
-    if (isBusy || !pendingFilters) {
+    if (isBusy || saveLock.current || !pendingFilters) {
       return;
     }
 
@@ -582,23 +784,35 @@ export function StockWipWorkspace() {
       <PageHeader
         title="Stock WIP FF"
         description="สต็อกสินค้าระหว่างการผลิตจากไฟล์ Stock WIP FF 2569.xlsx"
-        actions={<><Badge variant="outline">DATABASE</Badge> {draft && (<Button
-            type="button"
-            variant="outline"
-            onClick={openCreateForm}
-            disabled={!canEdit || draft.period.view !== "MONTH"}
-            title={
-              draft.period.view === "YEAR"
-                ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
-                : "เพิ่มรายการ WIP"
-            }
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            เพิ่มรายการ WIP
-          </Button>)}</>}
+        actions={
+          <>
+            <Badge variant="outline">DATABASE</Badge>{" "}
+            {draft && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openCreateForm}
+                disabled={
+                  !canEdit || dialogOpen || draft.period.view !== "MONTH"
+                }
+                title={
+                  draft.period.view === "YEAR"
+                    ? "กรุณาเลือกงวดรายเดือนก่อนเพิ่มรายการ WIP"
+                    : "เพิ่มรายการ WIP"
+                }
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                เพิ่มรายการ WIP
+              </Button>
+            )}
+          </>
+        }
       />
 
-      <fieldset disabled={isBusy} className="min-w-0 border-0 p-0">
+      <fieldset
+        disabled={isBusy || dialogOpen}
+        className="min-w-0 border-0 p-0"
+      >
         <StockWipFilters
           value={filters}
           onChange={handleFiltersChange}
@@ -637,6 +851,12 @@ export function StockWipWorkspace() {
                       ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
                       : "ข้อมูลตรงกับฉบับที่โหลดหรือบันทึกไว้ล่าสุด"}
           </p>
+          {pendingDeleteCount > 0 && (
+            <p className="text-xs font-medium text-danger">
+              รอลบถาวร {pendingDeleteCount.toLocaleString("th-TH")} รายการ ·
+              ต้องกดบันทึกข้อมูล
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -644,7 +864,7 @@ export function StockWipWorkspace() {
             type="button"
             variant="outline"
             onClick={handleReload}
-            disabled={isBusy}
+            disabled={isBusy || dialogOpen}
           >
             <RefreshCw className="size-4" aria-hidden="true" />
             โหลดข้อมูลใหม่
@@ -654,15 +874,17 @@ export function StockWipWorkspace() {
             type="button"
             variant="outline"
             onClick={handleDiscard}
-            disabled={isBusy || !hasUnsavedChanges}
+            disabled={isBusy || dialogOpen || !hasUnsavedChanges}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
             ยกเลิกการแก้ไข
           </Button>
           <Button
             type="button"
-            onClick={handleSave}
-            disabled={!canEdit || !hasUnsavedChanges}
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={!canEdit || dialogOpen || !hasUnsavedChanges}
           >
             <Save className="size-4" aria-hidden="true" />
             {isSaving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
@@ -714,11 +936,14 @@ export function StockWipWorkspace() {
             onViewDaily={
               draft.period.view === "MONTH"
                 ? (row) => {
-                    if (!isBusy) setSelectedDailyCode(row.item.code_new);
+                    if (!isBusy && !saveLock.current && !dialogOpen) {
+                      setSelectedDailyCode(row.item.code_new);
+                    }
                   }
                 : undefined
             }
-            disabled={!canEdit}
+            onDelete={openDeleteWip}
+            disabled={!canEdit || dialogOpen}
           />
         </>
       )}
@@ -728,7 +953,10 @@ export function StockWipWorkspace() {
           key={draft.id}
           open={createOpen}
           period={draft.period}
-          onOpenChange={setCreateOpen}
+          onOpenChange={(open) => {
+            if (!open) setCreateOpen(false);
+            else openCreateForm();
+          }}
           onCreate={handleCreate}
           disabled={!canEdit}
         />
@@ -768,6 +996,73 @@ export function StockWipWorkspace() {
       </Dialog>
 
       <AlertDialog
+        open={pendingDeleteSave !== null}
+        onOpenChange={(open) => {
+          if (!open && !saveLock.current) setPendingDeleteSave(null);
+        }}
+      >
+        <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ยืนยันบันทึกและลบสินค้า WIP ถาวร
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ระบบจะลบทะเบียนสินค้า WIP ยอดสรุป
+              และรายละเอียดการเคลื่อนไหวของรายการด้านล่างออกจากฐานข้อมูลในงวดที่เลือก
+              พร้อมบันทึกการเพิ่มและแก้ไขทั้งหมด
+              การลบที่บันทึกสำเร็จแล้วไม่สามารถเรียกคืนจากหน้านี้ได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 rounded-lg border bg-muted/25 p-3 text-sm">
+            <p className="font-medium">
+              {periodLabel(pendingDeleteSave?.draft.period ?? draft.period)} (
+              {(pendingDeleteSave?.rows.length ?? 0).toLocaleString("th-TH")}{" "}
+              รายการ)
+            </p>
+            <ul className="max-h-48 space-y-2 overflow-y-auto">
+              {pendingDeleteSave?.rows.map((row) => (
+                <li
+                  key={row.item.code_new}
+                  className="wrap-break-word border-b pb-2 last:border-b-0 last:pb-0"
+                >
+                  <span className="font-medium">{row.item.code_new}</span>
+                  {row.item.code_old && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      Code Old: {row.item.code_old}
+                    </span>
+                  )}
+                  {row.item.name && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {row.item.name}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>
+              กลับไปยังฉบับร่าง
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={
+                !canEdit ||
+                pendingDeleteSave === null ||
+                pendingDeleteSave.rows.length === 0
+              }
+              onClick={() => {
+                if (pendingDeleteSave) void handleSave(pendingDeleteSave);
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              บันทึกและลบถาวร
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
         open={pendingFilters !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -791,6 +1086,50 @@ export function StockWipWorkspace() {
               onClick={confirmPeriodChange}
             >
               ทิ้งการแก้ไขและโหลดข้อมูล
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={deleteRow !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCode(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>นำสินค้า WIP ออกจากฉบับร่าง</AlertDialogTitle>
+            <AlertDialogDescription>
+              ต้องการนำสินค้า WIP ออกจากฉบับร่างของ {periodLabel(draft.period)}{" "}
+              หรือไม่? หากเคยบันทึกไว้แล้ว
+              ระบบจะลบถาวรเมื่อยืนยันบันทึกจากหน้าหลักเท่านั้น
+              สามารถยกเลิกการแก้ไขเพื่อคืนข้อมูลได้ก่อนบันทึก
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteRow && (
+            <div className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-semibold">รหัส {deleteRow.item.code_new}</p>
+              {deleteRow.item.code_old && (
+                <p className="text-xs text-muted-foreground">
+                  Code Old: {deleteRow.item.code_old}
+                </p>
+              )}
+              {deleteRow.item.name && (
+                <p className="text-muted-foreground">{deleteRow.item.name}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                ลำดับ {deleteRow.item.no} · {periodLabel(draft.period)}
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!canEdit}
+              onClick={confirmDeleteWip}
+            >
+              นำออกจากฉบับร่าง
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

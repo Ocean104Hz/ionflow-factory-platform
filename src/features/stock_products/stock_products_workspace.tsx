@@ -1,11 +1,14 @@
 "use client";
 
-import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
+import {
+  RowActionItem,
+  RowActionMenu,
+} from "@/src/components/factory/row-action-menu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Boxes,
   CalendarDays,
-  ClipboardList,
+  FileSpreadsheet,
   Pencil,
   Plus,
   Search,
@@ -34,10 +37,9 @@ import {
 
 import { StockProductsForm } from "./stock_products_form";
 import { StockProductsDailyForm } from "./stock_products_daily_form";
-import { StockProductsSoForm } from "./stock_products_so_form";
+import { StockProductsImportDialog } from "./import/stock_products_import_dialog";
 
 import {
-  appendStockProductsSoRow,
   blankStockProductsDaily,
   blankStockProductsRow,
   datesInStockProductsMonth,
@@ -48,14 +50,16 @@ import {
   stockProductsSoRowKey,
   upsertStockProductsRow,
   validateStockProductsRow,
-  validateStockProductsSoForStock,
+  validateStockProductsImportedSoRow,
   validateStockProductsSoSheetCoverage,
   STOCK_PRODUCTS_DAILY_FIELDS,
+  STOCK_PRODUCTS_EXCEL_SO_COLUMNS,
   STOCK_PRODUCTS_SO_SHEET_NAMES,
   STOCK_PRODUCTS_SUMMARY_FIELDS,
   type StockProductsDailyField,
   type StockProductsDailyValues,
   type StockProductsMonth,
+  type StockProductsRawCell,
   type StockProductsSoRow,
   type StockProductsSoSheetName,
   type StockProductsWorkbook,
@@ -71,25 +75,30 @@ import {
 
 const COPY = {
   title: "สต็อกสินค้า",
-  desc: "จัดการสต็อกสินค้า รับ-จ่ายรายวัน และรายการ SO ทั้ง 16 ชีต",
-  storage: "ฐานข้อมูลจริง",
+  desc: "จัดการสต็อกสินค้า รับ-จ่ายรายวัน และรายการ SO ",
+  storage: "",
   stock: "สต็อกสินค้าคงเหลือ",
-  so: "รายการ SO",
   productCount: "รายการสินค้า",
   dailyCount: "รายการรับ-จ่ายรายวัน",
   soCount: "บรรทัดรายการ SO",
-  soSheets: "ชีต SO",
+
+  stockGroup: "เลือก SO",
+  allStockGroups: "สรุปสินค้าสำเร็จรูปคงเหลือ FF",
+  unassignedStockGroup: "ไม่ระบุหมวด",
   stockSearch: "ค้นหาสินค้า",
   stockPlaceholder: "ค้นหารหัสสินค้า ชื่อ หรือประเภท",
   soSearch: "ค้นหารายการ SO",
-  soPlaceholder: "ชื่อลูกค้า เลข SO หรือชื่อสินค้า",
-  pickSheet: "เลือกชีต SO",
-  allSheets: "ทุกชีต",
+  soPlaceholder: "ค้นหาวันที่ เลข SO ลูกค้า หรือชื่อสินค้า",
+  noSo: "ไม่พบรายการที่มีเลข SO ในชีตหรือคำค้นหาที่เลือก",
+  soDate: "วันที่ SO",
+  soNumber: "เลข SO",
+  customer: "ลูกค้า",
+  soQuantity: "จำนวน SO",
+  sheetHint:
+    "",
   noStock: "ไม่พบรายการสินค้าที่ตรงกับการค้นหา",
-  noSo: "ไม่พบรายการ SO ในชีตหรือตัวกรองที่เลือก",
   dailyButton: "ดูรายวัน",
   dailyTitle: "รายละเอียดรับ-จ่ายรายวัน",
-  dateRaw: "วันที่ SO",
   totalF: "ยอด (F)",
   received: "รับเข้า",
   receivedReturn: "รับคืน",
@@ -102,13 +111,10 @@ const COPY = {
   count: "ตรวจนับ",
   difference: "ผลต่าง",
   remark: "หมายเหตุ",
-  group: "ประเภท",
+  group: "SO",
   code: "รหัสสินค้า",
   productName: "ชื่อสินค้า",
   unit: "หน่วย",
-  soNumber: "เลข SO",
-  customer: "ลูกค้า",
-  quantity: "จำนวน",
   empty: "ไม่มีข้อมูล",
   showing: "แสดง",
   from: "จาก",
@@ -120,12 +126,14 @@ const COPY = {
   period: "ประจำเดือน",
   summary: "ยอดสรุปตาม Excel",
   stockHint: "ยอดสรุปแสดงตามข้อมูลที่บันทึก โดยไม่คำนวณอัตโนมัติ",
-  soHint: "รายการ SO ไม่หักยอดสต็อกอัตโนมัติ",
+  soHint: "รายการ SO ทุกเดือนและทุกปี ไม่หักยอดสต็อกอัตโนมัติ",
   databaseHint: "ข้อมูลจากฐานข้อมูล ไม่นำเข้า Local Storage อัตโนมัติ",
-  dateHint: "วันที่ SO ตามที่บันทึกในฐานข้อมูล",
   dailyHint: "แสดงครบทุกวันในเดือน รวมวันที่ไม่มีการเคลื่อนไหว",
   stockDetail: "ข้อมูลสินค้า",
   dailyRows: "วันที่มีรายการ",
+  importExcel: "นำเข้า Excel",
+  importHint:
+    "เมื่อยืนยันการนำเข้า ระบบจะแทนที่ Stock เฉพาะงวดนี้ และ SO ทุกเดือนทุกปีทั้ง 16 ชีต รวมถึง SO ที่เพิ่มด้วยตนเอง ตาม Excel ล่าสุด",
 } as const;
 
 const STOCK_COLUMNS = [
@@ -158,13 +166,10 @@ const DAILY_COLUMNS = [
   label: string;
 }[];
 
-const SO_SHEET_OPTIONS = [
-  { value: "ALL", label: COPY.allSheets },
-  ...STOCK_PRODUCTS_SO_SHEET_NAMES.map((name) => ({
-    value: name,
-    label: name,
-  })),
-];
+const ALL_STOCK_GROUPS = "ALL";
+const UNASSIGNED_STOCK_GROUP = "UNASSIGNED";
+const STOCK_GROUP_PREFIX = "group:";
+const SO_SHEET_PREFIX = "so:";
 
 const PAGE_SIZE = 25;
 const STOCK_API = "/api/stock/products";
@@ -181,6 +186,86 @@ const EMPTY_WORKBOOK: StockProductsWorkbook = {
   so_sheets: STOCK_PRODUCTS_SO_SHEET_NAMES.map((name) => ({ name, rows: [] })),
 };
 const QUANTITY_CLASSES = "whitespace-nowrap text-right tabular-nums";
+
+// item_group is already provided by the API as row.item.group.
+// Treat blank/whitespace-only groups as unassigned; never modify source rows.
+function stockGroupValue(group: string | null): string {
+  const label = group?.trim();
+  return label ? `${STOCK_GROUP_PREFIX}${label}` : UNASSIGNED_STOCK_GROUP;
+}
+
+function hasSoNumber(row: StockProductsSoRow): boolean {
+  return row.so_number.trim().length > 0;
+}
+
+function selectedSoSheetName(
+  value: string,
+): StockProductsSoSheetName | undefined {
+  return STOCK_PRODUCTS_SO_SHEET_NAMES.find(
+    (name) => value === `${SO_SHEET_PREFIX}${name}`,
+  );
+}
+
+function buildStockGroupOptions(
+  rows: readonly StockProductsStockRow[],
+  sheets: StockProductsWorkbook["so_sheets"],
+  selectedGroup: string,
+): { value: string; label: string }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const value = stockGroupValue(row.item.group);
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  // Preserve the selected group with a zero count if its last item is deleted.
+  if (
+    selectedGroup.startsWith(STOCK_GROUP_PREFIX) &&
+    !counts.has(selectedGroup)
+  ) {
+    counts.set(selectedGroup, 0);
+  }
+
+  const groups = [...counts.entries()]
+    .filter(([value]) => value !== UNASSIGNED_STOCK_GROUP)
+    .sort(([left], [right]) => left.localeCompare(right, "th-TH"));
+
+  const soCounts = new Map(
+    sheets.map((sheet) => [sheet.name, sheet.rows.filter(hasSoNumber).length]),
+  );
+
+  // Sheet and stock-group options have different identities and count units.
+  // Never infer a stock item's SO relationship from its name or group.
+  return [
+    {
+      value: ALL_STOCK_GROUPS,
+      label: `${COPY.allStockGroups} `,
+    },
+    ...STOCK_PRODUCTS_SO_SHEET_NAMES.map((name) => ({
+      value: `${SO_SHEET_PREFIX}${name}`,
+      label: `${name} (${(soCounts.get(name) ?? 0).toLocaleString("th-TH")} SO)`,
+    })),
+    ...groups.map(([value, count]) => ({
+      value,
+      label: `Stock · ${value.slice(STOCK_GROUP_PREFIX.length)} (${count.toLocaleString("th-TH")} สินค้า)`,
+    })),
+    {
+      value: UNASSIGNED_STOCK_GROUP,
+      label: `Stock · ${COPY.unassignedStockGroup} (${(counts.get(UNASSIGNED_STOCK_GROUP) ?? 0).toLocaleString("th-TH")} สินค้า)`,
+    },
+  ];
+}
+
+function filterStockRowsByGroup(
+  rows: readonly StockProductsStockRow[],
+  selectedGroup: string,
+  search: string,
+): StockProductsStockRow[] {
+  const groupRows =
+    selectedGroup === ALL_STOCK_GROUPS
+      ? rows
+      : rows.filter((row) => stockGroupValue(row.item.group) === selectedGroup);
+  return filterStockProductsRows(groupRows, search);
+}
 
 function originalCell(value: string | number | boolean | null): string {
   return value === null || value === "" ? "-" : String(value);
@@ -202,11 +287,6 @@ type StockEditor = {
 type DailyEditor = {
   row: StockProductsStockRow;
   date: string;
-};
-
-type SoEditor = {
-  id: string;
-  sheet: StockProductsSoSheetName;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -265,33 +345,90 @@ function isStockRow(value: unknown): value is StockProductsStockRow {
   );
 }
 
+function isSoRawCell(value: unknown): value is StockProductsRawCell {
+  return (
+    value === null ||
+    typeof value === "boolean" ||
+    (typeof value === "string" && !value.includes("\0")) ||
+    (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
 function isSoRow(value: unknown): value is StockProductsSoRow {
   if (!isRecord(value)) return false;
 
+  const sheetName = STOCK_PRODUCTS_SO_SHEET_NAMES.find(
+    (name) => name === value.sheet_name,
+  );
+  const supplementaryCount =
+    STOCK_PRODUCTS_EXCEL_SO_COLUMNS.supplementary_last -
+    STOCK_PRODUCTS_EXCEL_SO_COLUMNS.supplementary_first +
+    1;
+
+  if (
+    !isDatabaseId(value.id) ||
+    !sheetName ||
+    typeof value.source_row !== "number" ||
+    !Number.isSafeInteger(value.source_row) ||
+    value.source_row < 0 ||
+    typeof value.date_raw !== "string" ||
+    typeof value.customer_name !== "string" ||
+    !value.customer_name.trim() ||
+    typeof value.so_number !== "string" ||
+    !value.so_number.trim() ||
+    typeof value.product_name !== "string" ||
+    !value.product_name.trim() ||
+    typeof value.quantity !== "string" ||
+    !value.quantity.trim() ||
+    !Number.isFinite(Number(value.quantity)) ||
+    typeof value.unit !== "string" ||
+    !Array.isArray(value.supplementary_cells) ||
+    value.supplementary_cells.length !== supplementaryCount ||
+    !value.supplementary_cells.every(isSoRawCell)
+  ) {
+    return false;
+  }
+
+  if (value.stock_row_key === undefined) {
+    // Independent Excel rows have a database ID after saving, but no stock link.
+    // The import validator expects a source row without its generated ID.
+    if (
+      typeof value.source_date_text !== "string" ||
+      (value.document_date !== null && typeof value.document_date !== "string")
+    ) {
+      return false;
+    }
+
+    return (
+      Object.keys(
+        validateStockProductsImportedSoRow({
+          sheet_name: sheetName,
+          source_row: value.source_row,
+          date_raw: value.date_raw,
+          document_date: value.document_date,
+          source_date_text: value.source_date_text,
+          customer_name: value.customer_name,
+          so_number: value.so_number,
+          product_name: value.product_name,
+          quantity: value.quantity,
+          unit: value.unit,
+          supplementary_cells: value.supplementary_cells,
+        }),
+      ).length === 0
+    );
+  }
+
+  // Manually created/legacy SO rows still require a real date and stock ID.
   return (
-    isDatabaseId(value.id) &&
     typeof value.stock_row_key === "string" &&
     value.stock_row_key.startsWith("stock:local:") &&
     isDatabaseId(value.stock_row_key.slice("stock:local:".length)) &&
-    STOCK_PRODUCTS_SO_SHEET_NAMES.some((name) => name === value.sheet_name) &&
-    typeof value.source_row === "number" &&
-    Number.isInteger(value.source_row) &&
-    typeof value.date_raw === "string" &&
+    !value.date_raw.startsWith("0000-") &&
     isValidStockProductsAddedDate(value.date_raw) &&
-    hasStringFields(value, [
-      "customer_name",
-      "so_number",
-      "product_name",
-      "quantity",
-      "unit",
-    ]) &&
-    Array.isArray(value.supplementary_cells) &&
-    value.supplementary_cells.every(
-      (cell: unknown) =>
-        isNullableString(cell) ||
-        typeof cell === "boolean" ||
-        (typeof cell === "number" && Number.isFinite(cell)),
-    )
+    (value.document_date === undefined ||
+      value.document_date === value.date_raw) &&
+    (value.source_date_text === undefined ||
+      typeof value.source_date_text === "string")
   );
 }
 
@@ -665,16 +802,22 @@ function StockProductsDailyView({
                       {originalCell(record?.[column.field] ?? "")}
                     </TableCell>
                   ))}
-                  <TableCell className="text-center"><RowActionMenu>
-                    <RowActionItem type="button" disabled={readOnly} onClick={() => onEdit(date)}>
-                      {record ? (
-                        <Pencil aria-hidden="true" />
-                      ) : (
-                        <Plus aria-hidden="true" />
-                      )}
-                      {record ? "แก้ไข" : "บันทึก"}
-                    </RowActionItem>
-                  </RowActionMenu></TableCell>
+                  <TableCell className="text-center">
+                    <RowActionMenu>
+                      <RowActionItem
+                        type="button"
+                        disabled={readOnly}
+                        onClick={() => onEdit(date)}
+                      >
+                        {record ? (
+                          <Pencil aria-hidden="true" />
+                        ) : (
+                          <Plus aria-hidden="true" />
+                        )}
+                        {record ? "แก้ไข" : "บันทึก"}
+                      </RowActionItem>
+                    </RowActionMenu>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -686,25 +829,109 @@ function StockProductsDailyView({
   );
 }
 
+/** Display one row per SO line, including repeated order numbers. */
+function StockProductsSoTable({
+  rows,
+  stockRows,
+  loading,
+}: {
+  rows: readonly StockProductsSoRow[];
+  stockRows: readonly StockProductsStockRow[];
+  loading: boolean;
+}) {
+  const stockCodes = new Map(
+    stockRows.map((row) => [stockProductsRowKey(row), row.item.code]),
+  );
+
+  return (
+    <Table
+      className="min-w-250 text-xs"
+      containerProps={{
+        className: "min-w-0 max-w-full border-t border-border",
+        tabIndex: 0,
+        role: "region",
+        "aria-label": "รายการ SO",
+      }}
+    >
+      <TableHeader className="bg-muted/40">
+        <TableRow>
+          <TableHead className="min-w-28">{COPY.soDate}</TableHead>
+          <TableHead className="min-w-36">{COPY.soNumber}</TableHead>
+          <TableHead className="min-w-48">{COPY.customer}</TableHead>
+          <TableHead className="min-w-32">{COPY.code}</TableHead>
+          <TableHead className="min-w-80">{COPY.productName}</TableHead>
+          <TableHead className="min-w-24 text-right">
+            {COPY.soQuantity}
+          </TableHead>
+          <TableHead className="min-w-18">{COPY.unit}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={7}
+              className="py-10 text-center text-muted-foreground"
+            >
+              {loading ? "กำลังโหลด..." : COPY.noSo}
+            </TableCell>
+          </TableRow>
+        ) : (
+          rows.map((row) => (
+            <TableRow key={stockProductsSoRowKey(row)}>
+              <TableCell
+                className="whitespace-nowrap tabular-nums"
+                title={row.source_date_text ?? undefined}
+              >
+                {originalCell(row.date_raw)}
+                {row.document_date === null && (
+                  <span className="block text-xs text-amber-700 dark:text-amber-400">
+                    {String(row.date_raw ?? "").trim()
+                      ? "วันที่ไม่ถูกต้อง"
+                      : "ไม่ระบุวันที่"}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="font-mono">{row.so_number}</TableCell>
+              <TableCell className="max-w-64 whitespace-normal wrap-break-word">
+                {originalCell(row.customer_name)}
+              </TableCell>
+              <TableCell className="font-mono">
+                {originalCell(
+                  row.stock_row_key
+                    ? (stockCodes.get(row.stock_row_key) ?? null)
+                    : null,
+                )}
+              </TableCell>
+              <TableCell className="max-w-96 whitespace-normal wrap-break-word font-medium">
+                {originalCell(row.product_name)}
+              </TableCell>
+              <TableCell className={QUANTITY_CLASSES}>
+                {originalCell(row.quantity)}
+              </TableCell>
+              <TableCell>{originalCell(row.unit)}</TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
 export function StockProductsWorkspace() {
   const stockSearchId = useId();
-  const soSearchId = useId();
-  const [activeView, setActiveView] = useState<"STOCK" | "SO">("STOCK");
   const [stockSearch, setStockSearch] = useState("");
-  const [soSearch, setSoSearch] = useState("");
-  const [selectedSheet, setSelectedSheet] = useState<
-    StockProductsSoSheetName | "ALL"
-  >("ALL");
+  const [selectedStockGroup, setSelectedStockGroup] =
+    useState(ALL_STOCK_GROUPS);
   const [stockPage, setStockPage] = useState(1);
-  const [soPage, setSoPage] = useState(1);
   const [selectedStockKey, setSelectedStockKey] = useState<string | null>(null);
   const [stockEditor, setStockEditor] = useState<StockEditor | null>(null);
   const [dailyEditor, setDailyEditor] = useState<DailyEditor | null>(null);
-  const [soEditor, setSoEditor] = useState<SoEditor | null>(null);
   const [deleteTarget, setDeleteTarget] =
     useState<StockProductsStockRow | null>(null);
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
 
   const [workbook, setWorkbook] =
     useState<StockProductsWorkbook>(EMPTY_WORKBOOK);
@@ -738,46 +965,52 @@ export function StockProductsWorkspace() {
     loadState.loading ||
     Boolean(loadState.error) ||
     refreshRequired ||
-    isSaving;
+    isSaving ||
+    importOpen;
 
   const selectedStockRow =
     stock.rows.find((row) => stockProductsRowKey(row) === selectedStockKey) ??
     null;
+  const selectedSoSheet = selectedSoSheetName(selectedStockGroup);
+  const stockGroupOptions = useMemo(
+    () => buildStockGroupOptions(stock.rows, soSheets, selectedStockGroup),
+    [stock.rows, soSheets, selectedStockGroup],
+  );
   const stockRows = useMemo(
-    () => filterStockProductsRows(stock.rows, stockSearch),
-    [stock.rows, stockSearch],
+    () => filterStockRowsByGroup(stock.rows, selectedStockGroup, stockSearch),
+    [stock.rows, selectedStockGroup, stockSearch],
   );
   const soRows = useMemo(
     () =>
-      filterStockProductsSoRows(soSheets, {
-        sheet: selectedSheet,
-        search: soSearch,
-      }),
-    [soSheets, selectedSheet, soSearch],
+      selectedSoSheet
+        ? filterStockProductsSoRows(soSheets, {
+            sheet: selectedSoSheet,
+            search: stockSearch,
+          }).filter(hasSoNumber)
+        : [],
+    [soSheets, selectedSoSheet, stockSearch],
   );
+  const selectedSoCount = selectedSoSheet
+    ? (soSheets
+        .find((sheet) => sheet.name === selectedSoSheet)
+        ?.rows.filter(hasSoNumber).length ?? 0)
+    : 0;
+  const visibleRowCount = selectedSoSheet ? soRows.length : stockRows.length;
   const currentStockPage = Math.min(
     stockPage,
-    Math.max(1, Math.ceil(stockRows.length / PAGE_SIZE)),
-  );
-  const currentSoPage = Math.min(
-    soPage,
-    Math.max(1, Math.ceil(soRows.length / PAGE_SIZE)),
+    Math.max(1, Math.ceil(visibleRowCount / PAGE_SIZE)),
   );
   const stockPageRows = stockRows.slice(
     (currentStockPage - 1) * PAGE_SIZE,
     currentStockPage * PAGE_SIZE,
   );
   const soPageRows = soRows.slice(
-    (currentSoPage - 1) * PAGE_SIZE,
-    currentSoPage * PAGE_SIZE,
+    (currentStockPage - 1) * PAGE_SIZE,
+    currentStockPage * PAGE_SIZE,
   );
   const movementDays = useMemo(
     () => stock.rows.reduce((sum, row) => sum + row.daily.length, 0),
     [stock.rows],
-  );
-  const soLineCount = useMemo(
-    () => soSheets.reduce((sum, sheet) => sum + sheet.rows.length, 0),
-    [soSheets],
   );
 
   function clearFeedback() {
@@ -789,9 +1022,9 @@ export function StockProductsWorkspace() {
     if (
       saveLock.current ||
       loadState.loading ||
+      importOpen ||
       stockEditor ||
       dailyEditor ||
-      soEditor ||
       deleteTarget
     )
       return;
@@ -824,6 +1057,50 @@ export function StockProductsWorkspace() {
       saveLock.current = false;
       setIsSaving(false);
     }
+  }
+
+  /* ---------------- Excel import ---------------- */
+
+  function openImportExcel() {
+    if (
+      readOnly ||
+      saveLock.current ||
+      stockEditor ||
+      dailyEditor ||
+      deleteTarget ||
+      selectedStockRow
+    ) {
+      return;
+    }
+
+    clearFeedback();
+    setImportOpen(true);
+  }
+
+  function handleImported(inserted: number, insertedSo: number) {
+    // The committed replacement invalidates the old Stock and SO lists.
+    // Keep the result dialog open and reset the stock filters.
+    setSelectedStockKey(null);
+    setSelectedStockGroup(ALL_STOCK_GROUPS);
+    setStockSearch("");
+    setStockPage(1);
+    setSaveError("");
+    setNotice(
+      `นำเข้า Excel สำเร็จ: Stock ${inserted.toLocaleString("th-TH")} รายการ สำหรับงวด ${monthLabel(stock.period.year_be, stock.period.month)} และ SO ${insertedSo.toLocaleString("th-TH")} รายการ ทุกเดือนทุกปีตาม Excel ล่าสุด`,
+    );
+
+    // Do not display the replaced lists or append rows from the preview.
+    // Only a successful canonical GET may re-enable editing.
+    setWorkbook(EMPTY_WORKBOOK);
+    setRefreshRequired(true);
+    setLoadState({ loading: true, error: "" });
+    setRefreshToken((previous) => previous + 1);
+  }
+
+  function handleImportReloadRequired(message: string) {
+    setRefreshRequired(true);
+    setNotice("");
+    setSaveError(message);
   }
 
   function openCreateProduct() {
@@ -902,6 +1179,8 @@ export function StockProductsWorkspace() {
       (saved) => {
         const rows = replaceProduct(saved);
         setStockEditor(null);
+        // Reveal the saved item even when it belongs to another group.
+        setSelectedStockGroup(ALL_STOCK_GROUPS);
         setStockSearch("");
         const index = rows.findIndex(
           (current) =>
@@ -941,6 +1220,7 @@ export function StockProductsWorkspace() {
       async () => {
         const payload = await writeStock("DELETE", {
           action: "delete_product",
+          confirm_hard_delete: true,
           item_id: itemId,
           period: stock.period,
           expected: {
@@ -956,6 +1236,10 @@ export function StockProductsWorkspace() {
         return itemId;
       },
       (deletedId) => {
+        const deletedKey = stockProductsRowKey(target);
+
+        // The API deletes the product and its linked SO rows atomically.
+        // Remove only the confirmed item and matching SO keys from local state.
         setWorkbook((previous) => ({
           ...previous,
           stock: {
@@ -964,14 +1248,23 @@ export function StockProductsWorkspace() {
               (row) => row.item.id !== deletedId,
             ),
           },
+          so_sheets: previous.so_sheets.map((sheet) => ({
+            ...sheet,
+            rows: sheet.rows.filter((row) => row.stock_row_key !== deletedKey),
+          })),
         }));
-        if (selectedStockKey === stockProductsRowKey(target)) {
+        if (selectedStockKey === deletedKey) {
           setSelectedStockKey(null);
         }
         setDeleteTarget(null);
         setStockPage(currentStockPage);
+
+        // Reload both Stock and SO from the database before allowing writes.
+        setRefreshRequired(true);
+        setLoadState({ loading: true, error: "" });
+        setRefreshToken((previous) => previous + 1);
       },
-      "ลบสินค้าออกจากเดือนรายงานเรียบร้อยแล้ว",
+      "ลบสินค้าและ SO ที่เชื่อมโยงแบบถาวรเรียบร้อยแล้ว",
     );
   }
 
@@ -1033,115 +1326,45 @@ export function StockProductsWorkspace() {
     );
   }
 
-  function openCreateSo() {
-    if (readOnly || saveLock.current) return;
-    clearFeedback();
-    setSoEditor({
-      id: crypto.randomUUID(),
-      sheet:
-        selectedSheet === "ALL"
-          ? STOCK_PRODUCTS_SO_SHEET_NAMES[0]
-          : selectedSheet,
-    });
-  }
-
-  async function saveSo(row: StockProductsSoRow) {
-    if (!soEditor || readOnly || saveLock.current) return;
-    const selected = stock.rows.find(
-      (current) => stockProductsRowKey(current) === row.stock_row_key,
-    );
-    if (
-      row.id !== soEditor.id ||
-      !selected ||
-      !isDatabaseId(selected.item.id)
-    ) {
-      setSaveError("กรุณาเลือกสินค้าจากสต็อก");
-      return;
-    }
-    const error = Object.values(
-      validateStockProductsSoForStock(row, stock.rows),
-    )[0];
-    if (error) {
-      setSaveError(error);
-      return;
-    }
-    const itemId = selected.item.id;
-    await runSave(
-      async () => {
-        const payload = await writeStock("POST", {
-          action: "create_so",
-          item_id: itemId,
-          period: stock.period,
-          sheet_name: row.sheet_name,
-          date_raw: String(row.date_raw).trim(),
-          customer_name: row.customer_name.trim(),
-          so_number: row.so_number.trim(),
-          quantity: row.quantity.trim(),
-          unit: row.unit.trim(),
-        });
-        const saved = payload.row;
-        if (
-          !isSoRow(saved) ||
-          saved.sheet_name !== row.sheet_name ||
-          saved.stock_row_key !== stockProductsRowKey(selected) ||
-          soSheets.some((sheet) =>
-            sheet.rows.some((current) => current.id === saved.id),
-          )
-        ) {
-          throw new StockApiError(UNCERTAIN_SAVE, true);
-        }
-        return saved;
-      },
-      (saved) => {
-        const sheets = appendStockProductsSoRow(soSheets, saved);
-        const sheet = sheets.find(
-          (current) => current.name === saved.sheet_name,
-        );
-        setWorkbook((previous) => ({ ...previous, so_sheets: sheets }));
-        setSoEditor(null);
-        setSelectedSheet(saved.sheet_name);
-        setSoSearch("");
-        setSoPage(
-          Math.max(1, Math.ceil((sheet?.rows.length ?? 0) / PAGE_SIZE)),
-        );
-      },
-      "เพิ่มรายการ SO เรียบร้อยแล้ว",
-    );
-  }
-
-  function chooseSoSheet(next: string) {
-    if (next === "ALL") {
-      setSelectedSheet("ALL");
-      setSoPage(1);
-      return;
-    }
-    const known = STOCK_PRODUCTS_SO_SHEET_NAMES.find((name) => name === next);
-    if (known !== undefined) {
-      setSelectedSheet(known);
-      setSoPage(1);
-    }
+  function chooseStockGroup(next: string) {
+    if (!stockGroupOptions.some((option) => option.value === next)) return;
+    setSelectedStockGroup(next);
+    setStockSearch("");
+    setStockPage(1);
   }
 
   return (
-    <div className="min-w-0 space-y-5">
+    <div className="w-full min-w-0 max-w-full space-y-5">
       <PageHeader
         title={COPY.title}
         description={COPY.desc}
-        actions={<><Badge variant="outline">{COPY.storage}</Badge> {activeView === "STOCK" ? (<Button variant="outline"
-                  type="button"
-                  disabled={readOnly}
-                  onClick={openCreateProduct}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  เพิ่มสินค้า
-                </Button>) : (<Button variant="outline"
-                  type="button"
-                  disabled={readOnly}
-                  onClick={openCreateSo}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  เพิ่มรายการ SO
-                </Button>)}</>}
+        actions={
+          <>
+            {/* <Badge variant="outline">{COPY.storage}</Badge> */}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={readOnly}
+              title={COPY.importHint}
+              onClick={openImportExcel}
+            >
+              <FileSpreadsheet
+                className="size-4 text-emerald-600"
+                aria-hidden="true"
+              />
+              {COPY.importExcel}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={readOnly}
+              onClick={openCreateProduct}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              เพิ่มสินค้า
+            </Button>
+          </>
+        }
       />
 
       {loadState.loading && (
@@ -1152,7 +1375,7 @@ export function StockProductsWorkspace() {
           กำลังโหลดข้อมูลจากฐานข้อมูล...
         </p>
       )}
-      {(loadState.error || refreshRequired) && (
+      {(loadState.error || (refreshRequired && !loadState.loading)) && (
         <p
           role="alert"
           className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
@@ -1207,7 +1430,8 @@ export function StockProductsWorkspace() {
             disabled={
               loadState.loading ||
               isSaving ||
-              Boolean(stockEditor || dailyEditor || soEditor || deleteTarget)
+              importOpen ||
+              Boolean(stockEditor || dailyEditor || deleteTarget)
             }
             onClick={reloadWorkbook}
           >
@@ -1216,12 +1440,11 @@ export function StockProductsWorkspace() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         {[
           { label: COPY.productCount, value: stock.rows.length, Icon: Boxes },
-          { label: COPY.dailyCount, value: movementDays, Icon: CalendarDays },
-          { label: COPY.soCount, value: soLineCount, Icon: ClipboardList },
-          { label: COPY.soSheets, value: soSheets.length, Icon: Search },
+          { label: COPY.dailyCount, value: movementDays, Icon: CalendarDays }
+  
         ].map(({ label, value, Icon }) => (
           <div
             key={label}
@@ -1238,293 +1461,221 @@ export function StockProductsWorkspace() {
         ))}
       </div>
 
-      <div
-        className="flex flex-wrap gap-2"
-        role="group"
-        aria-label="Stock products view"
+      <section
+        className="w-full min-w-0 max-w-full space-y-4"
+        aria-label={COPY.stock}
       >
-        <Button
-          type="button"
-          variant={activeView === "STOCK" ? "default" : "outline"}
-          aria-pressed={activeView === "STOCK"}
-          onClick={() => setActiveView("STOCK")}
-        >
-          <Boxes className="size-4" aria-hidden="true" />
-          {COPY.stock}
-        </Button>
-        <Button
-          type="button"
-          variant={activeView === "SO" ? "default" : "outline"}
-          aria-pressed={activeView === "SO"}
-          onClick={() => setActiveView("SO")}
-        >
-          <ClipboardList className="size-4" aria-hidden="true" />
-          {COPY.so} ({soSheets.length})
-        </Button>
-      </div>
-
-      {activeView === "STOCK" ? (
-        <section className="min-w-0 space-y-4" aria-label={COPY.stock}>
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-2 sm:max-w-xl">
-                <Label htmlFor={stockSearchId}>{COPY.stockSearch}</Label>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id={stockSearchId}
-                    type="search"
-                    autoComplete="off"
-                    value={stockSearch}
-                    onChange={(event) => {
-                      setStockSearch(event.currentTarget.value);
-                      setStockPage(1);
-                    }}
-                    placeholder={COPY.stockPlaceholder}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">
-                  {stockRows.length.toLocaleString("th-TH")}/
-                  {stock.rows.length.toLocaleString("th-TH")}{" "}
-                  {COPY.productCount}
-                </Badge>
-
-              </div>
-            </div>
-          </div>
-          <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
-              <p className="text-sm font-semibold">{COPY.stock}</p>
-              <p className="text-xs text-muted-foreground">{COPY.stockHint}</p>
-            </div>
-            <div className="max-w-full overflow-x-auto border-t border-border">
-              <Table className="min-w-560 text-xs">
-                <TableHeader className="bg-muted/40">
-                  <TableRow>
-                    <TableHead className="min-w-32">{COPY.code}</TableHead>
-                    <TableHead className="min-w-80">
-                      {COPY.productName}
-                    </TableHead>
-                    <TableHead className="min-w-24">{COPY.group}</TableHead>
-                    <TableHead className="min-w-18">{COPY.unit}</TableHead>
-                    {STOCK_COLUMNS.map((column) => (
-                      <TableHead
-                        key={column.field}
-                        className="min-w-24 text-right"
-                      >
-                        {column.label}
-                      </TableHead>
-                    ))}
-                    <TableHead className="min-w-36">{COPY.remark}</TableHead>
-                    <TableHead className="min-w-28">
-                      {COPY.dailyButton}
-                    </TableHead>
-                    <TableHead className="min-w-28 text-center">
-                      จัดการ
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stockPageRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={18}
-                        className="py-10 text-center text-muted-foreground"
-                      >
-                        {loadState.loading ? "กำลังโหลด..." : COPY.noStock}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    stockPageRows.map((row) => (
-                      <TableRow key={stockProductsRowKey(row)}>
-                        <TableCell className="font-mono text-xs">
-                          {originalCell(row.item.code)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {row.item.name.trim()}
-                        </TableCell>
-                        <TableCell>{originalCell(row.item.group)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {originalCell(row.item.unit)}
-                        </TableCell>
-                        {STOCK_COLUMNS.map((column) => (
-                          <TableCell
-                            key={column.field}
-                            className={QUANTITY_CLASSES}
-                          >
-                            {originalCell(row.summary[column.field])}
-                          </TableCell>
-                        ))}
-                        <TableCell
-                          className="max-w-48 truncate"
-                          title={row.remark}
-                        >
-                          {originalCell(row.remark)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              clearFeedback();
-                              setSelectedStockKey(stockProductsRowKey(row));
-                            }}
-                          >
-                            <CalendarDays
-                              className="size-3.5"
-                              aria-hidden="true"
-                            />
-                            {COPY.dailyButton}
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <RowActionMenu>
-                            <RowActionItem type="button" disabled={readOnly} title="แก้ไขสินค้า" aria-label={`แก้ไข ${row.item.name}`} onClick={() => openEditProduct(row)}>
-                              <Pencil className="size-4" aria-hidden="true" />
-                            แก้ไขสินค้า</RowActionItem>
-                            <RowActionItem type="button" disabled={readOnly} title="ลบสินค้า" aria-label={`ลบสินค้า ${row.item.name}`} onClick={() => openDeleteProduct(row)} className="w-full justify-start text-destructive">
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            ลบสินค้า</RowActionItem>
-                          </RowActionMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <StockProductsPagination
-              page={currentStockPage}
-              total={stockRows.length}
-              itemLabel={COPY.productCount}
-              onPageChange={setStockPage}
-            />
-          </div>
-        </section>
-      ) : (
-        <section className="min-w-0 space-y-4" aria-label={COPY.so}>
-          <div className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 sm:p-5">
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
             <SelectField
-              label={COPY.pickSheet}
-              value={selectedSheet}
-              onChange={chooseSoSheet}
-              options={SO_SHEET_OPTIONS}
+              label={COPY.stockGroup}
+              value={selectedStockGroup}
+              onChange={chooseStockGroup}
+              options={stockGroupOptions}
+              disabled={loadState.loading}
             />
-            <div className="space-y-2">
-              <Label htmlFor={soSearchId}>{COPY.soSearch}</Label>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor={stockSearchId}>
+                {selectedSoSheet ? COPY.soSearch : COPY.stockSearch}
+              </Label>
               <div className="relative">
                 <Search
                   className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
                   aria-hidden="true"
                 />
                 <Input
-                  id={soSearchId}
+                  id={stockSearchId}
                   type="search"
                   autoComplete="off"
-                  value={soSearch}
+                  value={stockSearch}
                   onChange={(event) => {
-                    setSoSearch(event.currentTarget.value);
-                    setSoPage(1);
+                    setStockSearch(event.currentTarget.value);
+                    setStockPage(1);
                   }}
-                  placeholder={COPY.soPlaceholder}
+                  placeholder={
+                    selectedSoSheet ? COPY.soPlaceholder : COPY.stockPlaceholder
+                  }
                   className="pl-9"
                 />
               </div>
             </div>
-          </div>
-          <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold">
-                  {COPY.so} ·{" "}
-                  {selectedSheet === "ALL" ? COPY.allSheets : selectedSheet}
-                </p>
-                <p className="text-xs text-muted-foreground">{COPY.soHint}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">
-                  {soRows.length.toLocaleString("th-TH")} {COPY.soCount}
-                </Badge>
-
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                {visibleRowCount.toLocaleString("th-TH")}/
+                {(selectedSoSheet
+                  ? selectedSoCount
+                  : stock.rows.length
+                ).toLocaleString("th-TH")}{" "}
+                {selectedSoSheet ? COPY.soCount : COPY.productCount}
+              </Badge>
             </div>
-            <div className="max-w-full overflow-x-auto border-t border-border">
-              <Table className="min-w-250 text-xs">
-                <TableHeader className="bg-muted/40">
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            {COPY.sheetHint}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {COPY.importHint}
+          </p>
+        </div>
+        <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
+            <p className="text-sm font-semibold">
+              {selectedSoSheet ? `รายการ SO · ${selectedSoSheet}` : COPY.stock}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {selectedSoSheet ? COPY.soHint : COPY.stockHint}
+            </p>
+          </div>
+          {selectedSoSheet ? (
+            <>
+              <StockProductsSoTable
+                rows={soPageRows}
+                stockRows={stock.rows}
+                loading={loadState.loading}
+              />
+              <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground sm:px-5">
+                รหัสสินค้าจะแสดงเฉพาะเมื่อ SO เชื่อมโยงกับ Stock ในงวดนี้ โดยตรง
+                ขีด (-) หมายถึงไม่พบรหัสที่เชื่อมโยง
+              </p>
+            </>
+          ) : (
+            <Table
+              className="min-w-560 text-xs"
+              containerProps={{
+                className: "min-w-0 max-w-full border-t border-border",
+                tabIndex: 0,
+                role: "region",
+                "aria-label": COPY.stock,
+              }}
+            >
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="min-w-24 text-center">
+                    {COPY.group}
+                  </TableHead>
+                  <TableHead className="min-w-32">{COPY.code}</TableHead>
+                  <TableHead className="min-w-80">{COPY.productName}</TableHead>
+                  <TableHead className="min-w-18">{COPY.unit}</TableHead>
+                  {STOCK_COLUMNS.map((column) => (
+                    <TableHead
+                      key={column.field}
+                      className="min-w-24 text-right"
+                    >
+                      {column.label}
+                    </TableHead>
+                  ))}
+                  <TableHead className="min-w-36">{COPY.remark}</TableHead>
+                  <TableHead className="min-w-28">{COPY.dailyButton}</TableHead>
+                  <TableHead className="min-w-28 text-center">จัดการ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockPageRows.length === 0 ? (
                   <TableRow>
-                    <TableHead className="min-w-22">{COPY.soSheets}</TableHead>
-                    <TableHead className="min-w-28">{COPY.dateRaw}</TableHead>
-                    <TableHead className="min-w-48">{COPY.customer}</TableHead>
-                    <TableHead className="min-w-36">{COPY.soNumber}</TableHead>
-                    <TableHead className="min-w-72">
-                      {COPY.productName}
-                    </TableHead>
-                    <TableHead className="min-w-20 text-right">
-                      {COPY.quantity}
-                    </TableHead>
-                    <TableHead className="min-w-16">{COPY.unit}</TableHead>
+                    <TableCell
+                      colSpan={18}
+                      className="py-10 text-center text-muted-foreground"
+                    >
+                      {loadState.loading ? "กำลังโหลด..." : COPY.noStock}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {soPageRows.length === 0 ? (
-                    <TableRow>
+                ) : (
+                  stockPageRows.map((row) => (
+                    <TableRow key={stockProductsRowKey(row)}>
+                      <TableCell className="whitespace-nowrap text-center font-medium">
+                        {originalCell(row.item.group)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {originalCell(row.item.code)}
+                      </TableCell>
+                      <TableCell className="max-w-96 whitespace-normal wrap-break-word font-medium">
+                        {row.item.name.trim()}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {originalCell(row.item.unit)}
+                      </TableCell>
+                      {STOCK_COLUMNS.map((column) => (
+                        <TableCell
+                          key={column.field}
+                          className={QUANTITY_CLASSES}
+                        >
+                          {originalCell(row.summary[column.field])}
+                        </TableCell>
+                      ))}
                       <TableCell
-                        colSpan={7}
-                        className="py-10 text-center text-muted-foreground"
+                        className="max-w-48 truncate"
+                        title={row.remark}
                       >
-                        {loadState.loading ? "กำลังโหลด..." : COPY.noSo}
+                        {originalCell(row.remark)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            clearFeedback();
+                            setSelectedStockKey(stockProductsRowKey(row));
+                          }}
+                        >
+                          <CalendarDays
+                            className="size-3.5"
+                            aria-hidden="true"
+                          />
+                          {COPY.dailyButton}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <RowActionMenu>
+                          <RowActionItem
+                            type="button"
+                            disabled={readOnly}
+                            title="แก้ไขสินค้า"
+                            aria-label={`แก้ไข ${row.item.name}`}
+                            onClick={() => openEditProduct(row)}
+                          >
+                            <Pencil className="size-4" aria-hidden="true" />
+                            แก้ไขสินค้า
+                          </RowActionItem>
+                          <RowActionItem
+                            type="button"
+                            disabled={readOnly}
+                            title="ลบสินค้า"
+                            aria-label={`ลบสินค้า ${row.item.name}`}
+                            onClick={() => openDeleteProduct(row)}
+                            className="w-full justify-start text-destructive"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                            ลบสินค้า
+                          </RowActionItem>
+                        </RowActionMenu>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    soPageRows.map((row) => (
-                      <TableRow key={stockProductsSoRowKey(row)}>
-                        <TableCell className="font-medium">
-                          {row.sheet_name}
-                        </TableCell>
-                        <TableCell
-                          className="whitespace-nowrap font-mono"
-                          title={COPY.dateHint}
-                        >
-                          {originalCell(row.date_raw)}
-                        </TableCell>
-                        <TableCell>{originalCell(row.customer_name)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {originalCell(row.so_number)}
-                        </TableCell>
-                        <TableCell>{originalCell(row.product_name)}</TableCell>
-                        <TableCell className={QUANTITY_CLASSES}>
-                          {originalCell(row.quantity)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {originalCell(row.unit)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <StockProductsPagination
-              page={currentSoPage}
-              total={soRows.length}
-              itemLabel={COPY.soCount}
-              onPageChange={setSoPage}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">{COPY.dateHint}</p>
-        </section>
-      )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+          <StockProductsPagination
+            page={currentStockPage}
+            total={visibleRowCount}
+            itemLabel={selectedSoSheet ? COPY.soCount : COPY.productCount}
+            onPageChange={setStockPage}
+          />
+        </div>
+      </section>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         {COPY.databaseHint} · {COPY.stockHint} · {COPY.soHint}
       </p>
+
+      <StockProductsImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        period={stock.period}
+        onImported={handleImported}
+        onReloadRequired={handleImportReloadRequired}
+      />
 
       <Dialog
         open={selectedStockRow !== null}
@@ -1607,23 +1758,6 @@ export function StockProductsWorkspace() {
         />
       )}
 
-      {soEditor && (
-        <StockProductsSoForm
-          key={soEditor.id}
-          id={soEditor.id}
-          initialSheet={soEditor.sheet}
-          stockRows={stock.rows}
-          onSave={(row) => {
-            void saveSo(row);
-          }}
-          onCancel={() => {
-            if (saveLock.current) return;
-            setSoEditor(null);
-            setSaveError("");
-          }}
-        />
-      )}
-
       <Dialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
@@ -1634,10 +1768,12 @@ export function StockProductsWorkspace() {
           className="w-[calc(100vw-2rem)] sm:max-w-md"
           showCloseButton={!isSaving}
         >
-          <DialogTitle>ยืนยันการลบสินค้า</DialogTitle>
+          <DialogTitle>ยืนยันการลบสินค้าถาวร</DialogTitle>
           <DialogDescription>
-            สินค้าจะถูกนำออกจากสต็อกของเดือนที่แสดง โดยไม่ลบทะเบียนสินค้า
-            ข้อมูลรับ-จ่าย หรือ SO ออกจากฐานข้อมูล
+            ระบบจะลบทะเบียนสินค้า ยอดสรุป ข้อมูลรับ-จ่ายรายวัน และ SO
+            ทุกรายการที่เชื่อมโยงกับสินค้านี้ในทุกชีต แม้ SO จะอยู่คนละเดือน
+            ไม่รวม SO จาก Excel ที่ไม่ได้เชื่อมโยงกับสินค้า
+            ข้อมูลที่ถูกลบจะไม่สามารถ เรียกคืนจากหน้านี้ได้
           </DialogDescription>
           {deleteTarget && (
             <div className="space-y-4">
@@ -1662,13 +1798,14 @@ export function StockProductsWorkspace() {
                 </Button>
                 <Button
                   type="button"
+                  variant="destructive"
                   disabled={readOnly}
                   onClick={() => {
                     void confirmDeleteProduct();
                   }}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
-                  ยืนยันการลบ
+                  {isSaving ? "กำลังลบ..." : "ลบสินค้าและ SO ถาวร"}
                 </Button>
               </div>
             </div>

@@ -1,14 +1,15 @@
 /**
- * Finished-product stock FF: UI-mock domain contracts.
+ * Finished-product stock FF: shared domain contracts.
  *
  * Source workbook: 1 finished-product summary worksheet and 16 SO worksheets.
  * Source workbook data is a snapshot, not an API or a live inventory ledger.
  *
  * IMPORTANT:
- * - SO records never deduct stock. New SO rows reference existing stock rows.
+ * - SO records never deduct stock. Manual SO rows reference existing stock rows.
+ * - Excel SO rows are independent of stock and may have an invalid source date.
  * - Item codes and names are not unique keys; use sheet and Excel row.
  * - Empty cells remain distinct from the numeric value zero.
- * - SO dates may be Excel numbers or literal text. Preserve the raw cell.
+ * - Preserve the source date text separately from the normalized document date.
  * - Source summary and daily cells are not recalculated here.
  */
 
@@ -138,17 +139,21 @@ export interface StockProductsStockSheet {
   rows: StockProductsStockRow[];
 }
 
-/** An SO date is intentionally raw: some source cells are malformed. */
+/** Display value; legacy rows may contain Excel numbers or literal text. */
 export type StockProductsSourceDate = string | number | null;
 export type StockProductsRawCell = string | number | boolean | null;
 
 export interface StockProductsSoRow {
   id?: string;
-  /** Existing stock row key; older imported SO rows may not have a link. */
+  /** Required by the manual SO form; omitted for independent Excel SO rows. */
   stock_row_key?: string;
   sheet_name: StockProductsSoSheetName;
   source_row: number;
   date_raw: StockProductsSourceDate;
+  /** Gregorian ISO date, or null when the source date cannot be resolved. */
+  document_date?: string | null;
+  /** Text read from Excel before date normalization; optional for legacy rows. */
+  source_date_text?: string;
   customer_name: string;
   so_number: string;
   product_name: string;
@@ -316,6 +321,7 @@ export function filterStockProductsSoRows(
         [
           row.sheet_name,
           row.date_raw == null ? "" : String(row.date_raw),
+          row.source_date_text ?? "",
           row.customer_name,
           row.so_number,
           row.product_name,
@@ -496,6 +502,84 @@ export function validateStockProductsSoRow(
     errors.quantity = "กรุณาระบุจำนวน";
   } else if (!Number.isFinite(Number(row.quantity))) {
     errors.quantity = "กรุณาระบุจำนวนเป็นตัวเลข";
+  }
+
+  return errors;
+}
+
+/** Validate an Excel SO row independently of stock and manual-form rules. */
+export function validateStockProductsImportedSoRow(
+  row: StockProductsSoRow,
+): StockProductsFormErrors {
+  const errors = validateStockProductsSoRow(row);
+
+  // Excel rows may preserve an invalid or empty date without inventing one.
+  // The parser supplies both date fields; legacy and manual rows need not.
+  delete errors.date_raw;
+  if (
+    typeof row.source_date_text !== "string" ||
+    row.source_date_text.includes("\0")
+  ) {
+    errors.source_date_text = "ไม่พบข้อความวันที่ต้นฉบับจาก Excel";
+  }
+
+  if (
+    row.document_date !== null &&
+    (typeof row.document_date !== "string" ||
+      row.document_date.startsWith("0000-") ||
+      !isValidStockProductsAddedDate(row.document_date))
+  ) {
+    errors.document_date = "วันที่จริงของ SO ไม่ถูกต้อง";
+  }
+
+  if (
+    typeof row.date_raw !== "string" ||
+    row.date_raw !== (row.document_date ?? row.source_date_text)
+  ) {
+    errors.date_raw = "วันที่แสดงผลไม่ตรงกับข้อมูลวันที่จาก Excel";
+  }
+
+  if (!STOCK_PRODUCTS_SO_SHEET_NAMES.includes(row.sheet_name)) {
+    errors.sheet_name = "ไม่พบชีต SO ที่รองรับ";
+  }
+
+  if (!Number.isSafeInteger(row.source_row) || row.source_row < 1) {
+    errors.source_row = "ลำดับแถว Excel ไม่ถูกต้อง";
+  }
+
+  // Source rows must not be linked by a guessed stock identity.
+  if (row.stock_row_key !== undefined) {
+    errors.stock_row_key = "รายการ SO จาก Excel ต้องไม่มีการจับคู่ Stock";
+  }
+
+  if (row.id !== undefined) {
+    errors.id = "รายการ SO จาก Excel ต้องไม่มี ID จากฐานข้อมูล";
+  }
+
+  if (
+    !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(
+      row.quantity.trim(),
+    ) ||
+    !Number.isFinite(Number(row.quantity))
+  ) {
+    errors.quantity = "กรุณาตรวจสอบค่าจำนวนสินค้าใน Excel";
+  }
+
+  const supplementaryCount =
+    STOCK_PRODUCTS_EXCEL_SO_COLUMNS.supplementary_last -
+    STOCK_PRODUCTS_EXCEL_SO_COLUMNS.supplementary_first +
+    1;
+  if (
+    row.supplementary_cells.length !== supplementaryCount ||
+    !row.supplementary_cells.every(
+      (value) =>
+        value === null ||
+        typeof value === "boolean" ||
+        (typeof value === "string" && !value.includes("\0")) ||
+        (typeof value === "number" && Number.isFinite(value)),
+    )
+  ) {
+    errors.supplementary_cells = "ข้อมูลเพิ่มเติม SO คอลัมน์ H ถึง N ไม่ถูกต้อง";
   }
 
   return errors;

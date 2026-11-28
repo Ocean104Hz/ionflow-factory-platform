@@ -16,7 +16,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_roles WHERE rolname = 'foliar_fertilizer_app'
+    SELECT 1
+    FROM pg_roles
+    WHERE rolname = 'foliar_fertilizer_app'
   ) THEN
     RAISE EXCEPTION 'Runtime role foliar_fertilizer_app does not exist';
   END IF;
@@ -24,10 +26,10 @@ END $$;
 
 
 -- ==================================================
--- 1. CUSTOMER MASTER
+-- 1. STOCK CUSTOMER MASTER
 -- ==================================================
 
-CREATE TABLE foliar_fertilizer.m_customers (
+CREATE TABLE foliar_fertilizer.m_stock_customers (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
   customer_code text UNIQUE,
@@ -42,10 +44,10 @@ CREATE TABLE foliar_fertilizer.m_customers (
 
 
 -- ==================================================
--- 2. ITEM MASTER
+-- 2. STOCK ITEM MASTER
 -- ==================================================
 
-CREATE TABLE foliar_fertilizer.m_items (
+CREATE TABLE foliar_fertilizer.m_stock_items (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
   item_code text,
@@ -73,6 +75,7 @@ CREATE TABLE foliar_fertilizer.m_items (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 
 -- ==================================================
 -- 3. STOCK LOCATION MASTER
@@ -116,7 +119,7 @@ CREATE TABLE foliar_fertilizer.m_stock_documents (
   document_date date,
 
   customer_id bigint
-    REFERENCES foliar_fertilizer.m_customers(id)
+    REFERENCES foliar_fertilizer.m_stock_customers(id)
     ON DELETE RESTRICT,
 
   reference_document_id bigint
@@ -139,6 +142,7 @@ CREATE TABLE foliar_fertilizer.m_stock_documents (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+
 -- ==================================================
 -- 5. STOCK DOCUMENT LINES
 -- ==================================================
@@ -154,7 +158,7 @@ CREATE TABLE foliar_fertilizer.r_stock_document_lines (
   line_no integer NOT NULL CHECK (line_no > 0),
 
   item_id bigint
-    REFERENCES foliar_fertilizer.m_items(id)
+    REFERENCES foliar_fertilizer.m_stock_items(id)
     ON DELETE RESTRICT,
 
   source_line_id bigint
@@ -171,7 +175,7 @@ CREATE TABLE foliar_fertilizer.r_stock_document_lines (
   ),
 
   owner_customer_id bigint
-    REFERENCES foliar_fertilizer.m_customers(id)
+    REFERENCES foliar_fertilizer.m_stock_customers(id)
     ON DELETE RESTRICT,
 
   -- Stock locations
@@ -240,8 +244,8 @@ CREATE TABLE foliar_fertilizer.r_stock_document_lines (
 -- 6. INDEXES
 -- ==================================================
 
-CREATE INDEX idx_m_items_item_type
-  ON foliar_fertilizer.m_items (
+CREATE INDEX idx_m_stock_items_item_type
+  ON foliar_fertilizer.m_stock_items (
     item_type
   );
 
@@ -276,8 +280,8 @@ CREATE INDEX idx_r_stock_document_lines_owner_customer
 -- ==================================================
 
 REVOKE ALL ON TABLE
-  foliar_fertilizer.m_customers,
-  foliar_fertilizer.m_items,
+  foliar_fertilizer.m_stock_customers,
+  foliar_fertilizer.m_stock_items,
   foliar_fertilizer.m_stock_locations,
   foliar_fertilizer.m_stock_documents,
   foliar_fertilizer.r_stock_document_lines
@@ -285,8 +289,8 @@ FROM PUBLIC;
 
 
 REVOKE ALL ON SEQUENCE
-  foliar_fertilizer.m_customers_id_seq,
-  foliar_fertilizer.m_items_id_seq,
+  foliar_fertilizer.m_stock_customers_id_seq,
+  foliar_fertilizer.m_stock_items_id_seq,
   foliar_fertilizer.m_stock_locations_id_seq,
   foliar_fertilizer.m_stock_documents_id_seq,
   foliar_fertilizer.r_stock_document_lines_id_seq
@@ -298,8 +302,8 @@ TO foliar_fertilizer_app;
 
 
 GRANT SELECT, INSERT, UPDATE ON TABLE
-  foliar_fertilizer.m_customers,
-  foliar_fertilizer.m_items,
+  foliar_fertilizer.m_stock_customers,
+  foliar_fertilizer.m_stock_items,
   foliar_fertilizer.m_stock_locations,
   foliar_fertilizer.m_stock_documents,
   foliar_fertilizer.r_stock_document_lines
@@ -307,8 +311,8 @@ TO foliar_fertilizer_app;
 
 
 GRANT USAGE ON SEQUENCE
-  foliar_fertilizer.m_customers_id_seq,
-  foliar_fertilizer.m_items_id_seq,
+  foliar_fertilizer.m_stock_customers_id_seq,
+  foliar_fertilizer.m_stock_items_id_seq,
   foliar_fertilizer.m_stock_locations_id_seq,
   foliar_fertilizer.m_stock_documents_id_seq,
   foliar_fertilizer.r_stock_document_lines_id_seq

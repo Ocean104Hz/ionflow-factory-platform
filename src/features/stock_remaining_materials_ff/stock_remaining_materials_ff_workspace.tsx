@@ -7,6 +7,7 @@ import {
   PackagePlus,
   RotateCcw,
   Save,
+  Trash2,
 } from "lucide-react";
 
 import { PageHeader } from "@/src/components/factory/patterns";
@@ -317,14 +318,22 @@ function rowsByRef(rows: readonly StockMaterialRow[]) {
 function changedMaterialRows(
   saved: StockMaterialSheet,
   draft: StockMaterialSheet,
+  deleteRefs: readonly StockMaterialRowRef[],
 ) {
   if (saved.id !== draft.id) throw new MaterialApiError("เดือนรายงานไม่ตรงกัน");
   const previous = rowsByRef(saved.rows);
   const current = rowsByRef(draft.rows);
+  const deleting = new Set(deleteRefs);
+  // A missing row is never enough to authorize deletion. Each removed saved
+  // row must have been explicitly selected by the user in this draft.
   if (
     previous.size !== saved.rows.length ||
     current.size !== draft.rows.length ||
-    [...previous.keys()].some((key) => !current.has(key))
+    deleting.size !== deleteRefs.length ||
+    deleteRefs.some((ref) => !previous.has(ref) || current.has(ref)) ||
+    [...previous.keys()].some(
+      (ref) => !current.has(ref) && !deleting.has(ref),
+    )
   ) {
     throw new MaterialApiError("รายการวัสดุไม่ถูกต้อง กรุณาตรวจสอบฉบับร่าง");
   }
@@ -337,17 +346,25 @@ function changedMaterialRows(
 async function persistMaterialSheet(
   saved: MaterialSnapshot,
   draft: StockMaterialSheet,
+  deleteRefs: readonly StockMaterialRowRef[],
+  confirmHardDelete: boolean,
 ): Promise<MaterialSnapshot> {
-  const changes = changedMaterialRows(saved.sheet, draft);
-  if (changes.length === 0) return saved;
+  const changes = changedMaterialRows(saved.sheet, draft, deleteRefs);
+  if (deleteRefs.length > 0 && !confirmHardDelete) {
+    throw new MaterialApiError("กรุณายืนยันการลบวัสดุถาวรก่อนบันทึก");
+  }
+  if (changes.length === 0 && deleteRefs.length === 0) return saved;
   const body = JSON.stringify({
     action: "save_sheet",
     period: draft.period,
     expected_revision: saved.revision,
     changes,
+    ...(deleteRefs.length > 0
+      ? { delete_refs: deleteRefs, confirm_hard_delete: true }
+      : {}),
   });
   if (
-    changes.length > MAX_CHANGED_ROWS ||
+    changes.length + deleteRefs.length > MAX_CHANGED_ROWS ||
     new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES
   ) {
     throw new MaterialApiError(
@@ -367,6 +384,12 @@ async function persistMaterialSheet(
     true,
   );
   const snapshot = readApiSnapshot(payload, draft.period, true);
+  if (
+    deleteRefs.length > 0 &&
+    (!isRecord(payload) || payload.deleted !== deleteRefs.length)
+  ) {
+    throw new MaterialApiError(UNCERTAIN_SAVE, true);
+  }
   const expected = rowsByRef(draft.rows);
   const actual = rowsByRef(snapshot.sheet.rows);
   if (
@@ -422,6 +445,8 @@ export function StockRemainingMaterialsFfWorkspace() {
   const [selectedDailyRowRef, setSelectedDailyRowRef] =
     useState<StockMaterialRowRef | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [deleteRefs, setDeleteRefs] = useState<StockMaterialRowRef[]>([]);
+  const [confirmDeleteSaveOpen, setConfirmDeleteSaveOpen] = useState(false);
   const [pendingFilters, setPendingFilters] =
     useState<StockMaterialFilterValues | null>(null);
   const [errors, setErrors] = useState<StockMaterialValidationErrors>({});
@@ -433,13 +458,20 @@ export function StockRemainingMaterialsFfWorkspace() {
     () =>
       Boolean(
         savedSheet &&
-        JSON.stringify(draft.rows) !== JSON.stringify(savedSheet.rows),
+        (deleteRefs.length > 0 ||
+          JSON.stringify(draft.rows) !== JSON.stringify(savedSheet.rows)),
       ),
-    [draft.rows, savedSheet],
+    [deleteRefs.length, draft.rows, savedSheet],
   );
   const busy = loadState.loading || isSaving;
   const readOnly =
     busy || Boolean(loadState.error) || refreshRequired || !savedSnapshot;
+  const pendingDeletedRows = useMemo(() => {
+    const deleting = new Set(deleteRefs);
+    return (savedSheet?.rows ?? []).filter((row) =>
+      deleting.has(stockMaterialRowRef(row)),
+    );
+  }, [deleteRefs, savedSheet]);
   const reloadPending =
     pendingFilters !== null &&
     stockMaterialPeriodKey(pendingFilters.period) ===
@@ -474,6 +506,8 @@ export function StockRemainingMaterialsFfWorkspace() {
         if (controller.signal.aborted) return;
         setSavedSnapshot(snapshot);
         setDraft(structuredClone(snapshot.sheet));
+        setDeleteRefs([]);
+        setConfirmDeleteSaveOpen(false);
         setLoadState({ loading: false, error: "" });
         setRefreshRequired(false);
       })
@@ -512,6 +546,8 @@ export function StockRemainingMaterialsFfWorkspace() {
     setSelectedDailyRowRef(null);
     setIsCreateOpen(false);
     setPendingFilters(null);
+    setDeleteRefs([]);
+    setConfirmDeleteSaveOpen(false);
     setErrors({});
     setNotice(null);
     setLoadPeriod({ ...nextFilters.period });
@@ -522,6 +558,7 @@ export function StockRemainingMaterialsFfWorkspace() {
       loadLock.current ||
       saveLock.current ||
       isCreateOpen ||
+      confirmDeleteSaveOpen ||
       selectedDailyRow
     )
       return;
@@ -533,8 +570,15 @@ export function StockRemainingMaterialsFfWorkspace() {
   }
 
   function handleFiltersChange(nextFilters: StockMaterialFilterValues) {
-    if (loadLock.current || saveLock.current || isCreateOpen || pendingFilters)
+    if (
+      loadLock.current ||
+      saveLock.current ||
+      isCreateOpen ||
+      pendingFilters ||
+      confirmDeleteSaveOpen
+    ) {
       return;
+    }
     const currentKey = stockMaterialPeriodKey(filters.period);
     const nextKey = stockMaterialPeriodKey(nextFilters.period);
 
@@ -633,8 +677,44 @@ export function StockRemainingMaterialsFfWorkspace() {
     }
   }
 
+  function stageDeleteMaterial(rowRef: StockMaterialRowRef) {
+    if (
+      readOnly ||
+      loadLock.current ||
+      saveLock.current ||
+      !savedSheet ||
+      pendingFilters ||
+      confirmDeleteSaveOpen ||
+      isCreateOpen
+    ) {
+      return;
+    }
+    if (!draft.rows.some((row) => stockMaterialRowRef(row) === rowRef)) return;
+
+    const isSaved = savedSheet.rows.some(
+      (row) => stockMaterialRowRef(row) === rowRef,
+    );
+    if (isSaved) {
+      setDeleteRefs((current) =>
+        current.includes(rowRef) ? current : [...current, rowRef],
+      );
+    }
+    setDraft((current) => ({
+      ...current,
+      rows: current.rows.filter((row) => stockMaterialRowRef(row) !== rowRef),
+    }));
+    setSelectedDailyRowRef(null);
+    setErrors({});
+    setNotice({
+      tone: "draft",
+      text: isSaved
+        ? "นำวัสดุออกจากฉบับร่างแล้ว ระบบจะลบข้อมูลถาวรเมื่อยืนยันการบันทึกเท่านั้น"
+        : "นำวัสดุที่ยังไม่ได้บันทึกออกจากฉบับร่างแล้ว ไม่มีข้อมูลในฐานข้อมูลถูกลบ",
+    });
+  }
+
   function handleDiscard() {
-    if (loadLock.current || saveLock.current) return;
+    if (loadLock.current || saveLock.current || confirmDeleteSaveOpen) return;
     if (!savedSheet) {
       setNotice({
         tone: "error",
@@ -644,6 +724,8 @@ export function StockRemainingMaterialsFfWorkspace() {
     }
 
     setDraft(structuredClone(savedSheet));
+    setDeleteRefs([]);
+    setConfirmDeleteSaveOpen(false);
     setSelectedDailyRowRef(null);
     setIsCreateOpen(false);
     setErrors({});
@@ -653,7 +735,7 @@ export function StockRemainingMaterialsFfWorkspace() {
     });
   }
 
-  async function handleSave() {
+  async function handleSave(confirmHardDelete = false) {
     if (
       readOnly ||
       loadLock.current ||
@@ -662,7 +744,8 @@ export function StockRemainingMaterialsFfWorkspace() {
       !hasUnsavedChanges ||
       isCreateOpen ||
       selectedDailyRow ||
-      pendingFilters
+      pendingFilters ||
+      confirmDeleteSaveOpen !== confirmHardDelete
     )
       return;
 
@@ -676,17 +759,31 @@ export function StockRemainingMaterialsFfWorkspace() {
       return;
     }
 
+    if (deleteRefs.length > 0 && !confirmHardDelete) {
+      setConfirmDeleteSaveOpen(true);
+      return;
+    }
+
     saveLock.current = true;
     setIsSaving(true);
+    setConfirmDeleteSaveOpen(false);
     setNotice(null);
     try {
-      const snapshot = await persistMaterialSheet(savedSnapshot, draft);
+      const snapshot = await persistMaterialSheet(
+        savedSnapshot,
+        draft,
+        deleteRefs,
+        confirmHardDelete,
+      );
       setSavedSnapshot(snapshot);
       setDraft(structuredClone(snapshot.sheet));
+      setDeleteRefs([]);
       setErrors({});
       setNotice({
         tone: "success",
-        text: "บันทึกวัสดุ ยอดสรุป และรายละเอียดรายวันลงฐานข้อมูลเรียบร้อยแล้ว",
+        text: deleteRefs.length > 0
+          ? `บันทึกข้อมูลและลบวัสดุถาวร ${deleteRefs.length.toLocaleString("th-TH")} รายการ`
+          : "บันทึกวัสดุ ยอดสรุป และรายละเอียดรายวันลงฐานข้อมูลเรียบร้อยแล้ว",
       });
     } catch (error) {
       if (!(error instanceof MaterialApiError) || error.reloadRequired) {
@@ -786,6 +883,11 @@ export function StockRemainingMaterialsFfWorkspace() {
                   ? "มีการแก้ไขที่ยังไม่ได้บันทึก"
                   : "ข้อมูลตรงกับฉบับล่าสุดที่โหลดจากฐานข้อมูล"}
           </p>
+          {deleteRefs.length > 0 && (
+            <p className="text-xs font-medium text-destructive" role="status">
+              รอลบถาวรเมื่อบันทึก {deleteRefs.length.toLocaleString("th-TH")} รายการ
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -817,6 +919,7 @@ export function StockRemainingMaterialsFfWorkspace() {
               readOnly ||
               !hasUnsavedChanges ||
               isCreateOpen ||
+              confirmDeleteSaveOpen ||
               Boolean(selectedDailyRow)
             }
           >
@@ -841,7 +944,7 @@ export function StockRemainingMaterialsFfWorkspace() {
               : notice.tone === "error"
                 ? "ต้องตรวจสอบข้อมูล"
                 : notice.tone === "draft"
-                  ? "เพิ่มวัสดุในฉบับร่างแล้ว"
+                  ? "ปรับปรุงฉบับร่างแล้ว"
                   : "ยกเลิกการแก้ไขแล้ว"}
           </AlertTitle>
           <AlertDescription>{notice.text}</AlertDescription>
@@ -921,6 +1024,22 @@ export function StockRemainingMaterialsFfWorkspace() {
                 ข้อมูลรับ-จ่ายรายวันของวัสดุในเดือนที่เลือก
                 การแก้ไขจะยังไม่ถูกบันทึกจนกว่าจะกดบันทึกจากหน้าหลัก
               </DialogDescription>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 p-3">
+                <p className="text-xs text-muted-foreground">
+                  สามารถยกเลิกการแก้ไขเพื่อคืนข้อมูลได้ก่อนบันทึก
+                </p>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={readOnly}
+                  onClick={() =>
+                    stageDeleteMaterial(stockMaterialRowRef(selectedDailyRow))
+                  }
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  นำวัสดุออกจากฉบับร่าง
+                </Button>
+              </div>
               <StockRemainingMaterialsFfDailyDetail
                 sheet={draft}
                 row={selectedDailyRow}
@@ -935,11 +1054,63 @@ export function StockRemainingMaterialsFfWorkspace() {
       </Dialog>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        ข้อมูลจากฐานข้อมูล · การเพิ่มและแก้ไขอยู่ในฉบับร่างจนกว่าจะกดบันทึก ·
+        ข้อมูลจากฐานข้อมูล · การเพิ่ม แก้ไข และลบอยู่ในฉบับร่างจนกว่าจะกดบันทึก ·
         รายการเดิมแยกด้วยเลขแถว Excel และรายการที่สร้างผ่านเว็บใช้ client_id ·
         เพิ่มวัสดุเฉพาะเดือนที่เลือก · ไม่คำนวณราคาหรือยอดคงเหลืออัตโนมัติ ·
         ไม่ได้นำเข้าข้อมูล Excel หรือ Mock โดยอัตโนมัติ
       </p>
+
+      <AlertDialog
+        open={confirmDeleteSaveOpen}
+        onOpenChange={(open) => {
+          if (!open && !saveLock.current) setConfirmDeleteSaveOpen(false);
+        }}
+      >
+        <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันบันทึกและลบวัสดุถาวร</AlertDialogTitle>
+            <AlertDialogDescription>
+              ระบบจะลบทะเบียนวัสดุ ยอดสรุป และข้อมูลรับ-จ่ายรายวันของรายการด้านล่างออกจากฐานข้อมูลในเดือนที่เลือก พร้อมบันทึกการเพิ่มและแก้ไขทั้งหมด การลบที่บันทึกสำเร็จแล้วไม่สามารถเรียกคืนจากหน้านี้ได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 rounded-lg border bg-muted/25 p-3 text-sm">
+            <p className="font-medium">
+              {periodLabel(draft.period)} ({deleteRefs.length.toLocaleString("th-TH")} รายการ)
+            </p>
+            <ul className="max-h-48 space-y-2 overflow-y-auto">
+              {pendingDeletedRows.map((row) => (
+                <li
+                  key={stockMaterialRowRef(row)}
+                  className="border-b pb-2 wrap-break-word last:border-b-0 last:pb-0"
+                >
+                  {row.item.name}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {row.item.code ?? "-"} ·{" "}
+                    {row.item.client_id ?? `Excel ${row.item.source_row}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>กลับไปยังฉบับร่าง</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={
+                readOnly ||
+                pendingDeletedRows.length !== deleteRefs.length ||
+                deleteRefs.length === 0
+              }
+              onClick={() => {
+                void handleSave(true);
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              บันทึกและลบถาวร
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={pendingFilters !== null}
