@@ -256,7 +256,7 @@ export function NCReportHistory({
       <CardContent className="min-w-0 space-y-3 p-4">
         <div className="grid items-start gap-3 sm:grid-cols-2 @[900px]/main:grid-cols-4">
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="nc-search">
+            <Label htmlFor="nc-search" className="leading-relaxed">
               ค้นหา
             </Label>
 
@@ -272,7 +272,7 @@ export function NCReportHistory({
             />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 [&_label]:leading-relaxed [&_button]:h-9 [&_button]:rounded-lg">
             <ThaiBuddhistDatePicker
               label="จากวันที่"
               value={filters.from}
@@ -280,7 +280,7 @@ export function NCReportHistory({
             />
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 [&_label]:leading-relaxed [&_button]:h-9 [&_button]:rounded-lg">
             <ThaiBuddhistDatePicker
               label="ถึงวันที่"
               value={filters.to}
@@ -290,7 +290,7 @@ export function NCReportHistory({
           </div>
 
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="nc-page-size">
+            <Label htmlFor="nc-page-size" className="leading-relaxed">
               แสดงต่อหน้า
             </Label>
 
@@ -303,7 +303,7 @@ export function NCReportHistory({
             >
               <SelectTrigger
                 id="nc-page-size"
-                className="w-full rounded-lg"
+                className="h-9 w-full rounded-lg"
               >
                 <SelectValue />
               </SelectTrigger>

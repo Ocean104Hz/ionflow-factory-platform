@@ -1,30 +1,56 @@
+
 // NAN_LAB_ITECH_THEME_V1
 
 "use client";
 
-import { RowActionItem, RowActionMenu } from "@/src/components/factory/row-action-menu";
 import { useState } from "react";
 
 import {
+  ChevronDown,
   Download,
   FileText,
   Pencil,
   Printer,
-  Search,
   Trash2,
 } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import { Label } from "@/src/components/ui/label";
-import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
 
 import {
-  SectionCard,
-  FactoryDataTable,
-  Pagination,
-  SelectField,
-} from "@/src/components/factory/patterns";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/src/components/ui/card";
+
+import { Input } from "@/src/components/ui/input";
+import { Label } from "@/src/components/ui/label";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/src/components/ui/table";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
+
+import ThaiBuddhistDatePicker from "@/src/components/ui/thai-buddhist-date-picker";
 
 import {
   emptyLabFilters,
@@ -35,6 +61,15 @@ import {
   type LabSampleReceivingSheet,
   type LabSampleHistoryFilters,
 } from "./lab_sample_receiving_domain";
+
+const headClass =
+  "h-11 whitespace-nowrap px-4 py-3 text-sm font-semibold text-white";
+
+const cellClass =
+  "px-4 py-3 align-top text-sm";
+
+const menuItemClass =
+  "min-h-10 cursor-pointer gap-2.5 rounded-lg px-3 py-2 text-sm focus:bg-muted focus:text-foreground";
 
 /* ---------------- types ---------------- */
 
@@ -95,31 +130,19 @@ export function LabSampleReceivingHistory({
   onPrint,
   onDelete,
 }: Props) {
-  /* ---------------- filter state ---------------- */
-
-  const [draftFilters, setDraftFilters] =
-    useState<LabSampleHistoryFilters>(() => ({
-      ...emptyLabFilters,
-    }));
-
   const [filters, setFilters] =
     useState<LabSampleHistoryFilters>(() => ({
       ...emptyLabFilters,
     }));
 
-  const [filterError, setFilterError] = useState("");
-
-  /* ---------------- pagination state ---------------- */
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  /* ---------------- derived data ---------------- */
+  const filterError = labFilterError(filters);
 
-  const filteredRecords = filterLabSheets(
-    records,
-    filters,
-  );
+  const filteredRecords = filterError
+    ? []
+    : filterLabSheets(records, filters);
 
   const paginated = paginateLabSheets(
     filteredRecords,
@@ -127,299 +150,399 @@ export function LabSampleReceivingHistory({
     pageSize,
   );
 
-  /* ---------------- filter actions ---------------- */
+  const pages = Math.max(
+    1,
+    Math.ceil(filteredRecords.length / pageSize),
+  );
 
-  function handleSearch() {
-    const error = labFilterError(draftFilters);
+  const activeFilter = Boolean(
+    filters.search ||
+    filters.from ||
+    filters.to,
+  );
 
-    setFilterError(error);
+  function updateFilter<K extends keyof LabSampleHistoryFilters>(
+    key: K,
+    value: LabSampleHistoryFilters[K],
+  ) {
+    setFilters((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
 
-    if (error) {
-      return;
-    }
-
-    setFilters({ ...draftFilters });
     setPage(1);
   }
-
-  function handleResetFilters() {
-    setDraftFilters({ ...emptyLabFilters });
-    setFilters({ ...emptyLabFilters });
-
-    setFilterError("");
-    setPage(1);
-  }
-
-  /* ---------------- render ---------------- */
 
   return (
-    <div className="min-w-0 space-y-4">
-      {/* Search and Filters */}
+    <Card className="min-w-0 gap-0 rounded-xl border bg-card py-0 shadow-sm">
+      <CardHeader className="border-b px-4 py-3 [.border-b]:pb-3">
+        <CardTitle className="text-base font-semibold">
+          <h2>ข้อมูลที่บันทึก</h2>
+        </CardTitle>
+      </CardHeader>
 
-      <SectionCard
-        contentClassName="space-y-4"
-        title="ประวัติแบบบันทึกรับตัวอย่าง"
-        subtitle={`พบ ${filteredRecords.length} จาก ${records.length} เอกสาร`}
-      >
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleSearch();
-          }}
-        >
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {/* Search */}
+      <CardContent className="min-w-0 space-y-3 p-4">
+        {/* Search and Filters */}
 
-            <div className="grid min-w-0 content-start gap-2">
-              <Label htmlFor="lab-history-search">
-                ค้นหา
-              </Label>
+        <div className="grid items-start gap-3 sm:grid-cols-2 @[900px]/main:grid-cols-[1.35fr_1fr_1fr_0.65fr]">
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="lab-history-search">
+              ค้นหา
+            </Label>
 
-              <Input
-                id="lab-history-search"
-                value={draftFilters.search}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({
-                    ...current,
-                    search: event.currentTarget.value,
-                  }))
-                }
-                placeholder="คำขอ / รหัสตัวอย่าง / ชื่อ..."
-              />
-            </div>
-
-            {/* From Date */}
-            <div className="factory-itech-date-filter min-w-0">
-              <ThaiBuddhistDatePicker label="จากวันที่บันทึก" value={draftFilters.from} onChange={(value) => setDraftFilters((current) => ({ ...current, from: value }))} />
-            </div>
-
-            {/* To Date */}
-            <div className="factory-itech-date-filter min-w-0">
-              <ThaiBuddhistDatePicker label="ถึงวันที่บันทึก" value={draftFilters.to} onChange={(value) => setDraftFilters((current) => ({ ...current, to: value }))} error={filterError || undefined} />
-            </div>
-
-            <div className="min-w-0">
-              <SelectField
-                label="แสดงต่อหน้า"
-                value={String(pageSize)}
-                onChange={(value) => {
-                  setPageSize(Number(value));
-                  setPage(1);
-                }}
-                options={[5, 10, 20, 50, 100].map(
-                  (number) => ({
-                    value: String(number),
-                    label: `${number} รายการ`,
-                  }),
-                )}
-              />
-            </div>
+            <Input
+              id="lab-history-search"
+              className="h-9 rounded-lg"
+              placeholder="ค้นหา (เลขที่คำขอ/ชื่อ/รหัสตัวอย่าง)"
+              value={filters.search}
+              onChange={(event) =>
+                updateFilter(
+                  "search",
+                  event.currentTarget.value,
+                )
+              }
+            />
           </div>
 
-            {/* Actions */}
+          <div className="min-w-0 [&>div>label]:leading-none">
+            <ThaiBuddhistDatePicker
+              label="จากวันที่"
+              value={filters.from}
+              onChange={(value) =>
+                updateFilter("from", value)
+              }
+            />
+          </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button type="submit">
-                <Search
-                  className="size-4"
-                  aria-hidden="true"
-                />
-                ค้นหา
-              </Button>
+          <div className="min-w-0 [&>div>label]:leading-none">
+            <ThaiBuddhistDatePicker
+              label="ถึงวันที่"
+              value={filters.to}
+              onChange={(value) =>
+                updateFilter("to", value)
+              }
+              error={filterError || undefined}
+            />
+          </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleResetFilters}
-              >
-                ล้างตัวกรอง
-              </Button>
-            </div>
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="lab-history-page-size">
+              ต่อหน้า
+            </Label>
 
-          {/* Filter Error */}
-
-          {filterError && (
-            <p
-              id="lab-history-filter-error"
-              role="alert"
-              className="sr-only"
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setPage(1);
+              }}
             >
-              {filterError}
-            </p>
-          )}
-        </form>
+              <SelectTrigger
+                id="lab-history-page-size"
+                className="h-9 w-full rounded-lg"
+              >
+                <SelectValue />
+              </SelectTrigger>
 
-        <p className="text-sm text-muted-foreground">ทั้งหมด <span className="font-semibold text-foreground">{filteredRecords.length}</span> เอกสาร</p>
+              <SelectContent>
+                {[5, 10, 20, 50, 100].map((number) => (
+                  <SelectItem
+                    key={number}
+                    value={String(number)}
+                  >
+                    {number} รายการ
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-      {/* History Table */}
+        {filterError && (
+          <p role="alert" className="text-sm text-danger">
+            {filterError}
+          </p>
+        )}
 
-        <FactoryDataTable variant="history"
-        rows={paginated.items}
-        rowKey={(sheet) => sheet.id}
-        minWidth={1200}
-        columns={[
-          {
-            key: "request_no",
-            label: "เลขที่คำขอ",
-            render: (sheet) => {
+        {/* History Table */}
+
+        <Table
+          className="min-w-225 table-fixed text-foreground"
+          containerProps={{
+            className: "rounded-lg border",
+            role: "region",
+            "aria-label":
+              "ตารางประวัติแบบบันทึกรับตัวอย่าง เลื่อนแนวนอนเพื่อดูข้อมูล",
+            tabIndex: 0,
+          }}
+        >
+          <TableHeader>
+            <TableRow className="border-0 bg-[#173b63] hover:bg-[#173b63]">
+              <TableHead className={`${headClass} w-[18%]`}>
+                เลขที่คำขอ
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[13%]`}>
+                วันที่บันทึก
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[13%] text-center`}>
+                จำนวนตัวอย่าง
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[19%]`}>
+                ชื่อตัวอย่าง
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[13%]`}>
+                รหัสตัวอย่าง
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[12%]`}>
+                อัปเดตล่าสุด
+              </TableHead>
+
+              <TableHead className={`${headClass} w-[12%] text-center`}>
+                จัดการ
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {paginated.items.map((sheet) => {
               const requestNumbers = getUniqueValues(
                 sheet,
                 "request_no",
               );
 
-              return (
-                <div className="max-w-44 whitespace-normal break-all">
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto max-w-full justify-start whitespace-normal break-all p-0 text-left"
-                    title={requestNumbers.join(", ")}
-                    onClick={() => onView(sheet)}
-                  >
-                    {summarizeValues(requestNumbers)}
-                  </Button>
-
-                  <p
-                    className="mt-1 truncate text-xs text-muted-foreground"
-                    title={sheet.id}
-                  >
-                    ID: {sheet.id}
-                  </p>
-                </div>
-              );
-            },
-          },
-
-          {
-            key: "created_at",
-            label: "วันที่บันทึก",
-            render: (sheet) => (
-              <span className="whitespace-nowrap">
-                {formatLabDateTime(sheet.created_at)}
-              </span>
-            ),
-          },
-
-          {
-            key: "sample_count",
-            label: "จำนวนตัวอย่าง",
-            numeric: true,
-            render: (sheet) => (
-              <span className="font-medium tabular-nums">
-                {sheet.rows.length}
-              </span>
-            ),
-          },
-
-          {
-            key: "sample_name",
-            label: "ชื่อตัวอย่าง",
-            render: (sheet) => (
-              <div
-                className="max-w-60 whitespace-normal wrap-break-word"
-                title={getSampleNames(sheet)}
-              >
-                <p className="line-clamp-2">
-                  {getSampleNames(sheet)}
-                </p>
-              </div>
-            ),
-          },
-
-          {
-            key: "sample_code",
-            label: "รหัสตัวอย่าง",
-            render: (sheet) => {
               const sampleCodes = getUniqueValues(
                 sheet,
                 "sample_code",
               );
 
+              const sampleNames = getSampleNames(sheet);
+
               return (
-                <span
-                  className="block max-w-40 whitespace-normal break-all"
-                  title={sampleCodes.join(", ")}
+                <TableRow
+                  key={sheet.id}
+                  className="border-border/60 hover:bg-muted/40"
                 >
-                  {summarizeValues(sampleCodes)}
-                </span>
+                  {/* Request Number */}
+
+                  <TableCell className={cellClass}>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => onView(sheet)}
+                      className="block h-auto w-full overflow-hidden text-ellipsis whitespace-nowrap p-0 text-left font-medium text-foreground"
+                      title={requestNumbers.join(", ")}
+                    >
+                      {summarizeValues(requestNumbers)}
+                    </Button>
+
+                    <p
+                      className="truncate text-xs text-muted-foreground"
+                      title={sheet.id}
+                    >
+                      ID: {sheet.id}
+                    </p>
+                  </TableCell>
+
+                  {/* Created Date */}
+
+                  <TableCell className={cellClass}>
+                    <span className="whitespace-nowrap">
+                      {formatLabDateTime(sheet.created_at)}
+                    </span>
+                  </TableCell>
+
+                  {/* Sample Count */}
+
+                  <TableCell className={`${cellClass} text-center`}>
+                    <span className="font-medium tabular-nums">
+                      {sheet.rows.length}
+                    </span>
+                  </TableCell>
+
+                  {/* Sample Name */}
+
+                  <TableCell className={cellClass}>
+                    <p
+                      className="truncate font-medium"
+                      title={sampleNames}
+                    >
+                      {sampleNames}
+                    </p>
+                  </TableCell>
+
+                  {/* Sample Code */}
+
+                  <TableCell className={cellClass}>
+                    <p
+                      className="truncate font-medium"
+                      title={sampleCodes.join(", ")}
+                    >
+                      {summarizeValues(sampleCodes)}
+                    </p>
+                  </TableCell>
+
+                  {/* Updated Date */}
+
+                  <TableCell className={cellClass}>
+                    <span className="whitespace-nowrap">
+                      {formatLabDateTime(sheet.updated_at)}
+                    </span>
+                  </TableCell>
+
+                  {/* Actions */}
+
+                  <TableCell className={`${cellClass} text-center`}>
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 gap-1.5 rounded-xl border-[#a6bf49] bg-muted/40 px-2.5 text-xs font-medium text-[#173b63]! shadow-none hover:bg-muted hover:text-[#173b63]! data-[state=open]:border-[#a6bf49] data-[state=open]:bg-muted dark:text-foreground! dark:hover:text-foreground!"
+                          aria-label={`จัดการ ${summarizeValues(requestNumbers)}`}
+                        >
+                          จัดการ
+
+                          <ChevronDown
+                            aria-hidden="true"
+                            className="size-3.5"
+                          />
+                        </Button>
+                      </DropdownMenuTrigger>
+
+                      <DropdownMenuContent
+                        align="end"
+                        sideOffset={8}
+                        className="w-52 max-w-[calc(100vw-24px)] rounded-xl border bg-card p-1.5 text-foreground shadow-md"
+                      >
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          onSelect={() => onView(sheet)}
+                        >
+                          <FileText
+                            aria-hidden="true"
+                            className="text-current"
+                          />
+                          ดูรายงาน
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          onSelect={() => onPrint(sheet)}
+                        >
+                          <Printer
+                            aria-hidden="true"
+                            className="text-current"
+                          />
+                          พิมพ์เอกสาร
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          onSelect={() => onEdit(sheet)}
+                        >
+                          <Pencil
+                            aria-hidden="true"
+                            className="text-current"
+                          />
+                          แก้ไข
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          className={menuItemClass}
+                          disabled
+                          title="ยังไม่เปิดใช้งานการนำออก Excel"
+                        >
+                          <Download
+                            aria-hidden="true"
+                            className="text-current"
+                          />
+                          นำออก Excel
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          variant="destructive"
+                          className={`${menuItemClass} data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive`}
+                          onSelect={() => onDelete(sheet)}
+                        >
+                          <Trash2 aria-hidden="true" />
+                          ลบเอกสาร
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
               );
-            },
-          },
+            })}
 
-          {
-            key: "updated_at",
-            label: "อัปเดตล่าสุด",
-            render: (sheet) => (
-              <span className="whitespace-nowrap">
-                {formatLabDateTime(sheet.updated_at)}
+            {!paginated.items.length && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="py-12 text-center text-sm text-muted-foreground"
+                >
+                  {filterError
+                    ? "กรุณาตรวจสอบช่วงวันที่"
+                    : records.length
+                      ? "ไม่พบข้อมูลตามตัวกรอง"
+                      : "ยังไม่มีข้อมูลในประวัติ"}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Pagination */}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p role="status">
+            ทั้งหมด{" "}
+            <strong>{filteredRecords.length}</strong>{" "}
+            รายการ
+
+            {activeFilter && (
+              <span className="ml-1 text-muted-foreground">
+                (จาก {records.length})
               </span>
-            ),
-          },
+            )}
+          </p>
 
-          {
-            key: "actions",
-            label: "จัดการ",
-            render: (sheet) => (
-              <RowActionMenu appearance="itech">
-                {/* View */}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={paginated.page <= 1}
+              onClick={() =>
+                setPage(paginated.page - 1)
+              }
+            >
+              ก่อนหน้า
+            </Button>
 
-                <RowActionItem type="button" onClick={() => onView(sheet)}>
-                  <FileText
-                    className="size-4"
-                    aria-hidden="true"
-                  />
-                  ดูรายงาน
-                </RowActionItem>
+            <span className="whitespace-nowrap">
+              หน้า {paginated.page} / {pages}
+            </span>
 
-                {/* Print */}
-
-                <RowActionItem type="button" onClick={() => onPrint(sheet)}>
-                  <Printer
-                    className="size-4"
-                    aria-hidden="true"
-                  />
-                  พิมพ์เอกสาร
-                </RowActionItem>
-
-                {/* Edit */}
-
-                <RowActionItem type="button" onClick={() => onEdit(sheet)}>
-                  <Pencil
-                    className="size-4"
-                    aria-hidden="true"
-                  />
-                  แก้ไข
-                </RowActionItem>
-
-                <RowActionItem disabled title="ยังไม่เปิดใช้งานการนำออก Excel">
-                  <Download className="size-4" aria-hidden="true" />
-                  นำออก Excel
-                </RowActionItem>
-
-                {/* Delete */}
-
-                <RowActionItem type="button" onClick={() => onDelete(sheet)} className="w-full justify-start text-destructive">
-                  <Trash2
-                    className="size-4"
-                    aria-hidden="true"
-                  />
-                  ลบเอกสาร
-                </RowActionItem>
-              </RowActionMenu>
-            ),
-          },
-        ]}
-        pagination={
-          <Pagination
-            page={paginated.page}
-            pageSize={pageSize}
-            total={filteredRecords.length}
-            onChange={setPage}
-          />
-        }
-        />
-      </SectionCard>
-    </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={paginated.page >= pages}
+              onClick={() =>
+                setPage(paginated.page + 1)
+              }
+            >
+              ถัดไป
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

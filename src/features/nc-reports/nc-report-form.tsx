@@ -1,3 +1,4 @@
+
 "use client";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -94,7 +95,10 @@ export function NCReportForm({
     };
     if (key === "doc_date" || key === "production_date") {
       return (
-        <div key={key} className="min-w-0 [&_button]:h-10 [&_button]:rounded-lg [&_button]:shadow-none">
+        <div
+          key={key}
+          className="min-w-0 [&_label]:leading-relaxed [&_button]:h-10 [&_button]:rounded-lg [&_button]:shadow-none"
+        >
           <ThaiBuddhistDatePicker
             label={`${label} *`}
             value={report[key]}

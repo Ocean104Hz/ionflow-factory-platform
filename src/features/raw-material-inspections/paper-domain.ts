@@ -94,6 +94,6 @@ export function paperStatus(lines: PaperLine[]): string {
   return results.includes("fail") ? "ไม่ผ่าน" : results.includes("acceptable") ? "ยอมรับได้" : "ผ่าน";
 }
 export function validatePaperIdentity(id: unknown, version: unknown): { id: string; version: string } {
-  if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || typeof version !== "string" || !/^[1-9]\d{0,18}$/.test(version) || BigInt(version) >= 9223372036854775807n) throw new PaperValidationError("รหัสหรือ Version เอกสารไม่ถูกต้อง");
+  if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || typeof version !== "string" || !/^[1-9]\d{0,18}$/.test(version) || BigInt(version) >= BigInt("9223372036854775807")) throw new PaperValidationError("รหัสหรือ Version เอกสารไม่ถูกต้อง");
   return {id,version};
 }
