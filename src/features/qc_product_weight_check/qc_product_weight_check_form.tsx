@@ -1,6 +1,7 @@
 // NAN_QC_WEIGHT_ITECH_V1
 "use client";
 
+import { Fragment } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
@@ -30,7 +31,10 @@ import {
 import { SectionCard } from "@/src/components/factory/patterns";
 
 import {
-  blankQcWeightRow,
+  blankQcWeightPair,
+  appendQcWeightRound,
+  qcWeightTimeSpan,
+  updateQcWeightRoundTime,
   QC_WEIGHT_GROUP_KEYS,
   QC_WEIGHT_HEADER_LABELS,
   QC_WEIGHT_READING_INDEXES,
@@ -135,10 +139,11 @@ export function QcProductWeightCheckForm({
   function addRow() {
     onChange({
       ...document,
-      rows: [
-        ...document.rows,
-        blankQcWeightRow(crypto.randomUUID()),
-      ],
+      rows: appendQcWeightRound(
+        document.rows,
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ),
     });
   }
 
@@ -154,11 +159,7 @@ export function QcProductWeightCheckForm({
       rows:
         remaining.length > 0
           ? remaining
-          : [
-            blankQcWeightRow(
-              crypto.randomUUID(),
-            ),
-          ],
+          : blankQcWeightPair(crypto.randomUUID()),
     });
   }
 
@@ -419,7 +420,7 @@ export function QcProductWeightCheckForm({
                         colSpan={4}
                         className={headerClass}
                       >
-                        <div className="mx-auto flex min-h-20 w-full items-center justify-center rounded-md bg-surface p-2 text-foreground">
+                        <div className="mx-auto flex min-h-20 w-full items-center justify-center bg-transparent p-2 text-white **:data-[slot=select-trigger]:bg-white **:data-[slot=select-trigger]:text-slate-900 **:[[role=alert]]:text-red-200">
                           {group === "group_1" ? (
                             <span className="text-sm font-semibold">ตั้งค่าเครื่อง</span>
                           ) : (
@@ -496,10 +497,10 @@ export function QcProductWeightCheckForm({
               <TableBody>
                 {document.rows.map(
                   (row, rowIndex) => {
+                    const timeSpan = qcWeightTimeSpan(document.rows, rowIndex);
                     const timeError =
-                      errors[
-                      `rows.${rowIndex}.time`
-                      ];
+                      errors[`rows.${rowIndex}.time`] ||
+                      (timeSpan === 2 ? errors[`rows.${rowIndex + 1}.time`] : undefined);
 
                     const averageError =
                       errors[
@@ -512,24 +513,38 @@ export function QcProductWeightCheckForm({
                       ];
 
                     return (
-                      <TableRow key={row.id}>
-                        {/* Time */}
-
-                        <TableCell
-                          className={cellClass}
-                        >
-                          <ThaiTime15Picker
-                            label={`เวลารอบตรวจที่ ${rowIndex + 1}`}
-                            value={row.time}
-                            onChange={(value) =>
-                              updateRow(row.id, {
-                                time: value,
-                              })
-                            }
-                            error={timeError}
-                            allowEmpty
-                          />
-                        </TableCell>
+                      <Fragment key={row.id}>
+                        {rowIndex > 0 && rowIndex % 2 === 0 && (
+                          <>
+                            <TableRow aria-hidden="true">
+                              <TableCell colSpan={20} className="h-8 border border-border bg-surface p-0" />
+                            </TableRow>
+                            <TableRow aria-hidden="true">
+                              <TableCell colSpan={5} className="border border-border bg-surface p-0" />
+                              {QC_WEIGHT_GROUP_KEYS.slice(1).flatMap((group) =>
+                                QC_WEIGHT_READING_INDEXES.map((index) => (
+                                  <TableHead key={`${group}-repeat-${index}`} className={headerClass}>
+                                    {index + 1}
+                                  </TableHead>
+                                )),
+                              )}
+                              <TableCell colSpan={3} className="border border-border bg-surface p-0" />
+                            </TableRow>
+                          </>
+                        )}
+                      <TableRow>
+                        {/* One shared time for a compatible pair; legacy distinct times stay separate. */}
+                        {timeSpan !== 0 && (
+                          <TableCell rowSpan={timeSpan} className="border border-border p-2 align-middle whitespace-normal">
+                            <ThaiTime15Picker
+                              label={timeSpan === 2 ? `เวลารอบตรวจที่ ${rowIndex + 1}–${rowIndex + 2}` : `เวลารอบตรวจที่ ${rowIndex + 1}`}
+                              value={row.time}
+                              onChange={(value) => onChange(updateQcWeightRoundTime(document, rowIndex, value))}
+                              error={timeError}
+                              allowEmpty
+                            />
+                          </TableCell>
+                        )}
 
                         {/* Measurement Groups */}
 
@@ -677,6 +692,7 @@ export function QcProductWeightCheckForm({
                           </Button>
                         </TableCell>
                       </TableRow>
+                      </Fragment>
                     );
                   },
                 )}

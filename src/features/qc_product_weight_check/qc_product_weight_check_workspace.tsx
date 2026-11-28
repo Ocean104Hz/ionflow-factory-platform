@@ -22,7 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/src/components/ui/ta
 import { useQcDocuments } from "@/src/features/qc-documents/use-qc-documents";
 import { todayInBangkok } from "@/src/lib/date/thai-date";
 import {
-  blankQcWeightDocument,
+  blankQcWeightEntryDocument,
   validateQcWeightDocument,
   type QcProductWeightCheckDocument,
   type QcWeightErrors,
@@ -50,7 +50,7 @@ function createNewDocument(
   const today = todayInBangkok();
 
   return {
-    ...blankQcWeightDocument(rowId),
+    ...blankQcWeightEntryDocument(rowId),
     doc_no: `QC-W-${rowId}`,
     doc_date: today,
     prepared_date: today,
@@ -67,12 +67,6 @@ export function QcProductWeightCheckWorkspace() {
       createNewDocument(INITIAL_ROW_ID),
     );
 
-  const [baseline, setBaseline] = useState(() =>
-    JSON.stringify(
-      createNewDocument(INITIAL_ROW_ID),
-    ),
-  );
-
   /* ---------------- UI state ---------------- */
 
   const [tab, setTab] = useState<TabKey>("form");
@@ -81,11 +75,6 @@ export function QcProductWeightCheckWorkspace() {
     useState<QcWeightErrors>({});
 
   const [message, setMessage] = useState("");
-
-  const [pendingDocument, setPendingDocument] =
-    useState<QcProductWeightCheckDocument | null>(
-      null,
-    );
 
   const [documentToDelete, setDocumentToDelete] =
     useState<QcProductWeightCheckDocument | null>(
@@ -101,9 +90,6 @@ export function QcProductWeightCheckWorkspace() {
 
   const isEditing = Boolean(draft.id);
 
-  const hasUnsavedChanges =
-    JSON.stringify(draft) !== baseline;
-
   const activeDocument = activeView
     ? (records.find(
       (document) => document.id === activeView.id,
@@ -118,7 +104,6 @@ export function QcProductWeightCheckWorkspace() {
     const next = structuredClone(document);
 
     setDraft(next);
-    setBaseline(JSON.stringify(next));
 
     setErrors({});
     setMessage("");
@@ -128,11 +113,6 @@ export function QcProductWeightCheckWorkspace() {
   function requestOpenDocument(
     document: QcProductWeightCheckDocument,
   ) {
-    if (hasUnsavedChanges) {
-      setPendingDocument(structuredClone(document));
-      return;
-    }
-
     openDocument(document);
   }
 
@@ -165,7 +145,6 @@ export function QcProductWeightCheckWorkspace() {
       const saved = await persist(draft);
       setDraft(saved);
 
-      setBaseline(JSON.stringify(saved));
 
       setErrors({});
       setMessage(
@@ -229,12 +208,11 @@ export function QcProductWeightCheckWorkspace() {
     }
 
     if (draft.id === deletedId) {
-      const next = blankQcWeightDocument(
+      const next = blankQcWeightEntryDocument(
         crypto.randomUUID(),
       );
 
       setDraft(next);
-      setBaseline(JSON.stringify(next));
       setErrors({});
     }
 
@@ -353,49 +331,6 @@ export function QcProductWeightCheckWorkspace() {
           </TabsContent>
         </Tabs>
       </fieldset>
-
-      {/* Confirm Unsaved Changes */}
-
-      <AlertDialog
-        open={pendingDocument !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingDocument(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              ต้องการละทิ้งข้อมูลที่ยังไม่ได้บันทึก?
-            </AlertDialogTitle>
-
-            <AlertDialogDescription>
-              คุณมีข้อมูลที่แก้ไขค้างอยู่
-              หากดำเนินการต่อ
-              การเปลี่ยนแปลงที่ยังไม่ได้บันทึกจะหายไป
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              กลับไปแก้ไข
-            </AlertDialogCancel>
-
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingDocument) {
-                  openDocument(pendingDocument);
-                }
-
-                setPendingDocument(null);
-              }}
-            >
-              ยืนยันละทิ้งข้อมูล
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Confirm Delete */}
 

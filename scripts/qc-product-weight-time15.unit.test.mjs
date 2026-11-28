@@ -60,7 +60,7 @@ test("QC form uses the new picker for both range endpoints and row time", () => 
     assert.ok(form.includes("value={document.group_times[group]." + part + "}"));
     assert.ok(form.includes('updateQcWeightGroupTime(document, group, "' + part + '", value)'));
   }
-  assert.match(form, /value=\{row\.time\}[\s\S]*?updateRow\(row\.id, \{\s*time: value/);
+  assert.match(form, /value=\{row\.time\}[\s\S]*?updateQcWeightRoundTime\(document,\s*rowIndex,\s*value\)/);
   assert.match(form, /value=\{row\.average\}[\s\S]*?readOnly/);
   assert.match(form, /w-\[2290px\] min-w-\[2290px\]/);
   for (const [name, source, kind] of [["helper.ts", helperSource, ts.ScriptKind.TS], ["picker.tsx", picker, ts.ScriptKind.TSX], ["form.tsx", form, ts.ScriptKind.TSX]]) {

@@ -84,7 +84,12 @@ test("form, detail, preview and API wire the group ranges without removing exist
 
 test("group headers share a panel and the timed groups use two shared time pickers", () => {
   const form = read("form");
-  const panel = form.match(/<div\s+className="mx-auto flex min-h-20 w-full items-center justify-center rounded-md bg-surface p-2 text-foreground">([\s\S]*?)<\/TableHead>/);
+  const panel = form.match(
+    /<div\s+className="mx-auto flex min-h-20 w-full items-center justify-center bg-transparent p-2 text-white[^"]*">([\s\S]*?)<\/TableHead>/,
+  );
+
+  assert.match(panel?.[0] ?? "", /\*\*:data-\[slot=select-trigger\]:bg-white/);
+  assert.match(panel?.[0] ?? "", /\*\*:data-\[slot=select-trigger\]:text-slate-900/);
   assert.ok(panel, "one equal-size panel inside each mapped group header");
   assert.match(panel[1], /group\s*===\s*"group_1"\s*\?/);
   assert.ok(panel[1].includes("ตั้งค่าเครื่อง"));

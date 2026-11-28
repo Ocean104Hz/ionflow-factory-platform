@@ -70,19 +70,24 @@ test("shared Thai date and time components write the original fields", () => {
   assert.match(source.form, /options\?\.type === "date"/);
   assert.match(source.form, /<ThaiBuddhistDatePicker[\s\S]*?value=\{document\[field\]\}[\s\S]*?onChange=\{\s*\(value\)\s*=>\s*updateHeader\(\s*field,\s*value\s*,?\s*\)\s*\}/);
   assert.equal([...source.form.matchAll(/type: "date"/g)].length, 3);
-  assert.match(source.form, /<ThaiTime15Picker[\s\S]*?value=\{row\.time\}[\s\S]*?onChange=\{\s*\(value\)\s*=>\s*updateRow\(\s*row\.id,\s*\{\s*time:\s*value\s*,?\s*\}\s*,?\s*\)\s*\}/);
+  assert.match(source.form, /<ThaiTime15Picker[\s\S]*?value=\{row\.time\}[\s\S]*?onChange=\{\s*\(value\)\s*=>\s*onChange\(updateQcWeightRoundTime\(document,\s*rowIndex,\s*value\)\)\s*\}/);
   assert.doesNotMatch(source.form, /type="time"/);
+
   assert.match(source.history, /value=\{draftFilters\.from\}/);
   assert.match(source.history, /value=\{draftFilters\.to\}/);
   assert.match(source.history, /from: value/);
   assert.match(source.history, /to: value/);
+
   const doc = domain.blankQcWeightDocument("row-1");
   doc.doc_no = "QC-W-TEST";
   doc.product_name = "Test product";
+
   doc.rows[0].time = "23:59";
   assert.deepEqual(domain.validateQcWeightDocument(doc), {});
+
   doc.rows[0].time = "24:00";
   assert.ok(domain.validateQcWeightDocument(doc)["rows.0.time"]);
+
   doc.rows[0].time = "";
   assert.deepEqual(domain.validateQcWeightDocument(doc), {});
 });
@@ -93,19 +98,56 @@ test("opt-in theme, form-first tabs and live document actions are preserved", ()
   assert.match(source.workspace, /useState<TabKey>\("form"\)/);
   assert.match(source.workspace, /<TabsContent value="form"/);
   assert.match(source.workspace, /<TabsContent value="history"/);
+
   assert.match(source.workspace, /useQcDocuments<QcProductWeightCheckDocument>\("qc_product_weight_check"\)/);
   assert.match(source.workspace, /validateQcWeightDocument\(draft, records\)/);
   assert.match(source.workspace, /await persist\(draft\)/);
   assert.match(source.workspace, /await remove\(deletedId\)/);
-  assert.match(source.workspace, /hasUnsavedChanges/);
+
   assert.match(source.form, /factory-itech-form-table/);
   assert.match(source.history, /<RowActionMenu appearance="itech">/);
-  for (const action of ["View", "Print", "Edit", "Delete"]) assert.ok(source.history.includes("on" + action + "(document)"));
+
+  for (const action of ["View", "Print", "Edit", "Delete"]) {
+    assert.ok(source.history.includes("on" + action + "(document)"));
+  }
+
   assert.match(source.history, /filterQcWeightDocuments\(/);
   assert.match(source.history, /paginateQcWeightDocuments\(/);
   assert.match(source.history, /<Pagination/);
   assert.match(source.detail, /factory-itech-theme/);
   assert.match(source.detail, /<QcProductWeightCheckPaper document=\{document\}/);
+});
+
+test("documents open directly without unsaved changes confirmation while delete confirmation is preserved", () => {
+  assert.doesNotMatch(
+    source.workspace,
+    /hasUnsavedChanges|pendingDocument|setBaseline/,
+  );
+
+  assert.match(
+    source.workspace,
+    /function requestOpenDocument\([\s\S]*?\)\s*\{\s*openDocument\(document\);\s*\}/,
+  );
+
+  assert.doesNotMatch(
+    source.workspace,
+    /ต้องการละทิ้งข้อมูลที่ยังไม่ได้บันทึก/,
+  );
+
+  assert.match(
+    source.workspace,
+    /open=\{documentToDelete !== null\}/,
+  );
+
+  assert.match(
+    source.workspace,
+    /onClick=\{handleDeleteConfirm\}/,
+  );
+
+  assert.match(
+    source.workspace,
+    /ต้องการลบเอกสารนี้หรือไม่/,
+  );
 });
 
 test("weight table keeps compact measurement columns within its own horizontal scroll area", () => {

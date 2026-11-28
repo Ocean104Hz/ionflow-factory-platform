@@ -262,6 +262,57 @@ export function blankQcWeightDocument(
   };
 }
 
+// A new form displays two readings, but the API template must retain one row.
+export function blankQcWeightPair(rowId: string): QcProductWeightCheckRow[] {
+  return [blankQcWeightRow(rowId), blankQcWeightRow(`${rowId}-second`)];
+}
+
+export function blankQcWeightEntryDocument(rowId: string): QcProductWeightCheckDocument {
+  return { ...blankQcWeightDocument(rowId), rows: blankQcWeightPair(rowId) };
+}
+
+// Positional pairs. Do not hide or overwrite different times in older documents.
+export function qcWeightTimeSpan(
+  rows: readonly QcProductWeightCheckRow[],
+  index: number,
+): 0 | 1 | 2 {
+  if (!Number.isInteger(index) || index < 0 || index >= rows.length) return 0;
+  const firstIndex = index - (index % 2);
+  const first = rows[firstIndex];
+  const second = rows[firstIndex + 1];
+  if (!second || first.time !== second.time) return 1;
+  return index === firstIndex ? 2 : 0;
+}
+
+export function updateQcWeightRoundTime(
+  document: QcProductWeightCheckDocument,
+  index: number,
+  value: string,
+): QcProductWeightCheckDocument {
+  if (!Number.isInteger(index) || index < 0 || index >= document.rows.length) return document;
+  const span = qcWeightTimeSpan(document.rows, index);
+  const first = span === 0 ? index - 1 : index;
+  const count = span === 1 ? 1 : 2;
+  return {
+    ...document,
+    rows: document.rows.map((row, rowIndex) =>
+      rowIndex >= first && rowIndex < first + count ? { ...row, time: value } : row,
+    ),
+  };
+}
+
+export function appendQcWeightRound(
+  rows: readonly QcProductWeightCheckRow[],
+  firstId: string,
+  secondId: string,
+): QcProductWeightCheckRow[] {
+  // An incomplete last pair can be completed without changing existing data.
+  if (rows.length % 2 === 1) {
+    return [...rows, { ...blankQcWeightRow(firstId), time: rows[rows.length - 1].time }];
+  }
+  return [...rows, blankQcWeightRow(firstId), blankQcWeightRow(secondId)];
+}
+
 /* ---------------- update readings ---------------- */
 
 export function calculateQcWeightAverage(
